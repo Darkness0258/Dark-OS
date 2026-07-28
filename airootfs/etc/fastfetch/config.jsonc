@@ -1,0 +1,27 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "modules": [
+    "title",
+    "separator",
+    {
+      "type": "os",
+      "format": "Dark OS 1.3.0"
+    },
+    {
+      "type": "kernel",
+      "format": "6.9.0-dark"
+    },
+    "uptime",
+    "shell",
+    {
+      "type": "wm",
+      "format": "Dark Compositor (Hyprland)"
+    },
+    "theme",
+    "icons",
+    "terminal",
+    "cpu",
+    "gpu",
+    "memory"
+  ]
+}

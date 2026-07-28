@@ -1,0 +1,40 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 38,
+    "modules-left": ["custom/logo", "hyprland/workspaces"],
+    "modules-center": ["clock"],
+    "modules-right": ["cpu", "memory", "network", "pulseaudio", "battery", "custom/power"],
+
+    "custom/logo": {
+        "format": "❖ DARK OS ",
+        "tooltip": false
+    },
+    "clock": {
+        "format": "{:%a, %b %d  %I:%M %p}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+    "cpu": {
+        "format": "CPU {usage}%",
+        "tooltip": true
+    },
+    "memory": {
+        "format": "RAM {percentage}%"
+    },
+    "network": {
+        "format-wifi": "WiFi {signalStrength}%",
+        "format-ethernet": "Ethernet",
+        "format-disconnected": "Offline"
+    },
+    "pulseaudio": {
+        "format": "Vol {volume}%",
+        "format-muted": "Muted"
+    },
+    "battery": {
+        "format": "Bat {capacity}%"
+    },
+    "custom/power": {
+        "format": "⏻",
+        "tooltip": false
+    }
+}

@@ -1,0 +1,42 @@
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "JetBrainsMono Nerd Font", Roboto, sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba(10, 14, 23, 0.75);
+    border-bottom: 1px solid rgba(0, 162, 255, 0.25);
+    color: #e2e8f0;
+}
+
+#custom-logo {
+    color: #00a2ff;
+    font-weight: 900;
+    padding: 0 14px;
+    font-size: 14px;
+    text-shadow: 0 0 10px rgba(0, 162, 255, 0.6);
+}
+
+#clock {
+    color: #ffffff;
+    font-weight: bold;
+    padding: 0 16px;
+}
+
+#cpu, #memory, #network, #pulseaudio, #battery {
+    padding: 2px 10px;
+    margin: 4px 3px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+}
+
+#custom-power {
+    color: #ef4444;
+    padding: 0 14px;
+}

@@ -1,0 +1,44 @@
+name: Build ISO
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container:
+      image: archlinux
+      options: --privileged
+    steps:
+      - name: Ensure git is available for checkout
+        run: pacman -Sy --noconfirm git
+      - name: Check out profile
+        uses: actions/checkout@v4
+      - name: Install archiso
+        run: pacman -Syu --noconfirm archiso curl sudo
+      - name: Seed BlackArch mirrorlist and keyring
+        run: |
+          mkdir -p /etc/pacman.d
+          printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
+          curl -fsSLO https://blackarch.org/strap.sh
+          chmod +x strap.sh
+          ./strap.sh
+      - name: Seed Archiso releng boot profile
+        run: |
+          cp -rn /usr/share/archiso/configs/releng/airootfs/. airootfs/
+          cp -r /usr/share/archiso/configs/releng/efiboot .
+      - name: Build DarkOS ISO
+        run: bash build-iso.sh
+      - name: Split ISO for release
+        run: |
+          cd out
+          split -b 1900M darkos-*.iso darkos-iso-part-
+      - name: Publish ISO Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: DarkOS Build #${{ github.run_number }}
+          files: out/darkos-iso-part-*
