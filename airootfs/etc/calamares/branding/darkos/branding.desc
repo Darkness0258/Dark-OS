@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# DarkOS branding for Calamares installer.
+
+componentName: darkos
+name: DarkOS
+version: "1.3.0"
+shortProductName: DarkOS
+shortVersion: "1.3"
+versionedName: DarkOS 1.3.0
+bootloaderEntryName: DarkOS
+productUrl: https://darkos.io
+supportUrl: https://darkos.io/support
+knownIssuesUrl: https://darkos.io/issues
+releaseNotesUrl: https://darkos.io/releases
+
+strings:
+  productName: DarkOS
+  shortProductName: DarkOS
+  version: 1.3.0
+  shortVersion: 1.3
+  versionedName: DarkOS 1.3.0
+  bootloaderEntryName: DarkOS
+  productUrl: https://darkos.io
+  supportUrl: https://darkos.io/support
+  knownIssuesUrl: https://darkos.io/issues
+
+images:
+  productLogo: ""
+  productIcon: ""
+  productWelcome: ""
+  productWallpaper: ""
+  productLogoDark: ""
+  productIconDark: ""
+
+slideshow: "qml"
+style:
+  sidebarBackground: "#0d0f12"
+  sidebarText: "#f2f5f7"
+  sidebarTextSelect: "#00e5ff"
+  headerBackground: "#16181c"
+  headerText: "#f2f5f7"
+  bodyBackground: "#000000"
+  bodyText: "#f2f5f7"
+  linkColor: "#00e5ff"
+  cellBackground: "#16181c"
+  cellText: "#f2f5f7"
+  hoverBackground: "rgba(255,255,255,0.06)"
+  hoverText: "#f2f5f7"

@@ -34,7 +34,9 @@ The ISO is built using `archiso` (Arch Linux's official ISO creation toolchain).
 │   │   ├── systemd/system/getty@tty1.service.d/autologin.conf  # Auto-login on TTY1
 │   │   ├── sudoers.d/darkos
 │   │   ├── passwd, group, shadow
+│   │   ├── calamares/settings.conf  # Installer module sequence & branding
 │   │   └── pacman.d/                # Mirrorlists (seeded by CI)
+│   ├── usr/share/calamares/branding/darkos/  # Calamares slideshow + product strings
 │   └── home/darkos/.bash_profile    # Auto-starts Hyprland on TTY1
 ├── packages.x86_64              # Arch packages to install in the ISO (one per line)
 ├── pacman.conf                  # Repo config: core, extra, multilib, chaotic-aur, blackarch
@@ -121,6 +123,9 @@ See `architecture.md` for full detail. Essential points:
 
 ## Cautions
 
+- **Hyprland 0.55+ Lua migration threat:** Hyprland 0.55 (May 2026) introduced a Lua-based `hyprland.lua` config format. The old `hyprland.conf` key-value format still loads but upstream said support lasts "1-2 releases" then gets dropped. The CI pulls `hyprland` from Arch's rolling `extra` repo with no version pin — a future CI run could install a version that no longer supports the old config. **Pin the Hyprland version or migrate to `hyprland.lua` before the old format breaks.** If CI starts failing with "config option does not exist" errors, check whether Hyprland was updated past the deprecation window.
 - Boot mode support is currently **UEFI/systemd-boot only** — BIOS and GRUB are explicitly deferred to the backlog
 - The CI container is `archlinux:latest` (rolling release) — upstream archiso API changes can break the build. If `mkarchiso` fails after a fresh CI run, check upstream for renamed bootmode identifiers or changed profile conventions
 - `airootfs/` files inherited from the releng profile (copied fresh each CI run) are NOT in the repo — if you need a config that the releng profile provides, verify it exists in the CI copy rather than assuming it's committed
+- `pacman.conf` uses `SigLevel = Optional TrustAll` for Chaotic-AUR and BlackArch repos only — core/extra/multilib use `Required DatabaseOptional`. This was done to work around incomplete keyring seeding in CI and is acceptable for a live ISO, but should be tightened before any production or persistent install use
+- Calamares configs in `/etc/calamares/` are a minimal skeleton — the module sequence, partitioning, and branding need refinement before Calamares can actually complete an install. The `unpackfs.conf` source path assumes the standard archiso squashfs layout

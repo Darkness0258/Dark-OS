@@ -1,0 +1,34 @@
+---
+# DarkOS branding for Calamares
+# This file is a minimal skeleton — expand as the visual identity solidifies
+
+componentName: darkos
+version: 1.0.0
+name: DarkOS
+description: >-
+  DarkOS — an original, AI-first Linux OS (Arch + BlackArch + Hyprland)
+  with a cinematic glassmorphism/HUD shell and a voice-controlled assistant.
+  Tagline: "Control Everything."
+
+# Slideshow QML file (shown during installation)
+slideshow: show.qml
+
+# Slideshow aspect ratio (16:9 recommended)
+slideshowAspectRatio: 16/9
+
+# Strings for the welcome/finished pages
+strings:
+    productName: DarkOS
+    shortProductName: DarkOS
+    version: 1.0
+    shortVersion: "1.0"
+    versionedName: DarkOS 1.0
+    shortVersionedName: DarkOS 1.0
+    bootloaderEntryName: DarkOS
+    productUrl: https://darkos.dev
+    supportUrl: https://darkos.dev/support
+    knownIssuesUrl: https://darkos.dev/issues
+    releaseNotesUrl: https://darkos.dev/releases
+    donateUrl: https://darkos.dev/donate
+    yourCountry: "Default country selection for the system."
+    yourLanguage: "Default language selection for the system."
