@@ -42,6 +42,12 @@ jobs:
         run: |
           cd out
           split -b 1900M darkos-*.iso darkos-iso-part-
+      - name: Upload ISO Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: darkos-iso-parts
+          path: out/darkos-iso-part-*
+          retention-days: 1
       - name: Publish ISO Release
         uses: softprops/action-gh-release@v2
         with:
