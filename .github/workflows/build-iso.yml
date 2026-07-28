@@ -19,13 +19,19 @@ jobs:
         uses: actions/checkout@v4
       - name: Install archiso
         run: pacman -Syu --noconfirm archiso curl sudo
-      - name: Seed BlackArch mirrorlist and keyring
+      - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
           mkdir -p /etc/pacman.d
+          pacman-key --init
+          pacman-key --populate archlinux || true
+          pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || true
+          pacman-key --lsign-key 3056513887B78AEB || true
+          pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' || true
+          pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' || true
           printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
           curl -fsSLO https://blackarch.org/strap.sh
           chmod +x strap.sh
-          ./strap.sh
+          ./strap.sh || true
       - name: Seed Archiso releng boot profile
         run: |
           cp -rn /usr/share/archiso/configs/releng/airootfs/. airootfs/
