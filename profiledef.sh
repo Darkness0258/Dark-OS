@@ -15,6 +15,7 @@ declare -A file_permissions=(
   ["/etc/shadow"]="0:0:600"
   ["/etc/sudoers.d/darkos"]="0:0:440"
   ["/home/darkos"]="1000:1000:750"
+  ["/home/darkos/.bash_profile"]="1000:1000:644"
   ["/root/build-iso.sh"]="0:0:755"
   ["/usr/local/bin/darkos-tool-groups"]="0:0:755"
 )
