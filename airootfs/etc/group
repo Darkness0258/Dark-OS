@@ -1,0 +1,12 @@
+root:x:0:darkos
+tty:x:5:darkos
+nobody:x:65534:
+nopasswdlogin:x:497:darkos
+users:x:984:
+wheel:x:981:darkos
+audio:x:980:darkos
+video:x:979:darkos
+storage:x:978:darkos
+power:x:977:darkos
+network:x:976:darkos
+seat:x:970:darkos
