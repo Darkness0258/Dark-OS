@@ -87,7 +87,9 @@ See `architecture.md` for full detail. Essential points:
 - CI builds ISO and publishes to GitHub Releases
 
 **Known issues:**
-- Calamares has a module config skeleton and branding, but the install flow hasn't been tested end-to-end yet — may fail on partition layout, unpackfs source paths, or user setup
+- Calamares install flow completed successfully in VM testing (partition, unpackfs, user/root password, bootloader). The live session's passwordless darkos user is replaced by whatever the user sets during install — confirmed working.
+- Real-hardware boot test still pending
+- `darkos-tool-groups` picker script not yet written
 
 ## Design System Reference
 

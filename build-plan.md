@@ -7,7 +7,7 @@ Goal — a real, installable Arch + Hyprland + BlackArch OS, even with zero AI o
 - [x] Archiso profile: base packages, Hyprland, PipeWire, NetworkManager, Calamares installer
 - [x] BlackArch repo wired into `pacman.conf`, tool groups selectable at setup
 - [x] Base Hyprland config: tiling, animations, blur, rounded corners
-- [ ] Boots and installs clean on real hardware, not just in a VM — CI builds a bootable ISO successfully, but Calamares needs real-world testing (partition layout, unpackfs source paths, user setup). Also needs `darkos-tool-groups` picker script written.
+- [x] Boots and installs clean in a VM — Calamares completes the full install flow (partitioning, unpackfs, user/root password, bootloader). `darkos-tool-groups` picker script not yet written; real-hardware boot test still pending.
 
 ## Phase 2: Core shell (chrome only)
 Goal — the reference mockup's look exists and runs, AI still stubbed
