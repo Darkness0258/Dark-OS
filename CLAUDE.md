@@ -87,7 +87,7 @@ See `architecture.md` for full detail. Essential points:
 - CI builds ISO and publishes to GitHub Releases
 
 **Known issues:**
-- Calamares install flow completed successfully in VM testing (partition, unpackfs, user/root password, bootloader). The live session's passwordless darkos user is replaced by whatever the user sets during install — confirmed working.
+- Calamares completed a full install in a VM (partitioning → unpackfs → user/root password → bootloader) without fatal errors. However, nobody has rebooted into the installed system yet — it's not yet confirmed that the resulting OS boots, that the passwordless live-session setup is actually replaced, or that the real bootloader entry works.
 - Real-hardware boot test still pending
 - `darkos-tool-groups` picker script not yet written
 
