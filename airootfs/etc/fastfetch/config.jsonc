@@ -5,12 +5,9 @@
     "separator",
     {
       "type": "os",
-      "format": "Dark OS 1.3.0"
+      "format": "Dark OS (Arch Linux)"
     },
-    {
-      "type": "kernel",
-      "format": "6.9.0-dark"
-    },
+    "kernel",
     "uptime",
     "shell",
     {

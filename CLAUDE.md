@@ -33,10 +33,11 @@ The ISO is built using `archiso` (Arch Linux's official ISO creation toolchain).
 │   │   ├── fastfetch/config.jsonc   # Neofetch replacement config
 │   │   ├── systemd/system/getty@tty1.service.d/autologin.conf  # Auto-login on TTY1
 │   │   ├── sudoers.d/darkos
-│   │   ├── passwd, group, shadow
-│   │   ├── calamares/settings.conf  # Installer module sequence & branding
-│   │   └── pacman.d/                # Mirrorlists (seeded by CI)
-│   ├── usr/share/calamares/branding/darkos/  # Calamares slideshow + product strings
+│   │   ├── calamares/                   # Installer module sequence & branding
+│   │   └── pacman.d/                    # Mirrorlists (seeded by CI)
+│   ├── usr/
+│   │   ├── lib/sysusers.d/darkos.conf   # darkos user definition (live session)
+│   │   └── share/calamares/branding/darkos/  # Calamares slideshow + product strings
 │   └── home/darkos/.bash_profile    # Auto-starts Hyprland on TTY1
 ├── packages.x86_64              # Arch packages to install in the ISO (one per line)
 ├── pacman.conf                  # Repo config: core, extra, multilib, chaotic-aur, blackarch
@@ -87,7 +88,8 @@ See `architecture.md` for full detail. Essential points:
 - CI builds ISO and publishes to GitHub Releases
 
 **Known issues:**
-- Calamares is currently in `packages.x86_64` but the install flow hasn't been tested end-to-end yet
+- Calamares has a module config skeleton and branding, but the install flow hasn't been tested end-to-end yet — may fail on partition layout, unpackfs source paths, or user setup
+- The live session creates the `darkos` user via `sysusers.d` — `passwd`/`group`/`shadow` are no longer committed files (releng profile + package installs provide those). If a build fails with missing user/group errors, check that systemd-sysusers ran at boot
 
 ## Design System Reference
 
