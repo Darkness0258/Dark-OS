@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=The Void
+Comment=DarkOS default terminal (kitty)
+Exec=env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe kitty
+Icon=kitty
+Categories=System;TerminalEmulator;
+StartupNotify=true
+Terminal=false
