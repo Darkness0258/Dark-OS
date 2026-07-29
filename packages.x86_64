@@ -42,3 +42,4 @@ dosfstools
 ntfs-3g
 efibootmgr
 os-prober
+rsync
