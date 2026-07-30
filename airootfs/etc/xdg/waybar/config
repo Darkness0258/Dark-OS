@@ -31,7 +31,9 @@
         "format-muted": "Muted"
     },
     "battery": {
-        "format": "Bat {capacity}%"
+        "format": "{icon} {capacity}%",
+        "format-icons": ["", "", "", "", ""],
+        "format-charging": " {capacity}%"
     },
     "custom/power": {
         "format": "⏻",
