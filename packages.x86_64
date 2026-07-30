@@ -42,4 +42,4 @@ dosfstools
 ntfs-3g
 efibootmgr
 rsync
-grub
+ls
