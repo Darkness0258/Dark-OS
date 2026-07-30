@@ -50,7 +50,15 @@ Output is written to `out/darkos-*.iso`.
 qemu-system-x86_64 -cdrom out/darkos-*.iso -m 4096 -enable-kvm
 ```
 
-UEFI boot only (systemd-boot). BIOS/GRUB support is backlogged.
+UEFI boot only — the live ISO boots via systemd-boot. The installed system uses GRUB (installed by Calamares during the install process).
+
+### Launch the Installer
+
+On a booted live system, open a terminal (Super+Q) and run:
+
+```bash
+sudo QT_QPA_PLATFORM=wayland XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=$WAYLAND_DISPLAY QT_QUICK_BACKEND=software calamares
+```
 
 ## Project Structure
 
@@ -61,8 +69,13 @@ UEFI boot only (systemd-boot). BIOS/GRUB support is backlogged.
 │   │   ├── xdg/waybar/              # Waybar config + CSS
 │   │   ├── calamares/               # Installer module configs
 │   │   ├── fastfetch/config.jsonc   # System info display
-│   │   ├── systemd/system/          # Boot services
-│   │   └── sudoers.d/darkos         # Passwordless sudo (live session)
+│   │   ├── passwd, group, shadow    # Live session user (darkos, passwordless)
+│   │   ├── sudoers.d/darkos         # Passwordless sudo (live session)
+│   │   └── systemd/system/          # Boot services (autologin, seatd)
+│   ├── usr/
+│   │   ├── share/
+│   │   │   ├── applications/the-void.desktop  # Branded terminal launcher
+│   │   │   └── calamares/branding/darkos/     # Installer slideshow + icon
 │   └── home/darkos/.bash_profile    # Auto-starts Hyprland on TTY1
 ├── packages.x86_64              # Packages installed in the ISO
 ├── pacman.conf                  # Repository configuration
@@ -118,7 +131,7 @@ Full details in [build-plan.md](build-plan.md).
 ## Status
 
 - **Phase 1 is building** — CI produces bootable ISOs published as GitHub Releases
-- **Calamares installer** is packaged and has a base config, but the install flow still needs real-world testing
+- **Calamares installer** wizard completes successfully in VM testing (partitioning, unpackfs, user/root password, bootloader). The bootloader setup needs further work — the installed system hasn't been verified to boot yet.
 - **Phase 2 shell** (HUD, panels, dock, lock screen) is the next milestone
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).
