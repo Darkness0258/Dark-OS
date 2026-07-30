@@ -1,0 +1,14 @@
+[Unit]
+Description=DarkOS: install GRUB bootloader and generate config
+After=local-fs.target
+Before=multi-user.target
+ConditionPathExists=!/boot/grub/grub.cfg
+RequiresMountsFor=/boot/efi
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DarkOS --removable
+ExecStart=/usr/sbin/grub-mkconfig -o /boot/grub/grub.cfg
+
+[Install]
+WantedBy=multi-user.target
