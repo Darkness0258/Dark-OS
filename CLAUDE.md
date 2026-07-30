@@ -91,6 +91,18 @@ See `architecture.md` for full detail. Essential points:
 - Real-hardware boot test still pending
 - `darkos-tool-groups` picker script not yet written
 
+## Calamares Installer Notes
+
+The Calamares config went through heavy iteration this session. Key lessons:
+
+- **settings.conf sequence must use `show:` and `exec:` phases only** — any other phase name (e.g. `branding:`, `install:`, `postcfg:`) causes `FATAL: no sequence set`
+- **bootloader module is unreliable in the Calamares chroot.** Both the built-in GRUB and systemd-boot modules have issues:
+  - GRUB: `grub-install` exits code 1 even with `efiMountDir` set properly. The ESP mount alignment between `partition.conf` (`efiMountPoint`) and `bootloader.conf` (`efiMountDir`) must match — both use `/boot/efi` in the current config.
+  - systemd-boot: the Calamares module constructs kernel paths as `<kernelSearchPath>/<version>/<kernelName>`, which matches Fedora-style layouts but not Arch's flat `/boot/vmlinuz-linux` — it can never find the kernel on Arch.
+- The `shellprocess` Calamares module may not be available — it isn't in the version packaged for Arch. Don't rely on it.
+- For Calamares module config files, key names must match exactly what the Python module expects: `source:` not `src:`, `destination:` not `dest:` — the module throws `KeyError` on abbreviated names.
+- The `password` module doesn't exist as a standalone Calamares module; the `users` module handles both username and password on one page.
+
 ## Design System Reference
 
 **Files:** `ui-tokens.md` (primitives) and `ui-rules.md` (layout/conventions).
@@ -130,3 +142,5 @@ See `architecture.md` for full detail. Essential points:
 - The CI container is `archlinux:latest` (rolling release) — upstream archiso API changes can break the build. If `mkarchiso` fails after a fresh CI run, check upstream for renamed bootmode identifiers or changed profile conventions
 - `airootfs/` files inherited from the releng profile (copied fresh each CI run) are NOT in the repo — if you need a config that the releng profile provides, verify it exists in the CI copy rather than assuming it's committed
 - `pacman.conf` uses `SigLevel = Optional TrustAll` for Chaotic-AUR and BlackArch repos only — core/extra/multilib use `Required DatabaseOptional`. This was done to work around incomplete keyring seeding in CI and is acceptable for a live ISO, but should be tightened before any production or persistent install use
+- **kitty VM crash:** kitty requires OpenGL 3.3+. VMware's virtual GPU often only exposes an older version through Mesa, causing kitty to abort immediately. The config works around this with `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe` set in the keybind and the `.desktop` entry for "The Void". This is a VM-only workaround — remove these env vars when testing on real hardware.
+- **Live session auth:** The `darkos` user is created via committed `passwd`/`group`/`shadow` files (not `sysusers.d` — that can't write to a read-only squashfs). The `sudoers.d/darkos` uses `%wheel` (not the `darkos` user directly) so that a Calamares-created installed-system user also gets passwordless sudo during install. The Calamares `users.conf` has `setRootPassword: true` so the installed system does NOT inherit the live session's blank root password.
