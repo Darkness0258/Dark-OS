@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="preview.webp" alt="DarkOS preview" width="720">
+  <img src="darkos-icon.png" alt="DarkOS" width="300">
 </p>
 
 <h1 align="center">DarkOS</h1>
