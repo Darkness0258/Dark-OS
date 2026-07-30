@@ -41,5 +41,6 @@ gptfdisk
 dosfstools
 ntfs-3g
 efibootmgr
+grub
 os-prober
 rsync
