@@ -1,4 +1,4 @@
-/* Minimal DarkOS slideshow for Calamares */
+/* DarkOS slideshow for Calamares — API 2 */
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
@@ -7,6 +7,9 @@ Item {
     id: slideContainer
     width: 800
     height: 450
+
+    function onActivate() {}
+    function onLeave() {}
 
     Rectangle {
         anchors.fill: parent

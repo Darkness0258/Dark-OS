@@ -7,6 +7,7 @@ RequiresMountsFor=/boot/efi
 
 [Service]
 Type=oneshot
+ExecStartPre=/usr/bin/mkinitcpio -P
 ExecStart=/usr/sbin/grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DarkOS --removable
 ExecStart=/usr/sbin/grub-mkconfig -o /boot/grub/grub.cfg
 

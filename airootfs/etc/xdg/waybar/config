@@ -35,6 +35,7 @@
     },
     "custom/power": {
         "format": "⏻",
-        "tooltip": false
+        "tooltip": false,
+        "on-click": "systemctl poweroff"
     }
 }
