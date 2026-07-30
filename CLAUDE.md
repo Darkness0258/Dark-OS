@@ -31,12 +31,17 @@ The ISO is built using `archiso` (Arch Linux's official ISO creation toolchain).
 │   │   │   ├── hypr/hyprland.conf   # Hyprland compositor config
 │   │   │   └── waybar/              # Waybar config + CSS (top bar)
 │   │   ├── fastfetch/config.jsonc   # Neofetch replacement config
-│   │   ├── systemd/system/getty@tty1.service.d/autologin.conf  # Auto-login on TTY1
+│   │   ├── systemd/system/
+│   │   │   ├── getty@tty1.service.d/autologin.conf  # Auto-login on TTY1
+│   │   │   └── darkos-grub-repair.service   # First-boot GRUB installer
 │   │   ├── sudoers.d/darkos
 │   │   ├── passwd, group, shadow         # Live session user (darkos auto-login, passwordless)
-│   │   ├── calamares/                   # Installer module sequence & branding
+│   │   ├── calamares/                   # Installer module configs
 │   │   └── pacman.d/                    # Mirrorlists (seeded by CI)
-│   ├── usr/share/calamares/branding/darkos/  # Calamares slideshow + product strings
+│   ├── usr/
+│   │   ├── share/
+│   │   │   ├── applications/the-void.desktop  # Branded terminal launcher
+│   │   │   └── calamares/branding/darkos/     # Installer slideshow + icon
 │   └── home/darkos/.bash_profile    # Auto-starts Hyprland on TTY1
 ├── packages.x86_64              # Arch packages to install in the ISO (one per line)
 ├── pacman.conf                  # Repo config: core, extra, multilib, chaotic-aur, blackarch
