@@ -24,6 +24,14 @@ DarkOS is a real startup product — not a demo, not a theme pack, not a Windows
 - **Calamares graphical installer**
 - **Windows compatibility** via Wine 11 / Bottles / Proton / QEMU/KVM
 
+## Desktop Preview
+
+<p align="center">
+  <img src="preview.webp" alt="DarkOS desktop preview" width="720">
+</p>
+
+*Top bar, AI Core HUD, floating glass panels, left icon rail, and dock — running on Hyprland.*
+
 ## Quick Start
 
 ### Build the ISO
