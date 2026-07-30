@@ -13,12 +13,6 @@
 
 DarkOS is a real startup product — not a demo, not a theme pack, not a Windows/macOS clone. It combines a daily-drivable Arch Linux base with a cinematic glassmorphism/HUD desktop environment and a voice assistant that can see, hear, and control the whole system.
 
-## Preview
-
-![DarkOS](preview.webp)
-
-*Top bar, AI Core HUD, floating glass panels, left icon rail, and dock — running on Hyprland.*
-
 ## Features
 
 - **Arch Linux under the hood** — rolling releases, pacman + AUR, full software ecosystem
