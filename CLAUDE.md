@@ -101,9 +101,11 @@ See `architecture.md` for full detail. Essential points:
 The Calamares config went through heavy iteration this session. Key lessons:
 
 - **settings.conf sequence must use `show:` and `exec:` phases only** — any other phase name (e.g. `branding:`, `install:`, `postcfg:`) causes `FATAL: no sequence set`
-- **bootloader module is unreliable in the Calamares chroot.** Both the built-in GRUB and systemd-boot modules have issues:
-  - GRUB: `grub-install` exits code 1 even with `efiMountDir` set properly. The ESP mount alignment between `partition.conf` (`efiMountPoint`) and `bootloader.conf` (`efiMountDir`) must match — both use `/boot/efi` in the current config.
-  - systemd-boot: the Calamares module constructs kernel paths as `<kernelSearchPath>/<version>/<kernelName>`, which matches Fedora-style layouts but not Arch's flat `/boot/vmlinuz-linux` — it can never find the kernel on Arch.
+- **The Calamares bootloader modules are unusable for this profile.** Both built-in modules (GRUB and systemd-boot) fail in the chroot:
+  - Root cause (finally confirmed): the bootloader module runs while the live system is mounted from the **read-only squashfs**. Any wrapper script the module invokes cannot be made executable there — `chmod` fails with "Operation not permitted" — so the module can never succeed, regardless of config, exec bit, or line endings.
+  - GRUB specifically: `grub-install` also tries to write an NVRAM boot entry, which fails in VMs/chroots (exit 1).
+  - systemd-boot: the module constructs kernel paths as `<kernelSearchPath>/<version>/<kernelName>`, which matches Fedora-style layouts but not Arch's flat `/boot/vmlinuz-linux`.
+  - **Resolution:** neither `grubcfg` nor `bootloader` appears in the `settings.conf` exec sequence. GRUB is installed by `darkos-grub-repair.service` on first boot of the **installed** system, where files are on a writable partition and `chmod` works. The service is enabled by `services-systemd` EARLY in the exec sequence (before anything that could fail) and re-asserts the wrapper's exec bit as `ExecStartPre`.
 - The `shellprocess` Calamares module may not be available — it isn't in the version packaged for Arch. Don't rely on it.
 - For Calamares module config files, key names must match exactly what the Python module expects: `source:` not `src:`, `destination:` not `dest:` — the module throws `KeyError` on abbreviated names.
 - The `password` module doesn't exist as a standalone Calamares module; the `users` module handles both username and password on one page.
