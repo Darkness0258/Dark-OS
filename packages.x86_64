@@ -41,6 +41,7 @@ gptfdisk
 dosfstools
 ntfs-3g
 efibootmgr
+fastfetch
 rsync
 grub
 os-prober
