@@ -7,8 +7,11 @@ RequiresMountsFor=/boot/efi
 
 [Service]
 Type=oneshot
+# The wrapper can lose its exec bit between squashfs build and install
+# (mode delivery gap). Re-assert it explicitly before anything runs.
+ExecStartPre=/bin/chmod +x /usr/local/bin/darkos-grub-install.sh
 ExecStartPre=/usr/bin/mkinitcpio -P
-ExecStart=/usr/sbin/grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DarkOS --removable
+ExecStart=/usr/local/bin/darkos-grub-install.sh --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DarkOS --force --removable
 ExecStart=/usr/sbin/grub-mkconfig -o /boot/grub/grub.cfg
 
 [Install]
