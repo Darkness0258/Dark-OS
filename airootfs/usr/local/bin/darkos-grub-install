@@ -1,0 +1,55 @@
+#!/bin/bash
+# DarkOS GRUB installer wrapper.
+#
+# Why this exists: the Calamares bootloader module runs
+#   grub-install --force
+# which tries to write a boot entry to the firmware's NVRAM. That write
+# fails in VMs and in chroots (no EFI runtime available), causing
+# grub-install to exit 1 and leaving the installed system unbootable.
+#
+# This wrapper adds --removable, which skips the NVRAM write and instead
+# installs GRUB to the firmware-fallback path (\\EFI\\BOOT\\BOOTX64.EFI).
+# That fallback is what VMware/VirtualBox firmware checks even when no
+# NVRAM boot entry exists.
+#
+# Everything is also logged to /boot/grub/install.log so a failed
+# install can be diagnosed instead of guessing.
+
+LOG=/boot/grub/install.log
+mkdir -p /boot/grub
+
+log() {
+    echo "$@" | tee -a "$LOG"
+}
+
+: > "$LOG"
+log "=== DarkOS GRUB install (wrapper) ==="
+log "Date: $(date)"
+log ""
+log "--- Mounted filesystems ---"
+mount | tee -a "$LOG"
+log ""
+log "--- /boot/efi contents ---"
+ls -la /boot/efi 2>&1 | tee -a "$LOG"
+log ""
+log "--- ESP filesystem type ---"
+findmnt -no FSTYPE /boot/efi 2>&1 | tee -a "$LOG"
+log ""
+log "--- grub-install (--removable skips NVRAM write) ---"
+
+grub-install \
+    --target=x86_64-efi \
+    --efi-directory=/boot/efi \
+    --bootloader-id=DarkOS \
+    --force \
+    --removable 2>&1 | tee -a "$LOG"
+
+STATUS=${PIPESTATUS[0]}
+log ""
+log "--- grub-install exit code: $STATUS ---"
+
+if [ "$STATUS" -ne 0 ]; then
+    log "grub-install failed. See above for the actual error."
+fi
+
+exit "$STATUS"

@@ -16,4 +16,5 @@ declare -A file_permissions=(
   ["/etc/sudoers.d/darkos"]="0:0:440"
   ["/home/darkos"]="1000:1000:750"
   ["/home/darkos/.bash_profile"]="1000:1000:644"
+  ["/usr/local/bin/darkos-grub-install"]="0:0:755"
 )
