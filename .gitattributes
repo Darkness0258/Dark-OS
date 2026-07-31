@@ -1,3 +1,2 @@
 *.sh text eol=lf
-/airootfs/usr/local/bin/darkos-grub-install text eol=lf
 
