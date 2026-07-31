@@ -1,55 +1,47 @@
 #!/bin/bash
 # DarkOS GRUB installer wrapper.
 #
-# Why this exists: the Calamares bootloader module runs
-#   grub-install --force
-# which tries to write a boot entry to the firmware's NVRAM. That write
-# fails in VMs and in chroots (no EFI runtime available), causing
-# grub-install to exit 1 and leaving the installed system unbootable.
+# Calamares' bootloader module runs `grub-install --force`, which tries
+# to write a boot entry to firmware NVRAM. In VMs and chroots there is
+# no EFI runtime, so that write fails and grub-install exits 1 — leaving
+# the installed system unbootable while Calamares reports success.
 #
 # This wrapper adds --removable, which skips the NVRAM write and instead
-# installs GRUB to the firmware-fallback path (\\EFI\\BOOT\\BOOTX64.EFI).
-# That fallback is what VMware/VirtualBox firmware checks even when no
-# NVRAM boot entry exists.
+# installs GRUB to the firmware-fallback path (\EFI\BOOT\BOOTX64.EFI).
+# VMware/VirtualBox firmware checks that path even when no NVRAM entry
+# exists. Everything is logged to /boot/grub/install.log so failures
+# are diagnosable.
 #
-# Everything is also logged to /boot/grub/install.log so a failed
-# install can be diagnosed instead of guessing.
+# NOTE: must be executable (755) — profiledef.sh sets this on the ISO.
+
+set -u
 
 LOG=/boot/grub/install.log
 mkdir -p /boot/grub
 
-log() {
-    echo "$@" | tee -a "$LOG"
-}
-
-: > "$LOG"
-log "=== DarkOS GRUB install (wrapper) ==="
-log "Date: $(date)"
-log ""
-log "--- Mounted filesystems ---"
-mount | tee -a "$LOG"
-log ""
-log "--- /boot/efi contents ---"
-ls -la /boot/efi 2>&1 | tee -a "$LOG"
-log ""
-log "--- ESP filesystem type ---"
-findmnt -no FSTYPE /boot/efi 2>&1 | tee -a "$LOG"
-log ""
-log "--- grub-install (--removable skips NVRAM write) ---"
+{
+    echo "=== DarkOS GRUB install (wrapper) ==="
+    echo "Date: $(date)"
+    echo ""
+    echo "--- Mounted filesystems ---"
+    mount 2>&1
+    echo ""
+    echo "--- /boot/efi contents ---"
+    ls -la /boot/efi 2>&1
+    echo ""
+    echo "--- grub-install (--removable skips NVRAM write) ---"
+} > "$LOG" 2>&1
 
 grub-install \
     --target=x86_64-efi \
     --efi-directory=/boot/efi \
     --bootloader-id=DarkOS \
     --force \
-    --removable 2>&1 | tee -a "$LOG"
+    --removable >> "$LOG" 2>&1
 
-STATUS=${PIPESTATUS[0]}
-log ""
-log "--- grub-install exit code: $STATUS ---"
+STATUS=$?
 
-if [ "$STATUS" -ne 0 ]; then
-    log "grub-install failed. See above for the actual error."
-fi
+echo "" >> "$LOG"
+echo "--- grub-install exit code: $STATUS ---" >> "$LOG"
 
 exit "$STATUS"
