@@ -17,4 +17,5 @@ declare -A file_permissions=(
   ["/home/darkos"]="1000:1000:750"
   ["/home/darkos/.bash_profile"]="1000:1000:644"
   ["/usr/local/bin/darkos-grub-install.sh"]="0:0:755"
+  ["/usr/local/bin/the-void.sh"]="0:0:755"
 )

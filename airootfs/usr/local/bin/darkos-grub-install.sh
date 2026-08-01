@@ -28,8 +28,20 @@ log "Date: $(date)"
 log ""
 
 # --- Ensure the ESP is mounted at /boot/efi -------------------------
+# Prefer /etc/fstab: Calamares' fstab module writes the real ESP there
+# (matching partition.conf efiMountPoint: /boot/efi), so a plain
+# `mount /boot/efi` resolves the correct device. The lsblk scan is only
+# a fallback — trusting "first vfat partition" is fragile (a Windows
+# recovery partition or leftover USB would steal the install).
 if ! mountpoint -q /boot/efi; then
-    log "ESP not mounted at /boot/efi — searching for it..."
+    if grep -qE '^[^#].* /boot/efi ' /etc/fstab; then
+        log "ESP: mounting /boot/efi per /etc/fstab"
+        mount /boot/efi >> "$LOG" 2>&1 && log "  OK" || log "  mount failed, falling back to lsblk scan"
+    fi
+fi
+
+if ! mountpoint -q /boot/efi; then
+    log "ESP not mounted — searching for vfat partition (fallback)"
     ESP=$(lsblk -nro NAME,FSTYPE | awk '$2=="vfat" {print $1; exit}')
     if [ -n "$ESP" ]; then
         log "Found ESP: /dev/$ESP — mounting"

@@ -3,6 +3,8 @@ name: Build ISO
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -36,6 +38,11 @@ jobs:
         run: |
           cp -rn /usr/share/archiso/configs/releng/airootfs/. airootfs/
           cp -r /usr/share/archiso/configs/releng/efiboot .
+      - name: Record tool versions (diagnose rolling-repo breaks)
+        run: |
+          hyprland --version 2>/dev/null || pacman -Qi hyprland 2>/dev/null | grep Version || true
+          pacman -Qi calamares 2>/dev/null | grep Version || true
+          pacman -Qi archiso 2>/dev/null | grep Version || true
       - name: Build DarkOS ISO
         run: bash build-iso.sh
       - name: Split ISO for release
