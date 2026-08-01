@@ -8,8 +8,9 @@
 #
 # This runs on first boot of the INSTALLED system (via
 # darkos-grub-repair.service), where the root filesystem is writable,
-# so chmod and mounts both work — unlike the Calamares chroot, which
-# is a read-only squashfs and can never run grub-install.
+# so chmod and mounts both work. (grub-install itself would run fine in
+# a chroot — it's a system binary — but this wrapper file can't execute
+# on the read-only squashfs, which is why it runs post-install.)
 #
 # Logs everything to /boot/grub/install.log for diagnosis.
 
