@@ -3,8 +3,8 @@
 #
 # BlackArch packages are grouped (e.g. blackarch-scanner, blackarch-webapp,
 # blackarch-cracker, ...). This script lists the available groups and
-# installs the ones the user selects. It runs at install time (see
-# darkos-tool-groups.service) or standalone as root on any running system.
+# installs the ones the user selects. Run it as root on the installed
+# system (or from the live ISO).
 #
 # Usage:
 #   darkos-tool-groups                # interactive picker
@@ -18,24 +18,38 @@ REPO="blackarch"
 
 list_groups() {
     echo "Available BlackArch tool groups:"
-    pacman -Sg "$REPO" 2>/dev/null | sed 's/^blackarch-//' | sort | column -c 100
+    pacman -Sg "$REPO" 2>/dev/null | sed 's/^blackarch-//' | sort
+}
+
+install_group() {
+    local g="$1"
+    pacman -S --needed --noconfirm "blackarch-${g}"
 }
 
 interactive_pick() {
     local groups
     groups=$(pacman -Sg "$REPO" 2>/dev/null | sed 's/^blackarch-//' | sort)
-    [ -n "$groups" ] || { echo "No BlackArch groups found — is the repo configured?"; exit 1; }
-    echo "Select BlackArch tool groups to install (comma-separated, or 'all'):"
+    if [ -z "$groups" ]; then
+        echo "No BlackArch groups found — is the repo configured?" >&2
+        exit 1
+    fi
+    echo "Select BlackArch tool groups to install (space-separated, or 'all')."
+    echo "WARNING: 'all' installs the entire BlackArch repo (~2900 packages)."
+    echo ""
     echo "$groups"
     echo ""
-    read -rp "> " -a selection
-    # shellcheck disable=SC2068
-    for item in ${selection[@]:-}; do
+    read -rp "> " -a selection || true
+    if [ "${#selection[@]}" -eq 0 ]; then
+        echo "Nothing selected — exiting." >&2
+        exit 0
+    fi
+    for item in "${selection[@]}"; do
         if [ "$item" = "all" ]; then
+            echo "Installing entire BlackArch repo — this is a very large download." >&2
             pacman -S --needed --noconfirm "$REPO"
             return 0
         fi
-        pacman -S --needed --noconfirm "blackarch-$item"
+        install_group "$item"
     done
 }
 
@@ -43,8 +57,12 @@ case "${1:-}" in
     list)  list_groups ;;
     install)
         shift
+        if [ "$#" -eq 0 ]; then
+            echo "usage: darkos-tool-groups install <group> [<group> ...]" >&2
+            exit 1
+        fi
         for g in "$@"; do
-            pacman -S --needed --noconfirm "blackarch-$g"
+            install_group "$g"
         done
         ;;
     *)     interactive_pick ;;
