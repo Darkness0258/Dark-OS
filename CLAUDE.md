@@ -95,7 +95,7 @@ See `architecture.md` for full detail. Essential points:
 **Known issues:**
 - Calamares completes the install wizard in a VM (partitioning → unpackfs → user/root password) without fatal errors. GRUB is installed on the installed system's first boot by `darkos-grub-repair.service`. However, nobody has rebooted into the installed system yet — it's not yet confirmed that the resulting OS boots, that the passwordless live-session setup is actually replaced, or that the real bootloader entry works. The decisive check is `/boot/grub/install.log` on the installed system ending clean, plus a real login appearing.
 - Real-hardware boot test still pending
-- `darkos-tool-groups` picker script not yet written
+- `darkos-tool-groups` picker exists (`/usr/local/bin/darkos-tool-groups`) but isn't yet wired into the Calamares install flow — it's run manually as root. Wiring it in needs a display-based or non-interactive selection mechanism that doesn't rely on the possibly-absent `shellprocess` Calamares module.
 
 ## Calamares Installer Notes
 

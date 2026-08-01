@@ -1,3 +1,4 @@
 *.sh text eol=lf
 /airootfs/usr/local/bin/darkos-tty1-login text eol=lf
+/airootfs/usr/local/bin/darkos-tool-groups text eol=lf
 

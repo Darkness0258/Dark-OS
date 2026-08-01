@@ -1,0 +1,51 @@
+#!/bin/bash
+# DarkOS BlackArch tool-group picker.
+#
+# BlackArch packages are grouped (e.g. blackarch-scanner, blackarch-webapp,
+# blackarch-cracker, ...). This script lists the available groups and
+# installs the ones the user selects. It runs at install time (see
+# darkos-tool-groups.service) or standalone as root on any running system.
+#
+# Usage:
+#   darkos-tool-groups                # interactive picker
+#   darkos-tool-groups list           # list all groups
+#   darkos-tool-groups install <grp> [<grp> ...]   # install specific groups
+
+set -eu
+
+# BlackArch group prefix — groups live as blackarch-<name> in the repo.
+REPO="blackarch"
+
+list_groups() {
+    echo "Available BlackArch tool groups:"
+    pacman -Sg "$REPO" 2>/dev/null | sed 's/^blackarch-//' | sort | column -c 100
+}
+
+interactive_pick() {
+    local groups
+    groups=$(pacman -Sg "$REPO" 2>/dev/null | sed 's/^blackarch-//' | sort)
+    [ -n "$groups" ] || { echo "No BlackArch groups found — is the repo configured?"; exit 1; }
+    echo "Select BlackArch tool groups to install (comma-separated, or 'all'):"
+    echo "$groups"
+    echo ""
+    read -rp "> " -a selection
+    # shellcheck disable=SC2068
+    for item in ${selection[@]:-}; do
+        if [ "$item" = "all" ]; then
+            pacman -S --needed --noconfirm "$REPO"
+            return 0
+        fi
+        pacman -S --needed --noconfirm "blackarch-$item"
+    done
+}
+
+case "${1:-}" in
+    list)  list_groups ;;
+    install)
+        shift
+        for g in "$@"; do
+            pacman -S --needed --noconfirm "blackarch-$g"
+        done
+        ;;
+    *)     interactive_pick ;;
+esac
