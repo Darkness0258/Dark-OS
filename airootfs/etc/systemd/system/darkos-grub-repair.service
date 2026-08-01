@@ -3,7 +3,6 @@ Description=DarkOS: install GRUB bootloader and generate config
 After=local-fs.target
 Before=multi-user.target
 ConditionPathExists=!/boot/grub/grub.cfg
-RequiresMountsFor=/boot/efi
 
 [Service]
 Type=oneshot
@@ -11,8 +10,9 @@ Type=oneshot
 # (mode delivery gap). Re-assert it explicitly before anything runs.
 ExecStartPre=/bin/chmod +x /usr/local/bin/darkos-grub-install.sh
 ExecStartPre=/usr/bin/mkinitcpio -P
-ExecStart=/usr/local/bin/darkos-grub-install.sh --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DarkOS --force --removable
-ExecStart=/usr/sbin/grub-mkconfig -o /boot/grub/grub.cfg
+# The wrapper finds + mounts the ESP itself, installs GRUB with
+# --removable, and generates grub.cfg if missing.
+ExecStart=/usr/local/bin/darkos-grub-install.sh
 
 [Install]
 WantedBy=multi-user.target

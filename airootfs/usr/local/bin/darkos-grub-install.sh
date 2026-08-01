@@ -1,62 +1,70 @@
 #!/bin/bash
 # DarkOS GRUB installer wrapper.
 #
-# Calamares' bootloader module runs:
-#   chroot <root> <grubInstall> --target=x86_64-efi --efi-directory=<esp>
-#                                --bootloader-id=DarkOS --force
-# (check_target_env_call in src/modules/bootloader/main.py)
+# Self-contained: finds the ESP, mounts it at /boot/efi if not already
+# mounted, installs GRUB with --removable (writes to the firmware
+# fallback path \EFI\BOOT\BOOTX64.EFI that VMware always checks, and
+# skips the NVRAM write that fails in VMs), then generates grub.cfg.
 #
-# Plain grub-install tries to write a boot entry to firmware NVRAM via
-# efibootmgr. In VMs and chroots there is no EFI runtime, so that write
-# fails and grub-install exits 1 — leaving the installed system
-# unbootable while Calamares reports success.
+# This runs on first boot of the INSTALLED system (via
+# darkos-grub-repair.service), where the root filesystem is writable,
+# so chmod and mounts both work — unlike the Calamares chroot, which
+# is a read-only squashfs and can never run grub-install.
 #
-# This wrapper passes Calamares' args through unchanged and appends:
-#   --removable  -> install to the firmware-fallback path
-#                   (\\EFI\\BOOT\\BOOTX64.EFI), which VMware/VirtualBox
-#                   firmware checks even with no NVRAM entry
-#   --no-nvram   -> belt-and-suspenders, never touch NVRAM
-#
-# If grub-install succeeds but grub.cfg is missing (the grubcfg module
-# underperforms), this also generates it.
-#
-# Everything is logged to /boot/grub/install.log on the installed system
-# so failures are diagnosable instead of swallowed by Calamares.
-#
-# NOTE: must be executable (755) — set via profiledef.sh file_permissions
-# and stored 100755 in git so CI checks it out executable.
+# Logs everything to /boot/grub/install.log for diagnosis.
 
 set -u
 
 LOG=/boot/grub/install.log
-mkdir -p /boot/grub
+mkdir -p /boot/grub /boot/efi
 
-{
-    echo "=== DarkOS GRUB install (wrapper) ==="
-    echo "Date: $(date)"
-    echo "Args received from Calamares: $*"
-    echo ""
-    echo "--- Mounted filesystems ---"
-    mount 2>&1
-    echo ""
-    echo "--- ESP at /boot/efi ---"
-    findmnt /boot/efi 2>&1 || ls -la /boot/efi 2>&1
-    echo ""
-    echo "--- grub-install (passthrough args + --removable --no-nvram) ---"
-} > "$LOG" 2>&1
+log() {
+    echo "$@" | tee -a "$LOG"
+}
 
-grub-install "$@" --removable --no-nvram >> "$LOG" 2>&1
+: > "$LOG"
+log "=== DarkOS GRUB install (wrapper) ==="
+log "Date: $(date)"
+log ""
+
+# --- Ensure the ESP is mounted at /boot/efi -------------------------
+if ! mountpoint -q /boot/efi; then
+    log "ESP not mounted at /boot/efi — searching for it..."
+    ESP=$(lsblk -nro NAME,FSTYPE | awk '$2=="vfat" {print $1; exit}')
+    if [ -n "$ESP" ]; then
+        log "Found ESP: /dev/$ESP — mounting"
+        mount "/dev/$ESP" /boot/efi >> "$LOG" 2>&1
+    else
+        log "WARNING: no vfat partition found — ESP mount skipped"
+    fi
+else
+    log "ESP already mounted at /boot/efi"
+fi
+
+log ""
+log "--- Mounted filesystems ---"
+mount | grep -iE "efi|boot" >> "$LOG" 2>&1
+log ""
+log "--- /boot/efi contents ---"
+ls -la /boot/efi >> "$LOG" 2>&1
+log ""
+
+# --- Install GRUB ----------------------------------------------------
+log "--- grub-install (--removable skips NVRAM write) ---"
+grub-install \
+    --target=x86_64-efi \
+    --efi-directory=/boot/efi \
+    --bootloader-id=DarkOS \
+    --force \
+    --removable >> "$LOG" 2>&1
 STATUS=$?
+log "--- grub-install exit code: $STATUS ---"
 
-echo "" >> "$LOG"
-echo "--- grub-install exit code: $STATUS ---" >> "$LOG"
-
-# Ensure grub.cfg exists even if the grubcfg module underperformed.
 if [ "$STATUS" -eq 0 ] && [ ! -f /boot/grub/grub.cfg ]; then
-    echo "--- grub.cfg missing — generating with grub-mkconfig ---" >> "$LOG"
+    log "--- grub.cfg missing — generating ---"
     grub-mkconfig -o /boot/grub/grub.cfg >> "$LOG" 2>&1
     STATUS=$?
-    echo "--- grub-mkconfig exit code: $STATUS ---" >> "$LOG"
+    log "--- grub-mkconfig exit code: $STATUS ---"
 fi
 
 exit "$STATUS"
