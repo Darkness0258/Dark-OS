@@ -39,9 +39,10 @@ The ISO is built using `archiso` (Arch Linux's official ISO creation toolchain).
 │   │   ├── calamares/                   # Installer module configs
 │   │   └── pacman.d/                    # Mirrorlists (seeded by CI)
 │   ├── usr/
-│   │   ├── share/
-│   │   │   ├── applications/the-void.desktop  # Branded terminal launcher
-│   │   │   └── calamares/branding/darkos/     # Installer slideshow + icon
+│   │   ├── local/bin/                     # Runtime scripts (see below)
+│   │   └── share/
+│   │       ├── applications/the-void.desktop  # Branded terminal launcher
+│   │       └── calamares/branding/darkos/     # Installer slideshow + icon
 │   └── home/darkos/.bash_profile    # Auto-starts Hyprland on TTY1
 ├── packages.x86_64              # Arch packages to install in the ISO (one per line)
 ├── pacman.conf                  # Repo config: core, extra, multilib, chaotic-aur, blackarch
@@ -92,7 +93,7 @@ See `architecture.md` for full detail. Essential points:
 - CI builds ISO and publishes to GitHub Releases
 
 **Known issues:**
-- Calamares completed a full install in a VM (partitioning → unpackfs → user/root password → bootloader) without fatal errors. However, nobody has rebooted into the installed system yet — it's not yet confirmed that the resulting OS boots, that the passwordless live-session setup is actually replaced, or that the real bootloader entry works.
+- Calamares completes the install wizard in a VM (partitioning → unpackfs → user/root password) without fatal errors. GRUB is installed on the installed system's first boot by `darkos-grub-repair.service`. However, nobody has rebooted into the installed system yet — it's not yet confirmed that the resulting OS boots, that the passwordless live-session setup is actually replaced, or that the real bootloader entry works. The decisive check is `/boot/grub/install.log` on the installed system ending clean, plus a real login appearing.
 - Real-hardware boot test still pending
 - `darkos-tool-groups` picker script not yet written
 
@@ -109,6 +110,14 @@ The Calamares config went through heavy iteration this session. Key lessons:
 - The `shellprocess` Calamares module may not be available — it isn't in the version packaged for Arch. Don't rely on it.
 - For Calamares module config files, key names must match exactly what the Python module expects: `source:` not `src:`, `destination:` not `dest:` — the module throws `KeyError` on abbreviated names.
 - The `password` module doesn't exist as a standalone Calamares module; the `users` module handles both username and password on one page.
+
+## Runtime Scripts (`airootfs/usr/local/bin/`)
+
+Three scripts are shipped in the ISO and run at runtime. All are `100755` in git and `0:0:755` in `profiledef.sh`; two are invoked via `sh` to survive exec-bit loss from the CI releng-airootfs merge.
+
+- **`the-void.sh`** — terminal launcher ("The Void", backed by kitty). Sets `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe` only when `systemd-detect-virt --vm` reports a VM (kitty needs OpenGL 3.3+, VMware's virtual GPU often lacks it). Real hardware keeps GPU rendering. Referenced by the Hyprland `$mod+Q` keybind and `the-void.desktop`, both via `sh script`.
+- **`darkos-tty1-login`** — TTY1 autologin helper. Autologins as `darkos` only when `/run/archiso` exists (live ISO) AND the user exists; otherwise loops a normal login getty forever (so TTY1 never blanks). The `getty@tty1` override calls it directly and re-asserts its exec bit via `ExecStartPre chmod`.
+- **`darkos-grub-install.sh`** — GRUB installer, run by `darkos-grub-repair.service` on the installed system's first boot. Self-contained: mounts the ESP from `/etc/fstab` (lsblk vfat scan as fallback), installs GRUB with `--removable` + `--force`, generates `grub.cfg` if missing, and logs everything to `/boot/grub/install.log`. Can't run in the Calamares chroot (read-only squashfs) — that's why it's a first-boot service.
 
 ## Design System Reference
 
