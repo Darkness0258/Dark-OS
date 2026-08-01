@@ -9,7 +9,13 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
         chmod 700 "$XDG_RUNTIME_DIR"
     fi
     # No login manager -> no session bus. dbus-run-session starts a fresh
-    # bus for this session so Hyprland/polkit/portals/tray all get one
-    # (the runtime-dir /bus socket may never have been created).
-    exec dbus-run-session -- start-hyprland
+    # bus for this session so Hyprland/polkit/portals/tray all get one.
+    # NOTE: no exec here — if Hyprland crashes, the shell survives so the
+    # error is visible instead of the session silently dying and getty
+    # respawning forever.
+    dbus-run-session -- start-hyprland 2>&1 | tee /tmp/hyprland-start.log
+    echo ""
+    echo "=== Hyprland exited with code ${PIPESTATUS[0]} ==="
+    echo "Log: /tmp/hyprland-start.log"
+    echo "Press Ctrl+D to log out, or run 'dbus-run-session -- start-hyprland' to retry."
 fi
