@@ -7,12 +7,13 @@ ConditionPathExists=!/boot/grub/grub.cfg
 [Service]
 Type=oneshot
 # The wrapper can lose its exec bit between squashfs build and install
-# (mode delivery gap). Re-assert it explicitly before anything runs.
-ExecStartPre=/bin/chmod +x /usr/local/bin/darkos-grub-install.sh
+# (mode delivery gap). Re-assert it explicitly, then run via `sh` so a
+# missing exec bit can't block the install.
+ExecStartPre=/bin/chmod +x /usr/local/bin/darkos-grub-install.sh || true
 ExecStartPre=/usr/bin/mkinitcpio -P
 # The wrapper finds + mounts the ESP itself, installs GRUB with
 # --removable, and generates grub.cfg if missing.
-ExecStart=/usr/local/bin/darkos-grub-install.sh
+ExecStart=/bin/sh -c 'exec /usr/local/bin/darkos-grub-install.sh'
 
 [Install]
 WantedBy=multi-user.target

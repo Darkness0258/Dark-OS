@@ -2,7 +2,7 @@
 Type=Application
 Name=The Void
 Comment=DarkOS default terminal (kitty)
-Exec=/usr/local/bin/the-void.sh
+Exec=sh /usr/local/bin/the-void.sh
 Icon=kitty
 Categories=System;TerminalEmulator;
 StartupNotify=true
