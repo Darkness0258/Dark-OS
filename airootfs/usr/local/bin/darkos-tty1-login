@@ -1,0 +1,19 @@
+#!/bin/bash
+# TTY1 autologin helper for the DarkOS LIVE ISO.
+#
+# The getty@tty1 autologin override is copied by Calamares' unpackfs
+# onto the INSTALLED system too — but there the `darkos` user doesn't
+# exist (the users module creates a different account), so a hardcoded
+# `--autologin darkos` would break every login on a real install.
+#
+# This wrapper autologins as `darkos` ONLY when both are true:
+#   - we are on the live ISO (/run/archiso exists — archiso always
+#     creates it on live boot; it never exists on an installed system)
+#   - the `darkos` user actually exists
+# Otherwise it starts a normal getty that prompts for login.
+
+if [ -d /run/archiso ] && id darkos >/dev/null 2>&1; then
+    exec /sbin/agetty --autologin darkos --noclear "$1" "$2"
+else
+    exec /sbin/agetty --noclear "$1" "$2"
+fi
