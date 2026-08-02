@@ -8,6 +8,10 @@ Before=multi-user.target
 # menu-entry-containing config has been verified by the wrapper, which
 # writes this marker only on success.
 ConditionPathExists=!/var/lib/darkos-grub-repair.done
+# Never run on the LIVE ISO — it already ships an initramfs and doesn't
+# need GRUB installed. Without this, mkinitcpio -P runs on every live
+# boot (the marker doesn't exist there either), looking like a hang.
+ConditionPathExists=!/run/archiso
 
 [Service]
 Type=oneshot
