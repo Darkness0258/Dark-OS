@@ -20,4 +20,5 @@ declare -A file_permissions=(
   ["/usr/local/bin/the-void.sh"]="0:0:755"
   ["/usr/local/bin/darkos-tty1-login"]="0:0:755"
   ["/usr/local/bin/darkos-tool-groups"]="0:0:755"
+  ["/usr/local/bin/darkos-diagnose.sh"]="0:0:755"
 )
