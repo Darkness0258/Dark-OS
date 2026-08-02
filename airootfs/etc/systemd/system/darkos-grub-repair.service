@@ -15,13 +15,14 @@ ConditionPathExists=!/run/archiso
 
 [Service]
 Type=oneshot
-# The wrapper can lose its exec bit between squashfs build and install
-# (mode delivery gap). Re-assert it explicitly, then run via `sh` so a
-# missing exec bit can't block the install.
-ExecStartPre=/bin/chmod +x /usr/local/bin/darkos-grub-install.sh || true
-ExecStartPre=/usr/bin/mkinitcpio -P
-# The wrapper finds + mounts the ESP itself, installs GRUB with
-# --removable, and generates grub.cfg if missing.
+# ExecStartPre does NOT run through a shell: a bare `|| true` gets passed
+# to chmod as literal filenames ("chmod: cannot access '||'"). Wrap the
+# shell logic explicitly in sh -c.
+ExecStartPre=/bin/sh -c 'chmod +x /usr/local/bin/darkos-grub-install.sh || true'
+# The wrapper does the whole job in one fixed order: ensure a standard
+# mkinitcpio preset, drop the live-ISO archiso drop-in, build the
+# initramfs (mkinitcpio -P), install GRUB (--removable), regenerate
+# grub.cfg, and write the completion marker only when bootable.
 ExecStart=/bin/sh -c 'exec /usr/local/bin/darkos-grub-install.sh'
 
 [Install]
