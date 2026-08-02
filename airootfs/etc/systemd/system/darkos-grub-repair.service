@@ -2,7 +2,12 @@
 Description=DarkOS: install GRUB bootloader and generate config
 After=local-fs.target
 Before=multi-user.target
-ConditionPathExists=!/boot/grub/grub.cfg
+# Run on first boot regardless of whether grub.cfg exists (the in-install
+# bootloader step can fail silently, and a broken-but-present grub.cfg is
+# exactly the case that must be repaired). Only skip once a real,
+# menu-entry-containing config has been verified by the wrapper, which
+# writes this marker only on success.
+ConditionPathExists=!/var/lib/darkos-grub-repair.done
 
 [Service]
 Type=oneshot

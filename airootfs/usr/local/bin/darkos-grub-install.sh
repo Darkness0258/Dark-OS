@@ -73,11 +73,22 @@ grub-install \
 STATUS=$?
 log "--- grub-install exit code: $STATUS ---"
 
-if [ "$STATUS" -eq 0 ] && [ ! -f /boot/grub/grub.cfg ]; then
-    log "--- grub.cfg missing — generating ---"
+if [ "$STATUS" -eq 0 ]; then
+    log "--- regenerating grub.cfg (always — existing may be incomplete) ---"
     grub-mkconfig -o /boot/grub/grub.cfg >> "$LOG" 2>&1
     STATUS=$?
     log "--- grub-mkconfig exit code: $STATUS ---"
+fi
+
+# Mark repair complete ONLY if GRUB installed AND the config has real boot
+# entries. A broken-but-present grub.cfg (no menuentry) must NOT count as
+# done — otherwise the first-boot repair service skips and the loop stays.
+if [ "$STATUS" -eq 0 ] && grep -q "menuentry" /boot/grub/grub.cfg 2>/dev/null; then
+    mkdir -p /var/lib
+    touch /var/lib/darkos-grub-repair.done
+    log "--- repair complete — marker written ---"
+else
+    log "--- NOT marked complete (grub-mkconfig failed or grub.cfg has no menu entries) ---"
 fi
 
 exit "$STATUS"
