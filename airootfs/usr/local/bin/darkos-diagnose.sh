@@ -11,6 +11,7 @@
 # checking an empty dir), reports the four checks, and always unmounts.
 
 set -u
+set -o pipefail
 
 LOG="${DARKOS_DIAG_LOG:-/tmp/darkos-diagnose.log}"
 MNT="$(mktemp -d /tmp/darkos-diag.XXXXXX)"
