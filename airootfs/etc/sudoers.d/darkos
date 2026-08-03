@@ -1,1 +1,2 @@
-%wheel ALL=(ALL) NOPASSWD: ALL
+# Live-ISO convenience only. Calamares removes this file from the target.
+darkos ALL=(ALL:ALL) NOPASSWD: ALL

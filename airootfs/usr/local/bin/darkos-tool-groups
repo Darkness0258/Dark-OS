@@ -11,59 +11,105 @@
 #   darkos-tool-groups list           # list all groups
 #   darkos-tool-groups install <grp> [<grp> ...]   # install specific groups
 
-set -eu
+set -euo pipefail
 
-# BlackArch group prefix — groups live as blackarch-<name> in the repo.
-REPO="blackarch"
+# BlackArch exposes an aggregate `blackarch` group plus category groups named
+# `blackarch-<category>`. `pacman -Sg blackarch` lists packages in the
+# aggregate group; it does *not* list the category names. Query all group
+# memberships and extract the first column instead.
+GROUP_PREFIX="blackarch-"
 
-list_groups() {
-    echo "Available BlackArch tool groups:"
-    pacman -Sg "$REPO" 2>/dev/null | sed 's/^blackarch-//' | sort
+die() {
+    echo "darkos-tool-groups: $*" >&2
+    exit 1
 }
 
-install_group() {
-    local g="$1"
-    pacman -S --needed --noconfirm "blackarch-${g}"
+available_groups() {
+    pacman -Sg 2>/dev/null \
+        | awk '$1 ~ /^blackarch-/ { sub(/^blackarch-/, "", $1); print $1 }' \
+        | sort -u
+}
+
+normalize_group() {
+    local group="$1"
+    printf '%s\n' "${group#${GROUP_PREFIX}}"
+}
+
+group_exists() {
+    local wanted="$1"
+    available_groups \
+        | awk -v wanted="$wanted" '$0 == wanted { found=1 } END { exit !found }'
+}
+
+install_groups() {
+    [ "$EUID" -eq 0 ] || die "installation requires root (run with sudo)"
+
+    local input group
+    local -a targets=()
+    for input in "$@"; do
+        group="$(normalize_group "$input")"
+        case "$group" in
+            all)
+                targets=(blackarch)
+                break
+                ;;
+            ''|*[!a-zA-Z0-9._+-]*)
+                die "invalid group name: $input"
+                ;;
+        esac
+        group_exists "$group" || die "unknown BlackArch group: $input"
+        targets+=("${GROUP_PREFIX}${group}")
+    done
+
+    [ "${#targets[@]}" -gt 0 ] || die "no groups were selected"
+    pacman -S --needed --noconfirm "${targets[@]}"
 }
 
 interactive_pick() {
     local groups
-    groups=$(pacman -Sg "$REPO" 2>/dev/null | sed 's/^blackarch-//' | sort)
+    local -a selection=()
+    if ! groups="$(available_groups)"; then
+        die "could not read pacman's sync databases; verify the repository configuration"
+    fi
     if [ -z "$groups" ]; then
-        echo "No BlackArch groups found — is the repo configured?" >&2
-        exit 1
+        die "no BlackArch groups found; verify the repository and run 'pacman -Sy'"
     fi
     echo "Select BlackArch tool groups to install (space-separated, or 'all')."
     echo "WARNING: 'all' installs the entire BlackArch repo (~2900 packages)."
     echo ""
     echo "$groups"
     echo ""
-    read -rp "> " -a selection || true
+    if ! read -rp "> " -a selection; then
+        selection=()
+    fi
     if [ "${#selection[@]}" -eq 0 ]; then
         echo "Nothing selected — exiting." >&2
         exit 0
     fi
-    for item in "${selection[@]}"; do
-        if [ "$item" = "all" ]; then
-            echo "Installing entire BlackArch repo — this is a very large download." >&2
-            pacman -S --needed --noconfirm "$REPO"
-            return 0
-        fi
-        install_group "$item"
-    done
+    if printf '%s\n' "${selection[@]}" | grep -Fqx all; then
+        echo "Installing entire BlackArch repo — this is a very large download." >&2
+    fi
+    install_groups "${selection[@]}"
 }
 
 case "${1:-}" in
-    list)  list_groups ;;
+    list)
+        if ! groups="$(available_groups)"; then
+            die "could not read pacman's sync databases; verify the repository configuration"
+        fi
+        [ -n "$groups" ] || die "no BlackArch groups found; verify the repository and run 'pacman -Sy'"
+        printf '%s\n' "Available BlackArch tool groups:" "$groups"
+        ;;
     install)
         shift
         if [ "$#" -eq 0 ]; then
             echo "usage: darkos-tool-groups install <group> [<group> ...]" >&2
             exit 1
         fi
-        for g in "$@"; do
-            install_group "$g"
-        done
+        install_groups "$@"
+        ;;
+    help|-h|--help)
+        echo "usage: darkos-tool-groups [list | install <group> [<group> ...]]"
         ;;
     *)     interactive_pick ;;
 esac
