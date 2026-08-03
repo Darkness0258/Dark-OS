@@ -1,0 +1,20 @@
+#!/bin/bash
+# DarkOS Hyprland session launcher.
+#
+# The Hyprland package provides the binary as `Hyprland` (capital H), not
+# `start-hyprland`. Both the live ISO and the installed system call
+# `dbus-run-session -- start-hyprland` from their .bash_profile, so this
+# wrapper bridges the gap: it sets the session environment variables a
+# Wayland desktop expects and execs the real compositor.
+#
+# Keeping this as a wrapper (rather than inlining `Hyprland` into the
+# .bash_profile files) means the session env vars live in one place and
+# any future session setup (e.g. a display manager) can reuse it.
+
+set -euo pipefail
+
+export XDG_CURRENT_DESKTOP=Hyprland
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=Hyprland
+
+exec Hyprland "$@"

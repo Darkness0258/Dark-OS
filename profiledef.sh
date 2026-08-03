@@ -22,5 +22,7 @@ declare -A file_permissions=(
   ["/usr/local/bin/darkos-tool-groups"]="0:0:755"
   ["/usr/local/bin/darkos-diagnose.sh"]="0:0:755"
   ["/usr/local/bin/darkos-shell.py"]="0:0:755"
+  ["/usr/local/bin/start-hyprland"]="0:0:755"
+  ["/usr/local/bin/darkos-firstboot-tools"]="0:0:755"
 )
 

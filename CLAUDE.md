@@ -91,11 +91,12 @@ See `architecture.md` for full detail. Essential points:
 - Waybar top bar config + styling
 - TTY1 autologin + auto-start Hyprland
 - CI builds ISO and publishes to GitHub Releases
+- `start-hyprland` wrapper script (was missing — both `.bash_profile` files called a non-existent command; now created at `/usr/local/bin/start-hyprland`)
+- `darkos-tool-groups` wired into first-boot flow via `darkos-firstboot-tools` (wofi dialog on first Hyprland start, skips on live ISO and after first run)
 
 **Known issues:**
 - Calamares completes the install wizard in a VM (partitioning → unpackfs → user/root password) without fatal errors. The bootloader step runs `darkos-grub-install.sh` **during install** (via `bootloader.conf`'s `grubInstall` key), which builds a standard initramfs (the live ISO's `archiso` preset was wrong for a real disk — without it the kernel can't load the NVMe driver and panics with `VFS: unknown-block(0,0)`), forces text-mode GRUB (VMware can't draw `gfxterm`, showing a blank cursor), installs GRUB `--removable`, and regenerates `grub.cfg`. `darkos-grub-repair.service` remains as a first-boot safety net. However, nobody has rebooted into the installed system yet — it's not yet confirmed that the resulting OS boots, that the passwordless live-session setup is actually replaced, or that the real bootloader entry works. The decisive check is `/boot/grub/install.log` on the installed system ending clean, plus a real login appearing.
 - Real-hardware boot test still pending
-- `darkos-tool-groups` picker exists (`/usr/local/bin/darkos-tool-groups`) but isn't yet wired into the Calamares install flow — it's run manually as root. Wiring it in needs a display-based or non-interactive selection mechanism that doesn't rely on the possibly-absent `shellprocess` Calamares module.
 
 ## Calamares Installer Notes
 
@@ -112,11 +113,13 @@ The Calamares config went through heavy iteration this session. Key lessons:
 
 ## Runtime Scripts (`airootfs/usr/local/bin/`)
 
-Three scripts are shipped in the ISO and run at runtime. All are `100755` in git and `0:0:755` in `profiledef.sh`; two are invoked via `sh` to survive exec-bit loss from the CI releng-airootfs merge.
+Five scripts are shipped in the ISO and run at runtime. All are `100755` in git and `0:0:755` in `profiledef.sh`; several are invoked via `sh` to survive exec-bit loss from the CI releng-airootfs merge.
 
 - **`the-void.sh`** — terminal launcher ("The Void", backed by kitty). Sets `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe` only when `systemd-detect-virt --vm` reports a VM (kitty needs OpenGL 3.3+, VMware's virtual GPU often lacks it). Real hardware keeps GPU rendering. Referenced by the Hyprland `$mod+Q` keybind and `the-void.desktop`, both via `sh script`.
 - **`darkos-tty1-login`** — TTY1 autologin helper. Autologins as `darkos` only when `/run/archiso` exists (live ISO) AND the user exists; otherwise loops a normal login getty forever (so TTY1 never blanks). The `getty@tty1` override calls it directly and re-asserts its exec bit via `ExecStartPre=/bin/sh -c 'chmod +x … || true'` — the `sh -c` wrap is required because systemd's `ExecStartPre` does not run through a shell (a bare `|| true` would be passed to `chmod` as literal filenames).
 - **`darkos-grub-install.sh`** — the single source of truth for making the installed system bootable. Runs **both** during install (via `bootloader.conf`'s `grubInstall` key, in the writable Calamares chroot) **and** as a first-boot safety net (`darkos-grub-repair.service`). In one fixed order: ensures a standard `linux.preset` (the inherited live `archiso` one is wrong for a real disk), drops `/etc/mkinitcpio.conf.d/archiso.conf`, builds the initramfs (`mkinitcpio -P` — without it the kernel can't load the NVMe driver), forces text-mode GRUB (`GRUB_TERMINAL_OUTPUT=console`, `GRUB_GFXPAYLOAD_LINUX=text` — VMware can't draw `gfxterm`), mounts the ESP (fstab-first, lsblk fallback), installs GRUB `--removable`, regenerates `grub.cfg`, and writes the completion marker only when a real `menuentry` exists. Logs everything to `/boot/grub/install.log`.
+- **`start-hyprland`** — Hyprland session launcher. Both the live ISO and the installed system call `dbus-run-session -- start-hyprland` from their `.bash_profile`. The `hyprland` package provides `Hyprland` (capital H), not `start-hyprland`, so this wrapper bridges the gap: it sets the session environment variables (`XDG_CURRENT_DESKTOP`, `XDG_SESSION_TYPE`, `XDG_SESSION_DESKTOP`) and execs `Hyprland`. Without this script, neither the live session nor the installed system could start the desktop.
+- **`darkos-firstboot-tools`** — first-boot BlackArch tool-group picker. Runs via Hyprland `exec-once` on every session start, but only acts once: skips on the live ISO (`/run/archiso` check), skips if the completion marker exists (`~/.config/darkos/firstboot-tools.done`), otherwise shows a wofi dialog asking whether to install BlackArch tool groups. If the user opts in, launches `darkos-tool-groups` in a terminal (kitty + sudo) so the user can enter their password. Writes the marker regardless of the choice so it only fires once.
 
 ## Design System Reference
 

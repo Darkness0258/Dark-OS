@@ -1,0 +1,51 @@
+#!/bin/bash
+# DarkOS first-boot BlackArch tool-group picker.
+#
+# Runs on every Hyprland start via exec-once, but only acts once:
+#   - Skips on the live ISO (/run/archiso exists)
+#   - Skips if the completion marker already exists
+#   - Otherwise, shows a wofi dialog asking whether to install
+#     BlackArch tool groups, and launches the picker in a terminal
+#     so the user can enter their sudo password.
+#
+# The marker lives in the user's home (not /var/lib) because this
+# script runs as the logged-in user, not root, and the installed
+# system's wheel sudo requires a password.
+
+set -euo pipefail
+
+MARKER_DIR="${HOME}/.config/darkos"
+MARKER="${MARKER_DIR}/firstboot-tools.done"
+
+# Live ISO — never run the picker here.
+[ -d /run/archiso ] && exit 0
+
+# Already asked — don't pester the user on every Hyprland restart.
+[ -f "$MARKER" ] && exit 0
+
+# wofi is required for the GUI dialog.
+if ! command -v wofi >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Ask the user whether to install BlackArch tools now.
+choice=$(printf "Yes - Select tools now\nNo - Skip for now" \
+    | wofi --dmenu --prompt "Install BlackArch tools?" 2>/dev/null || true)
+
+# Write the marker regardless of the answer so this only fires once.
+mkdir -p "$MARKER_DIR"
+touch "$MARKER"
+
+# If the user cancelled or chose "No", we're done.
+[ -z "$choice" ] && exit 0
+case "$choice" in
+    No*) exit 0 ;;
+esac
+
+# Launch the tool-groups picker in a terminal so sudo can prompt.
+if command -v kitty >/dev/null 2>&1; then
+    kitty -e sudo /usr/local/bin/darkos-tool-groups
+elif command -v wofi >/dev/null 2>&1; then
+    # Fallback: run the wofi-based picker directly (no terminal output).
+    sudo /usr/local/bin/darkos-tool-groups
+fi
