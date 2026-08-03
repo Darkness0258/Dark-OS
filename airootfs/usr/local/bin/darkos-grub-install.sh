@@ -23,12 +23,13 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Never alter the live ISO. Calamares runs this script inside the installed
-# target, where /run/archiso is not present.
-if [ -d /run/archiso ]; then
-    stderr "ERROR: refusing to install GRUB into the live ISO"
-    exit 1
-fi
+# This script runs inside the install target (via Calamares' bootloader
+# module) and on the installed system's first boot (via
+# darkos-grub-repair.service). Neither context has /run/archiso. The
+# live-ISO protection lives at the SERVICE level
+# (ConditionPathExists=!/run/archiso) — a wrapper-level check can FALSE-
+# refuse during install if the chroot bind-mounts the live /run, so it is
+# deliberately not duplicated here.
 
 for command in awk cat findfs findmnt flock grep grub-install grub-mkconfig \
     lsblk mkinitcpio mount mountpoint mv readlink rm sed tee; do
