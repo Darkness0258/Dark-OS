@@ -1,0 +1,6 @@
+out/
+*.iso
+*.iso.*
+__pycache__/
+*.pyc
+.tmp/

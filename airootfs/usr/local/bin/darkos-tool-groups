@@ -13,10 +13,6 @@
 
 set -euo pipefail
 
-# BlackArch exposes an aggregate `blackarch` group plus category groups named
-# `blackarch-<category>`. `pacman -Sg blackarch` lists packages in the
-# aggregate group; it does *not* list the category names. Query all group
-# memberships and extract the first column instead.
 GROUP_PREFIX="blackarch-"
 
 die() {
@@ -24,7 +20,15 @@ die() {
     exit 1
 }
 
+ensure_sync_db() {
+    if [ ! -d /var/lib/pacman/sync/blackarch ] || [ -z "$(ls -A /var/lib/pacman/sync/blackarch 2>/dev/null)" ]; then
+        echo "Syncing pacman databases..." >&2
+        pacman -Sy --noconfirm 2>/dev/null || true
+    fi
+}
+
 available_groups() {
+    ensure_sync_db
     pacman -Sg 2>/dev/null \
         | awk '$1 ~ /^blackarch-/ { sub(/^blackarch-/, "", $1); print $1 }' \
         | sort -u
@@ -68,24 +72,41 @@ install_groups() {
 interactive_pick() {
     local groups
     local -a selection=()
-    if ! groups="$(available_groups)"; then
-        die "could not read pacman's sync databases; verify the repository configuration"
-    fi
+    groups="$(available_groups)"
+    
     if [ -z "$groups" ]; then
-        die "no BlackArch groups found; verify the repository and run 'pacman -Sy'"
+        echo "Updating BlackArch database..." >&2
+        pacman -Sy --noconfirm || true
+        groups="$(available_groups)"
     fi
-    echo "Select BlackArch tool groups to install (space-separated, or 'all')."
-    echo "WARNING: 'all' installs the entire BlackArch repo (~2900 packages)."
-    echo ""
-    echo "$groups"
-    echo ""
-    if ! read -rp "> " -a selection; then
-        selection=()
+    
+    if [ -z "$groups" ]; then
+        die "no BlackArch groups found; verify repository configuration in /etc/pacman.conf"
     fi
+
+    # Check if stdout/stdin is interactive TTY
+    if [ -t 0 ] && [ -t 1 ]; then
+        echo "Select BlackArch tool groups to install (space-separated, or 'all')."
+        echo "WARNING: 'all' installs the entire BlackArch repo (~2900 packages)."
+        echo ""
+        echo "$groups"
+        echo ""
+        if ! read -rp "> " -a selection; then
+            selection=()
+        fi
+    elif command -v wofi >/dev/null 2>&1; then
+        local chosen
+        chosen=$(printf "all\n%s" "$groups" | wofi --dmenu --prompt "Select BlackArch Tool Group:")
+        if [ -n "$chosen" ]; then
+            selection=("$chosen")
+        fi
+    fi
+
     if [ "${#selection[@]}" -eq 0 ]; then
         echo "Nothing selected — exiting." >&2
         exit 0
     fi
+
     if printf '%s\n' "${selection[@]}" | grep -Fqx all; then
         echo "Installing entire BlackArch repo — this is a very large download." >&2
     fi
@@ -94,10 +115,8 @@ interactive_pick() {
 
 case "${1:-}" in
     list)
-        if ! groups="$(available_groups)"; then
-            die "could not read pacman's sync databases; verify the repository configuration"
-        fi
-        [ -n "$groups" ] || die "no BlackArch groups found; verify the repository and run 'pacman -Sy'"
+        groups="$(available_groups)"
+        [ -n "$groups" ] || die "no BlackArch groups found; run 'pacman -Sy'"
         printf '%s\n' "Available BlackArch tool groups:" "$groups"
         ;;
     install)

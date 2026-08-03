@@ -1,0 +1,2 @@
+# BlackArch mirrorlist for DarkOS
+Server = https://blackarch.org/blackarch/$repo/os/$arch

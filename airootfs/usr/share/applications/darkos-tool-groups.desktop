@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=BlackArch Tool Installer
+GenericName=Security Tools Picker
+Comment=Select and install BlackArch tool groups
+Exec=sh -c 'kitty -e sudo /usr/local/bin/darkos-tool-groups'
+Icon=utilities-terminal
+Terminal=false
+Categories=System;Security;
+Keywords=blackarch;tools;pentest;security;installer;

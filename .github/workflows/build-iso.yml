@@ -43,7 +43,10 @@ jobs:
           chmod +x airootfs/usr/local/bin/darkos-grub-install.sh \
                    airootfs/usr/local/bin/darkos-tty1-login \
                    airootfs/usr/local/bin/darkos-tool-groups \
+                   airootfs/usr/local/bin/darkos-diagnose.sh \
+                   airootfs/usr/local/bin/darkos-shell.py \
                    airootfs/usr/local/bin/the-void.sh
+
       - name: Record tool versions (diagnose rolling-repo breaks)
         run: |
           hyprland --version 2>/dev/null || pacman -Qi hyprland 2>/dev/null | grep Version || true

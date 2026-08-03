@@ -1,0 +1,3 @@
+# Chaotic-AUR mirrorlist for DarkOS
+Server = https://cdn-mirror.chaotic.cx/chaotic-aur/$repo/$arch
+Server = https://geo-mirror.chaotic.cx/chaotic-aur/$repo/$arch

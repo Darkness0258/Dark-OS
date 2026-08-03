@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install DarkOS
+GenericName=System Installer
+Comment=Graphical system installer for DarkOS
+Exec=sudo calamares
+Icon=calamares
+Terminal=false
+Categories=System;
+Keywords=installer;calamares;darkos;setup;

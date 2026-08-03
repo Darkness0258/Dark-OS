@@ -47,3 +47,17 @@ rsync
 grub
 os-prober
 arch-install-scripts
+python
+python-gobject
+gtk3
+gtk-layer-shell
+swaybg
+mako
+brightnessctl
+pamixer
+playerctl
+ttf-font-awesome
+noto-fonts
+dialog
+
+
