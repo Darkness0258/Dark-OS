@@ -16,6 +16,25 @@ FALLBACK_ESP=
 GRUB_CFG_TMP=
 MARKER_TMP=
 
+# --- Calamares compatibility ------------------------------------------------
+# Calamares' bootloader module invokes this script with:
+#   --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DarkOS --force
+# Parse --efi-directory so Calamares can steer the ESP path. The other flags
+# are accepted silently — the script uses its own hardcoded equivalents
+# (DarkOS, x86_64-efi, --removable, --no-nvram) which are the correct
+# values for DarkOS's VM-compatible fallback-boot strategy.
+for _arg in "$@"; do
+    case "$_arg" in
+        --efi-directory=*)
+            ESP_MOUNT="${_arg#--efi-directory=}"
+            ;;
+        --target=*|--bootloader-id=*|--force)
+            : # accepted for compatibility; values are intentionally ignored
+            ;;
+    esac
+done
+unset _arg
+
 stderr() { printf '%s\n' "$*" >&2; }
 
 if [ "$EUID" -ne 0 ]; then

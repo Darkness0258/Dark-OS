@@ -16,6 +16,7 @@ wireplumber
 hyprland
 dbus
 xorg-xwayland
+xorg-xauth
 waybar
 ttf-jetbrains-mono-nerd
 kitty
