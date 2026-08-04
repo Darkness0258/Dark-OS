@@ -1,5 +1,6 @@
 base
 base-devel
+archlinux-keyring
 linux
 linux-headers
 linux-firmware
@@ -26,6 +27,10 @@ polkit-kde-agent
 qt5-wayland
 qt6-wayland
 calamares
+chaotic-keyring
+chaotic-mirrorlist
+blackarch-keyring
+blackarch-mirrorlist
 git
 sudo
 seatd
@@ -35,8 +40,7 @@ vulkan-radeon
 vulkan-intel
 vulkan-nouveau
 nvidia-utils
-nvidia-dkms
-libva-mesa-driver
+nvidia-open-dkms
 open-vm-tools
 parted
 gptfdisk
@@ -50,6 +54,7 @@ os-prober
 arch-install-scripts
 python
 python-gobject
+python-cairo
 gtk3
 gtk-layer-shell
 swaybg
@@ -57,8 +62,9 @@ mako
 brightnessctl
 pamixer
 playerctl
-ttf-font-awesome
+otf-font-awesome
 noto-fonts
 dialog
-
-
+ranger
+firefox
+neovim

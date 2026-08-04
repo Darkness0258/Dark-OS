@@ -2,7 +2,8 @@
 
 set -Eeuo pipefail
 
-readonly project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly project_dir
 readonly releng_profile="/usr/share/archiso/configs/releng"
 readonly out_dir="${project_dir}/out"
 

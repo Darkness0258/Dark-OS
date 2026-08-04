@@ -20,44 +20,38 @@ jobs:
       - name: Check out profile
         uses: actions/checkout@v4
       - name: Install ISO and AUR build dependencies
-        run: pacman -Syu --needed --noconfirm archiso base-devel curl git
+        run: pacman -Syu --needed --noconfirm archiso base-devel curl git python
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
+          set -euo pipefail
+          export TERM=xterm
           mkdir -p /etc/pacman.d
           pacman-key --init
-          pacman-key --populate archlinux || true
-          pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || true
-          pacman-key --lsign-key 3056513887B78AEB || true
-          pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' || true
-          pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' || true
+          pacman-key --populate archlinux
+          for attempt in 1 2 3; do
+            pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com && break
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+          done
+          pacman-key --lsign-key 3056513887B78AEB
+          pacman -U --needed --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+          pacman -U --needed --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
           printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
-          curl -fsSLO https://blackarch.org/strap.sh
+          curl --fail --location --retry 3 --retry-all-errors --output strap.sh https://blackarch.org/strap.sh
           chmod +x strap.sh
-          ./strap.sh || true
-      - name: Seed Archiso releng boot profile
-        run: |
-          cp -rn /usr/share/archiso/configs/releng/airootfs/. airootfs/
-          cp -r /usr/share/archiso/configs/releng/efiboot .
-      - name: Re-assert exec bits (survive releng-airootfs merge)
-        run: |
-          chmod +x airootfs/usr/local/bin/darkos-grub-install.sh \
-                   airootfs/usr/local/bin/darkos-tty1-login \
-                   airootfs/usr/local/bin/darkos-tool-groups \
-                   airootfs/usr/local/bin/darkos-diagnose.sh \
-                   airootfs/usr/local/bin/darkos-installer \
-                   airootfs/usr/local/bin/darkos-shell.py \
-                   airootfs/usr/local/bin/darkos-installer \
-                   airootfs/usr/local/bin/the-void.sh \
-                   airootfs/usr/local/bin/start-hyprland \
-                   airootfs/usr/local/bin/darkos-firstboot-tools
+          ./strap.sh
 
       - name: Record tool versions (diagnose rolling-repo breaks)
         run: |
-          hyprland --version 2>/dev/null || pacman -Qi hyprland 2>/dev/null | grep Version || true
-          pacman -Qi calamares 2>/dev/null | grep Version || true
-          pacman -Qi archiso 2>/dev/null | grep Version || true
+          pacman -Qi archiso | grep Version
+          bash --version | head -n 1
       - name: Build DarkOS ISO
         run: bash build-iso.sh
+      - name: Verify final ISO payload
+        run: |
+          shopt -s nullglob
+          images=(out/darkos-*.iso)
+          [ "${#images[@]}" -eq 1 ]
+          bash ci/verify-iso.sh "${images[0]}"
       - name: Split ISO for release
         run: |
           cd out
