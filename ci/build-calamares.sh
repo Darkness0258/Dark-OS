@@ -22,7 +22,7 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 
-for command in curl git makepkg repo-add runuser useradd sha256sum awk sed grep install; do
+for command in curl git makepkg pacman repo-add runuser useradd usermod sha256sum sed grep install; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         printf 'Required command not found: %s\n' "${command}" >&2
         exit 1
@@ -82,8 +82,9 @@ pkgbuild_sha="$(sed -nE "s/^sha256sums=\('[[:space:]]*([0-9a-f]{64})'[[:space:]]
         "${pkgbuild_sha:-<missing>}" "${CALAMARES_SOURCE_SHA256}" >&2
     exit 1
 }
-grep -Fq "${CALAMARES_SOURCE_URL}" "${pkgbuild}" || {
-    printf 'Pinned source URL is missing from the AUR PKGBUILD\n' >&2
+grep -Fxq 'url="https://codeberg.org/Calamares/calamares"' "${pkgbuild}" && \
+    grep -Fq 'releases/download/v$pkgver/$_pkgname-$pkgver.$_pkgext' "${pkgbuild}" || {
+    printf 'Unexpected source URL in the AUR PKGBUILD\n' >&2
     exit 1
 }
 
@@ -91,7 +92,7 @@ grep -Fq "${CALAMARES_SOURCE_URL}" "${pkgbuild}" || {
 # again, but doing this before the build makes a changed/malicious AUR recipe
 # fail explicitly instead of silently selecting a different source artifact.
 source_archive="${srcdest}/calamares-${CALAMARES_VERSION}.tar.gz"
-curl --fail --location --retry 3 --retry-delay 2 --silent --show-error \
+curl --fail --location --retry 3 --retry-delay 2 --retry-all-errors --silent --show-error \
     --output "${source_archive}" "${CALAMARES_SOURCE_URL}"
 printf '%s  %s\n' "${CALAMARES_SOURCE_SHA256}" "${source_archive}" | sha256sum --check --strict -
 
@@ -106,15 +107,24 @@ fi
 chown -R "${builder}:${builder}" "${work_root}"
 
 runuser --user "${builder}" -- env HOME="${build_home}" SRCDEST="${srcdest}" \
-    makepkg --noconfirm --cleanbuild --clean --nocheck "${pkgbuild}"
+    bash -c 'cd -- "$1" && exec makepkg --noconfirm --cleanbuild --clean --nocheck' \
+    bash "${aur_dir}"
 
-mapfile -t built_packages < <(find "${aur_dir}" -maxdepth 1 -type f -name "calamares-*.pkg.tar*" -print)
+mapfile -t built_packages < <(
+    find "${aur_dir}" -maxdepth 1 -type f -name "calamares-*.pkg.tar*" ! -name '*.sig' -print
+)
 if [[ "${#built_packages[@]}" -ne 1 ]]; then
     printf 'Expected exactly one Calamares package, found %s\n' "${#built_packages[@]}" >&2
     printf 'Build directory contents:\n' >&2
     find "${aur_dir}" -maxdepth 1 -type f -printf '  %f\n' >&2
     exit 1
 fi
+
+read -r built_name built_version < <(pacman -Qp "${built_packages[0]}")
+[[ "${built_name}" == "calamares" && "${built_version}" == "${CALAMARES_VERSION}-${CALAMARES_PKGREL}" ]] || {
+    printf 'Unexpected built package identity: %s %s\n' "${built_name:-<missing>}" "${built_version:-<missing>}" >&2
+    exit 1
+}
 
 install -d -m 0755 "${repo_dir}"
 # The destination is a dedicated temporary directory in CI.  Remove only the

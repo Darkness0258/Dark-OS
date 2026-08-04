@@ -19,8 +19,8 @@ jobs:
         run: pacman -Sy --noconfirm git
       - name: Check out profile
         uses: actions/checkout@v4
-      - name: Install archiso
-        run: pacman -Syu --noconfirm archiso curl sudo
+      - name: Install ISO and AUR build dependencies
+        run: pacman -Syu --needed --noconfirm archiso base-devel curl git
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
           mkdir -p /etc/pacman.d
@@ -44,7 +44,9 @@ jobs:
                    airootfs/usr/local/bin/darkos-tty1-login \
                    airootfs/usr/local/bin/darkos-tool-groups \
                    airootfs/usr/local/bin/darkos-diagnose.sh \
+                   airootfs/usr/local/bin/darkos-installer \
                    airootfs/usr/local/bin/darkos-shell.py \
+                   airootfs/usr/local/bin/darkos-installer \
                    airootfs/usr/local/bin/the-void.sh \
                    airootfs/usr/local/bin/start-hyprland \
                    airootfs/usr/local/bin/darkos-firstboot-tools
