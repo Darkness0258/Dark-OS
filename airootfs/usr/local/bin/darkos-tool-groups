@@ -21,9 +21,9 @@ die() {
 }
 
 ensure_sync_db() {
-    if [ ! -d /var/lib/pacman/sync/blackarch ] || [ -z "$(ls -A /var/lib/pacman/sync/blackarch 2>/dev/null)" ]; then
+    if [ ! -s /var/lib/pacman/sync/blackarch.db ]; then
         echo "Syncing pacman databases..." >&2
-        pacman -Sy --noconfirm 2>/dev/null || true
+        pacman -Sy --noconfirm
     fi
 }
 
@@ -36,7 +36,7 @@ available_groups() {
 
 normalize_group() {
     local group="$1"
-    printf '%s\n' "${group#${GROUP_PREFIX}}"
+    printf '%s\n' "${group#"${GROUP_PREFIX}"}"
 }
 
 group_exists() {
@@ -66,7 +66,9 @@ install_groups() {
     done
 
     [ "${#targets[@]}" -gt 0 ] || die "no groups were selected"
-    pacman -S --needed --noconfirm "${targets[@]}"
+    # Upgrade before installing from freshly-synced rolling repositories;
+    # `pacman -Sy` followed by a plain install can create a partial upgrade.
+    pacman -Syu --needed --noconfirm "${targets[@]}"
 }
 
 interactive_pick() {
@@ -76,7 +78,7 @@ interactive_pick() {
     
     if [ -z "$groups" ]; then
         echo "Updating BlackArch database..." >&2
-        pacman -Sy --noconfirm || true
+        pacman -Sy --noconfirm
         groups="$(available_groups)"
     fi
     

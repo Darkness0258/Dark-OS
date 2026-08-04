@@ -1,6 +1,8 @@
-*.sh text eol=lf
-*.py text eol=lf
-/airootfs/usr/local/bin/darkos-tty1-login text eol=lf
-/airootfs/usr/local/bin/darkos-tool-groups text eol=lf
-/airootfs/usr/local/bin/start-hyprland text eol=lf
-/airootfs/usr/local/bin/darkos-firstboot-tools text eol=lf
+# The profile is built on Linux but commonly edited on Windows. Normalize
+# every detected text file so shell scripts, Calamares YAML, systemd units,
+# desktop entries, QML, JSON, and Hyprland/Waybar configs cannot acquire CRLF.
+* text=auto eol=lf
+
+# Never run binary assets through text conversion.
+*.png binary
+*.webp binary

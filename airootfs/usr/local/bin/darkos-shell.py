@@ -6,14 +6,16 @@ GTK3 + Layer Shell Desktop Overlay
 import sys
 import os
 import math
-import time
 import argparse
+import subprocess
+
+import cairo
 
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
 gi.require_version('GdkPixbuf', '2.0')
-from gi.repository import Gtk, Gdk, GLib, GdkPixbuf, Pango
+from gi.repository import Gtk, Gdk, GLib, Gio
 
 try:
     gi.require_version('GtkLayerShell', '0.1')
@@ -208,8 +210,15 @@ class AIOrbCanvas(Gtk.DrawingArea):
         return False
 
 def cairo_create_radial(cr, cx, cy, r1, cx2, cy2, r2):
-    import cairo
     return cairo.RadialGradient(cx, cy, r1, cx2, cy2, r2)
+
+
+def launch(command):
+    """Start a fixed launcher command without invoking a shell."""
+    try:
+        subprocess.Popen(command, start_new_session=True)
+    except OSError as error:
+        print(f"DarkOS: could not launch {command[0]}: {error}", file=sys.stderr)
 
 
 class AIRadarCanvas(Gtk.DrawingArea):
@@ -301,22 +310,22 @@ class DarkOSDockWindow(Gtk.Window):
 
         # Dock Launchers
         left_apps = [
-            ("󰋜", "Files", "kitty -e ranger"),
-            ("󰞷", "Terminal", "sh /usr/local/bin/the-void.sh"),
-            ("󰈹", "Browser", "firefox"),
+            ("󰋜", "Files", ["kitty", "-e", "ranger"]),
+            ("󰞷", "Terminal", ["/usr/local/bin/the-void.sh"]),
+            ("󰈹", "Browser", ["firefox"]),
         ]
 
         right_apps = [
-            ("󰠮", "Notes", "kitty -e nvim"),
-            ("󰄨", "Store", "wofi --show drun"),
-            ("󰒓", "Settings", "wofi --show drun"),
+            ("󰠮", "Notes", ["kitty", "-e", "nvim"]),
+            ("󰄨", "Store", ["wofi", "--show", "drun"]),
+            ("󰒓", "Settings", ["wofi", "--show", "drun"]),
         ]
 
         for icon, name, cmd in left_apps:
             btn = Gtk.Button(label=icon)
             btn.get_style_context().add_class("dock-icon-btn")
             btn.set_tooltip_text(name)
-            btn.connect("clicked", lambda b, c=cmd: os.system(f"{c} &"))
+            btn.connect("clicked", lambda _button, c=cmd: launch(c))
             box.pack_start(btn, False, False, 0)
 
         # Center Enlarged AI Orb
@@ -331,7 +340,7 @@ class DarkOSDockWindow(Gtk.Window):
             btn = Gtk.Button(label=icon)
             btn.get_style_context().add_class("dock-icon-btn")
             btn.set_tooltip_text(name)
-            btn.connect("clicked", lambda b, c=cmd: os.system(f"{c} &"))
+            btn.connect("clicked", lambda _button, c=cmd: launch(c))
             box.pack_start(btn, False, False, 0)
 
         self.add(box)
@@ -398,7 +407,7 @@ class DarkOSHUDOverlay(Gtk.Window):
         self.response_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.response_card.get_style_context().add_class("glass-card")
         self.response_label = Gtk.Label()
-        self.response_label.set_markup("<span color='#00e5ff'><b>AI Assistant:</b> Ready and monitoring session.</span>")
+        self.response_label.set_markup("<span color='#00e5ff'><b>AI preview:</b> Backend integration is not connected yet.</span>")
         self.response_label.set_line_wrap(True)
         self.response_card.pack_start(self.response_label, False, False, 0)
         main_box.pack_start(self.response_card, False, False, 0)
@@ -407,15 +416,20 @@ class DarkOSHUDOverlay(Gtk.Window):
         self.show_all()
 
     def on_submit(self, widget):
-        text = self.entry.get_text().strip()
-        if not text:
+        request_text = self.entry.get_text().strip()
+        if not request_text:
             return
-        self.response_label.set_markup(f"<span color='#00e5ff'><b>Processing:</b></span> <span color='#f2f5f7'>{text}</span>")
+        safe_text = GLib.markup_escape_text(request_text)
+        self.response_label.set_markup(
+            f"<span color='#00e5ff'><b>Preview request:</b></span> "
+            f"<span color='#f2f5f7'>{safe_text}</span>"
+        )
         self.entry.set_text("")
-        
-        # Stub response handler
+
+        # This shell is a UI preview; do not claim the request was executed.
         GLib.timeout_add(800, lambda: self.response_label.set_markup(
-            f"<span color='#22e07a'><b>AI Result:</b></span> <span color='#f2f5f7'>Executed command '{text}' successfully.</span>"
+            "<span color='#9aa4ad'><b>Not executed:</b> "
+            "Connect an AI backend before using assistant actions.</span>"
         ))
 
 
@@ -511,10 +525,13 @@ class DarkOSSidePanels(Gtk.Window):
         ctrl_box.set_halign(Gtk.Align.CENTER)
         prev_btn = Gtk.Button(label="󰒮")
         play_btn = Gtk.Button(label="󰏤")
-        next_btn = Gtk.Button(label="xd")
+        next_btn = Gtk.Button(label="󰒭")
 
         for b in (prev_btn, play_btn, next_btn):
             b.get_style_context().add_class("dock-icon-btn")
+        prev_btn.connect("clicked", lambda _button: launch(["playerctl", "previous"]))
+        play_btn.connect("clicked", lambda _button: launch(["playerctl", "play-pause"]))
+        next_btn.connect("clicked", lambda _button: launch(["playerctl", "next"]))
         ctrl_box.pack_start(prev_btn, False, False, 0)
         ctrl_box.pack_start(play_btn, False, False, 0)
         ctrl_box.pack_start(next_btn, False, False, 0)
@@ -527,34 +544,63 @@ class DarkOSSidePanels(Gtk.Window):
 
 
 # --- Main Application Controller ---
+class DarkOSApplication(Gtk.Application):
+    """Single-instance shell; later CLI calls are forwarded over D-Bus."""
+
+    def __init__(self):
+        super().__init__(
+            application_id="org.darkos.Shell",
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+        )
+        self.dock = None
+        self.hud = None
+        self.controls = None
+
+    def do_activate(self):
+        if self.dock is not None:
+            return
+
+        apply_css()
+        self.dock = DarkOSDockWindow()
+        self.hud = DarkOSHUDOverlay()
+        self.controls = DarkOSSidePanels()
+        for window in (self.dock, self.hud, self.controls):
+            self.add_window(window)
+
+    @staticmethod
+    def toggle(window):
+        if window.is_visible():
+            window.hide()
+        else:
+            window.show_all()
+
+    def do_command_line(self, command_line):
+        parser = argparse.ArgumentParser(description="DarkOS Shell Controller")
+        parser.add_argument("--toggle-hud", action="store_true", help="Toggle AI HUD Radar Overlay")
+        parser.add_argument("--toggle-ai", action="store_true", help="Show and focus the AI prompt")
+        parser.add_argument("--toggle-side-panels", action="store_true", help="Toggle Quick Control Panel")
+        parser.add_argument("--toggle-control", action="store_true", help="Toggle Control Center")
+        try:
+            args = parser.parse_args(command_line.get_arguments()[1:])
+        except SystemExit as error:
+            return int(error.code or 0)
+
+        self.activate()
+
+        if args.toggle_side_panels or args.toggle_control:
+            self.toggle(self.controls)
+        if args.toggle_hud:
+            self.toggle(self.hud)
+        if args.toggle_ai:
+            if not self.hud.is_visible():
+                self.hud.show_all()
+            self.hud.entry.grab_focus()
+        return 0
+
+
 def main():
-    parser = argparse.ArgumentParser(description="DarkOS Shell Controller")
-    parser.add_argument("--toggle-hud", action="store_true", help="Toggle AI HUD Radar Overlay")
-    parser.add_argument("--toggle-ai", action="store_true", help="Focus AI Prompt")
-    parser.add_argument("--toggle-side-panels", action="store_true", help="Toggle Quick Control Panel")
-    parser.add_argument("--toggle-control", action="store_true", help="Toggle Control Center")
-    args = parser.parse_args()
-
-    apply_css()
-
-    dock = DarkOSDockWindow()
-    hud = DarkOSHUDOverlay()
-    controls = DarkOSSidePanels()
-
-    # Toggle handlers for CLI triggers
-    if args.toggle_side_panels or args.toggle_control:
-        if controls.is_visible():
-            controls.hide()
-        else:
-            controls.show_all()
-            
-    if args.toggle_hud or args.toggle_ai:
-        if hud.is_visible():
-            hud.hide()
-        else:
-            hud.show_all()
-
-    Gtk.main()
+    application = DarkOSApplication()
+    return application.run(sys.argv)
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

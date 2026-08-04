@@ -1,16 +1,16 @@
 # DarkOS Workspace Agent Rules & Guidelines
 
-Welcome to **DarkOS** — an original, AI-first Linux OS (Arch respin + BlackArch security tools + Hyprland compositor) featuring a cinematic glassmorphism/HUD shell and an integrated AI assistant.
+Welcome to **DarkOS** â€” an original, AI-first Linux OS (Arch respin + BlackArch security tools + Hyprland compositor) featuring a cinematic glassmorphism/HUD shell and an integrated AI assistant.
 
 ---
 
 ## 1. Build System & Commands
 
-- **Local ISO Build**: ash build-iso.sh (runs mkarchiso -v -w /tmp/archiso-tmp -o out .)
+- **Local ISO Build**: bash build-iso.sh (runs mkarchiso -v -w /tmp/archiso-tmp -o out .)
 - **Build Output**: out/
 - **CI Workflow**: .github/workflows/build-iso.yml (runs in Arch container on GitHub Actions, produces split ISO releases)
 - **Adding Packages**: Append package names (one per line) to packages.x86_64.
-- **Adding Config Files**: Place in irootfs/ matching target filesystem path (e.g. irootfs/etc/foo.conf -> /etc/foo.conf). Add any specific permission overrides to profiledef.sh (ile_permissions array).
+- **Adding Config Files**: Place in airootfs/ matching target filesystem path (e.g. airootfs/etc/foo.conf -> /etc/foo.conf). Add any specific permission overrides to profiledef.sh (file_permissions array).
 
 ---
 
@@ -18,9 +18,9 @@ Welcome to **DarkOS** — an original, AI-first Linux OS (Arch respin + BlackArch 
 
 - **Line Endings & Exec Bits**:
   - Windows host uses core.autocrlf=true. All shell scripts **MUST** maintain Unix LF (\n) line endings to avoid #!/bin/bash\r shebang crashes.
-  - Executable scripts MUST have ol=lf in .gitattributes or .sh extension, be stored with 100755 mode in git (git update-index --chmod=+x <file>), and have matching entries in profiledef.sh.
+  - Executable scripts MUST have eol=lf in .gitattributes or .sh extension, be stored with 100755 mode in git (git update-index --chmod=+x <file>), and have matching entries in profiledef.sh.
 - **CI Releng Copy Overrides**:
-  - At CI build time, eleng profile defaults are copied into irootfs/. Do NOT commit conflicting base files that break releng seeding.
+  - At CI build time, releng profile defaults are copied into airootfs/. Do NOT commit conflicting base files that break releng seeding.
 
 ---
 
@@ -48,8 +48,8 @@ Welcome to **DarkOS** — an original, AI-first Linux OS (Arch respin + BlackArch 
   - Secondary Accent: Neon Blue #2d7bff
   - Deep Accent: Purple #a855f7
 - **Glassmorphism**:
-  - Surface: gba(255, 255, 255, 0.06)
-  - Blur: ackdrop-filter: blur(24px)
+  - Surface: rgba(255, 255, 255, 0.06)
+  - Blur: backdrop-filter: blur(24px)
   - Border Radius: 16px (or standard panel radius)
 - **Layout Signature**: Top status bar + Left icon rail + Center HUD radar/dial + Floating side panels + Floating dock with enlarged AI Orb.
 
@@ -58,4 +58,4 @@ Welcome to **DarkOS** — an original, AI-first Linux OS (Arch respin + BlackArch 
 ## 5. Roadmap Status (Phase 1 -> Phase 2 Transition)
 
 - **Phase 1 (Bootable Foundation)**: Completed base archiso, Hyprland desktop config, Waybar, TTY autologin, and Calamares installer config (darkos-grub-install.sh). Fixed critical bug: start-hyprland wrapper script was missing (both .bash_profile files called a non-existent command). Wired darkos-tool-groups into first-boot flow via darkos-firstboot-tools (wofi dialog on first Hyprland start, skips on live ISO and after first run). Boot test still pending.
-- **Phase 2 (Core Shell Chrome)**: Active / Next focus — building the UI shell widgets (Top Bar, Central AI HUD, Dock, Glass side panels).
+- **Phase 2 (Core Shell Chrome)**: Active / Next focus â€” building the UI shell widgets (Top Bar, Central AI HUD, Dock, Glass side panels).
