@@ -16,10 +16,18 @@ airootfs_image_type="squashfs"
 # variable which disappears when profile loading returns, leaving mkarchiso's
 # global permission map empty and resetting every copied script to 0644.
 file_permissions=(
+  ["/etc/gshadow"]="0:0:600"
   ["/etc/shadow"]="0:0:600"
+  ["/etc/sudoers.d"]="0:0:750"
   ["/etc/sudoers.d/darkos"]="0:0:440"
   ["/home/darkos"]="1000:1000:750"
   ["/home/darkos/.bash_profile"]="1000:1000:644"
+  ["/root"]="0:0:750"
+  ["/root/.automated_script.sh"]="0:0:755"
+  ["/root/.gnupg"]="0:0:700"
+  ["/usr/local/bin/choose-mirror"]="0:0:755"
+  ["/usr/local/bin/Installation_guide"]="0:0:755"
+  ["/usr/local/bin/livecd-sound"]="0:0:755"
   ["/usr/local/bin/darkos-grub-install.sh"]="0:0:755"
   ["/usr/local/bin/the-void.sh"]="0:0:755"
   ["/usr/local/bin/darkos-tty1-login"]="0:0:755"

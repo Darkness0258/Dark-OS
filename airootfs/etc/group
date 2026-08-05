@@ -1,4 +1,5 @@
 root:x:0:darkos
+darkos:x:1000:
 tty:x:5:darkos
 nobody:x:65534:
 nopasswdlogin:x:497:darkos

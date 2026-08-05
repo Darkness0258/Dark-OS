@@ -11,7 +11,7 @@ if [[ -z "$iso_path" || ! -s "$iso_path" ]]; then
     exit 2
 fi
 
-for command in bash bsdtar grep mktemp python stat unsquashfs; do
+for command in awk bash bsdtar grep mktemp python stat unsquashfs; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'ISO verification requires %s\n' "$command" >&2
         exit 127
@@ -30,14 +30,22 @@ bsdtar -xOf "$iso_path" arch/x86_64/airootfs.sfs >"$squashfs"
 payload=(
     etc/calamares/settings.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
+    etc/group
+    etc/gshadow
     etc/pacman.conf
     etc/pacman.d/blackarch-mirrorlist
     etc/pacman.d/chaotic-mirrorlist
+    etc/passwd
+    etc/shadow
     etc/systemd/system/multi-user.target.wants/NetworkManager.service
     etc/systemd/system/multi-user.target.wants/bluetooth.service
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
     etc/systemd/system/multi-user.target.wants/seatd.service
+    root/.automated_script.sh
+    root/.gnupg
     usr/bin/calamares
+    usr/local/bin/Installation_guide
+    usr/local/bin/choose-mirror
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-firstboot-tools
     usr/local/bin/darkos-grub-install.sh
@@ -47,6 +55,7 @@ payload=(
     usr/local/bin/darkos-tty1-login
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
+    usr/local/bin/livecd-sound
     usr/share/applications/darkos-installer.desktop
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
@@ -56,9 +65,13 @@ unsquashfs -no-progress -d "$extracted" "$squashfs" "${payload[@]}" >/dev/null
 required_files=(
     etc/calamares/settings.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
+    etc/group
+    etc/gshadow
     etc/pacman.conf
     etc/pacman.d/blackarch-mirrorlist
     etc/pacman.d/chaotic-mirrorlist
+    etc/passwd
+    etc/shadow
     usr/bin/calamares
     usr/share/applications/darkos-installer.desktop
     usr/share/pacman/keyrings/blackarch.gpg
@@ -71,7 +84,60 @@ for relative in "${required_files[@]}"; do
     fi
 done
 
+[[ "$(stat -c '%a' "$extracted/etc/shadow")" == 600 ]] || {
+    printf 'Live /etc/shadow does not have mode 0600\n' >&2
+    exit 1
+}
+[[ "$(stat -c '%a' "$extracted/etc/gshadow")" == 600 ]] || {
+    printf 'Live /etc/gshadow does not have mode 0600\n' >&2
+    exit 1
+}
+
+# The live account databases are layered into the image before package
+# installation. Verify package-created system identities were merged and that
+# every passwd/group entry still has its corresponding shadow record.
+awk -F: '
+    NR == FNR { groups[$3] = $1; next }
+    !($4 in groups) {
+        printf "passwd user %s references missing primary GID %s\n", $1, $4 > "/dev/stderr"
+        bad = 1
+    }
+    END { exit bad }
+' "$extracted/etc/group" "$extracted/etc/passwd"
+
+awk -F: '
+    NR == FNR { shadow[$1] = 1; next }
+    !($1 in shadow) {
+        printf "passwd user %s has no shadow entry\n", $1 > "/dev/stderr"
+        bad = 1
+    }
+    END { exit bad }
+' "$extracted/etc/shadow" "$extracted/etc/passwd"
+
+awk -F: '
+    NR == FNR { gshadow[$1] = 1; next }
+    !($1 in gshadow) {
+        printf "group %s has no gshadow entry\n", $1 > "/dev/stderr"
+        bad = 1
+    }
+    END { exit bad }
+' "$extracted/etc/gshadow" "$extracted/etc/group"
+
+awk -F: '$1 == "darkos" && $3 == 1000 && $4 == 1000 { found = 1 } END { exit !found }' \
+    "$extracted/etc/passwd" || {
+    printf 'Live darkos account does not use UID:GID 1000:1000\n' >&2
+    exit 1
+}
+awk -F: '$1 == "darkos" && $3 == 1000 { found = 1 } END { exit !found }' \
+    "$extracted/etc/group" || {
+    printf 'Live darkos primary group is missing or does not use GID 1000\n' >&2
+    exit 1
+}
+
 scripts=(
+    root/.automated_script.sh
+    usr/local/bin/Installation_guide
+    usr/local/bin/choose-mirror
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-firstboot-tools
     usr/local/bin/darkos-grub-install.sh
@@ -81,6 +147,7 @@ scripts=(
     usr/local/bin/darkos-tty1-login
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
+    usr/local/bin/livecd-sound
 )
 for relative in "${scripts[@]}"; do
     path="$extracted/$relative"
@@ -94,6 +161,11 @@ for relative in "${scripts[@]}"; do
         exit 1
     fi
 done
+
+[[ "$(stat -c '%a' "$extracted/root/.gnupg")" == 700 ]] || {
+    printf 'Live root GnuPG directory does not have mode 0700\n' >&2
+    exit 1
+}
 
 for relative in "${scripts[@]}"; do
     case "$relative" in
