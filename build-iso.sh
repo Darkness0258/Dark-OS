@@ -53,6 +53,35 @@ readonly bash_scripts=(
     usr/local/bin/darkos-firstboot-tools
 )
 
+assert_profile_permissions() (
+    # Reproduce mkarchiso's loading scope. A `declare -A file_permissions` in
+    # profiledef.sh becomes local to load_profile() and leaves this map empty.
+    declare -A file_permissions=()
+    declare -A expected_permissions=(
+        ["/etc/shadow"]="0:0:600"
+        ["/etc/sudoers.d/darkos"]="0:0:440"
+    )
+    local relative
+    for relative in "${runtime_scripts[@]}"; do
+        expected_permissions["/${relative}"]="0:0:755"
+    done
+
+    load_profile() {
+        # shellcheck source=profiledef.sh
+        source "${project_dir}/profiledef.sh"
+    }
+    load_profile
+
+    for relative in "${!expected_permissions[@]}"; do
+        if [[ "${file_permissions[${relative}]:-}" != "${expected_permissions[${relative}]}" ]]; then
+            printf 'Invalid or invisible profile permission for %s: %s (expected %s)\n' \
+                "${relative}" "${file_permissions[${relative}]:-missing}" \
+                "${expected_permissions[${relative}]}" >&2
+            return 1
+        fi
+    done
+)
+
 assert_runtime_scripts() {
     local root="$1"
     local label="$2"
@@ -89,6 +118,7 @@ assert_runtime_scripts() {
 }
 
 printf 'Checking DarkOS runtime executables before staging...\n'
+assert_profile_permissions
 assert_runtime_scripts "${project_dir}/airootfs" 'source profile' repair
 for relative in "${bash_scripts[@]}"; do
     bash -n "${project_dir}/airootfs/${relative}"
@@ -124,6 +154,20 @@ done
 install -m 0644 "${project_dir}/packages.x86_64" "${stage_profile}/packages.x86_64"
 install -m 0644 "${project_dir}/profiledef.sh" "${stage_profile}/profiledef.sh"
 
+expected_iso="$(bash -c '
+    set -Eeuo pipefail
+    declare -A file_permissions=()
+    source "$1"
+    printf "%s/%s-%s-%s.iso\n" "$2" "$iso_name" "$iso_version" "$arch"
+' bash "${stage_profile}/profiledef.sh" "${out_dir}")"
+case "${expected_iso}" in
+    "${out_dir}/"*.iso) ;;
+    *)
+        printf 'Refusing unexpected ISO output path: %s\n' "${expected_iso}" >&2
+        exit 1
+        ;;
+esac
+
 assert_runtime_scripts "${stage_profile}/airootfs" 'staged profile' repair
 for relative in "${bash_scripts[@]}"; do
     bash -n "${stage_profile}/airootfs/${relative}"
@@ -153,8 +197,16 @@ awk -v repo_url="file://${repo_dir}" '
 ' "${project_dir}/pacman.conf" > "${stage_profile}/pacman.conf"
 
 mkdir -p "${out_dir}"
+if [[ -e "${expected_iso}" ]]; then
+    printf 'Removing stale ISO output before build: %s\n' "${expected_iso}"
+    rm -f -- "${expected_iso}"
+fi
 printf 'Building DarkOS ISO from a clean work directory...\n'
 mkarchiso -v -C "${stage_profile}/pacman.conf" -w "${work_dir}" -o "${out_dir}" "${stage_profile}"
+[[ -s "${expected_iso}" ]] || {
+    printf 'mkarchiso did not produce the expected ISO: %s\n' "${expected_iso}" >&2
+    exit 1
+}
 
 mapfile -d '' -t rootfs_images < <(find "${work_dir}" -type f -name airootfs.sfs -print0)
 if [[ "${#rootfs_images[@]}" -ne 1 ]]; then
@@ -175,5 +227,8 @@ done
 for relative in "${bash_scripts[@]}"; do
     bash -n "${verify_root}/${relative}"
 done
+
+printf 'Verifying the payload embedded in the final ISO...\n'
+bash "${project_dir}/ci/verify-iso.sh" "${expected_iso}"
 
 printf 'Build complete and packaged executables verified. Output written to %s/\n' "${out_dir}"

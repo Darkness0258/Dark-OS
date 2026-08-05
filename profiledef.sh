@@ -11,7 +11,11 @@ bootmodes=('uefi.systemd-boot')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
-declare -A file_permissions=(
+# mkarchiso pre-declares this associative array and sources profiledef.sh from
+# inside a function. Using `declare -A` here would create a function-local
+# variable which disappears when profile loading returns, leaving mkarchiso's
+# global permission map empty and resetting every copied script to 0644.
+file_permissions=(
   ["/etc/shadow"]="0:0:600"
   ["/etc/sudoers.d/darkos"]="0:0:440"
   ["/home/darkos"]="1000:1000:750"

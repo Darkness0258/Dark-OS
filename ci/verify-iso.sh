@@ -31,7 +31,12 @@ payload=(
     etc/calamares/settings.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
     etc/pacman.conf
+    etc/pacman.d/blackarch-mirrorlist
+    etc/pacman.d/chaotic-mirrorlist
     etc/systemd/system/multi-user.target.wants/NetworkManager.service
+    etc/systemd/system/multi-user.target.wants/bluetooth.service
+    etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
+    etc/systemd/system/multi-user.target.wants/seatd.service
     usr/bin/calamares
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-firstboot-tools
@@ -43,6 +48,8 @@ payload=(
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
     usr/share/applications/darkos-installer.desktop
+    usr/share/pacman/keyrings/blackarch.gpg
+    usr/share/pacman/keyrings/chaotic.gpg
 )
 unsquashfs -no-progress -d "$extracted" "$squashfs" "${payload[@]}" >/dev/null
 
@@ -50,8 +57,12 @@ required_files=(
     etc/calamares/settings.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
     etc/pacman.conf
+    etc/pacman.d/blackarch-mirrorlist
+    etc/pacman.d/chaotic-mirrorlist
     usr/bin/calamares
     usr/share/applications/darkos-installer.desktop
+    usr/share/pacman/keyrings/blackarch.gpg
+    usr/share/pacman/keyrings/chaotic.gpg
 )
 for relative in "${required_files[@]}"; do
     if [[ ! -s "$extracted/$relative" ]]; then
@@ -91,10 +102,24 @@ for relative in "${scripts[@]}"; do
     esac
 done
 
-if [[ ! -L "$extracted/etc/systemd/system/multi-user.target.wants/NetworkManager.service" ]]; then
-    printf 'NetworkManager live-session enablement is not a symlink\n' >&2
+for service in NetworkManager bluetooth darkos-grub-repair seatd; do
+    if [[ ! -L "$extracted/etc/systemd/system/multi-user.target.wants/${service}.service" ]]; then
+        printf '%s live-session enablement is not a symlink\n' "$service" >&2
+        exit 1
+    fi
+done
+
+runtime_pacman="$extracted/etc/pacman.conf"
+if grep -Fq 'TrustAll' "$runtime_pacman"; then
+    printf 'Runtime pacman.conf disables package-signature trust checks\n' >&2
     exit 1
 fi
+for repository in chaotic-aur blackarch; do
+    grep -Fq "[$repository]" "$runtime_pacman" || {
+        printf 'Runtime pacman.conf is missing repository: %s\n' "$repository" >&2
+        exit 1
+    }
+done
 
 settings="$extracted/etc/calamares/settings.conf"
 grep -Fq -- '- shellprocess@bootloader-install' "$settings" || {
@@ -105,5 +130,15 @@ if grep -Eq '^[[:space:]]+- bootloader[[:space:]]*$' "$settings"; then
     printf 'Calamares still invokes the exit-126-prone direct bootloader job\n' >&2
     exit 1
 fi
+
+pkglist="$verify_root/pkglist.x86_64.txt"
+bsdtar -xOf "$iso_path" arch/pkglist.x86_64.txt >"$pkglist"
+for package in blackarch-keyring blackarch-mirrorlist calamares chaotic-keyring \
+    chaotic-mirrorlist firefox neovim python-cairo ranger; do
+    grep -Eq "^${package}[[:space:]]" "$pkglist" || {
+        printf 'Required package is absent from the ISO package list: %s\n' "$package" >&2
+        exit 1
+    }
+done
 
 printf 'ISO verification passed: critical payload files and modes are valid.\n'

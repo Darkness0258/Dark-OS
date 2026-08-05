@@ -46,12 +46,6 @@ jobs:
           bash --version | head -n 1
       - name: Build DarkOS ISO
         run: bash build-iso.sh
-      - name: Verify final ISO payload
-        run: |
-          shopt -s nullglob
-          images=(out/darkos-*.iso)
-          [ "${#images[@]}" -eq 1 ]
-          bash ci/verify-iso.sh "${images[0]}"
       - name: Split ISO for release
         run: |
           cd out
