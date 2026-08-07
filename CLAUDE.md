@@ -6,12 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **DarkOS** — an original, AI-first Linux OS (Arch respin + BlackArch security tools + Hyprland compositor) with a cinematic glassmorphism/HUD shell and a voice assistant that can see, hear, and control the whole system. This is a real startup product, not a demo.
 
+`.agents/AGENTS.md` mirrors the guidance here (build commands, Windows line-ending/exec-bit rules, AI-control boundaries, design tokens) — keep the two files in sync when you change either.
+
 ## Build System
 
 The ISO is built with `archiso`. Local builds and CI run the same pipeline: stage a fresh releng profile, inject a locally-built pinned Calamares as a `[darkos-local]` repo, `mkarchiso`, then verify the artifacts. **There are no unit tests — correctness is enforced at build time** by `build-iso.sh` and `ci/verify-iso.sh` (shebang, exec-bit, CRLF, mode, and content checks on every shipped script).
 
 **Commands:**
 - Build ISO locally: `sudo bash build-iso.sh` (must be root; needs archiso + base-devel on an Arch host). Set `DARKOS_KEEP_WORK=1` to preserve its temp dirs on failure.
+- Run the built ISO in a VM (e.g. to test installed-system boot): `qemu-system-x86_64 -cdrom out/darkos-*.iso -m 4096 -enable-kvm` — UEFI boot only.
 - Syntax-check a script: `bash -n <file>` (shell) or `python -m py_compile <file>` (`.py`) — `verify-iso.sh` runs both against the built ISO.
 - Trigger a CI build: push to `main` or run `workflow_dispatch`. CI builds in a `--privileged` archlinux container, splits the ISO into 1900 MB `darkos-iso-part-*` files, and publishes them as a GitHub Release (`v<run_number>`).
 - Output: `out/darkos-*.iso`.
@@ -82,7 +85,7 @@ Files: `ui-tokens.md` (primitives) and `ui-rules.md` (layout/conventions).
 ## Common Tasks
 
 - **Add a package to the ISO:** one name per line in `packages.x86_64`.
-- **Add a config file to the ISO:** place under `airootfs/` matching the target path, add permissions to `profiledef.sh`'s `file_permissions` array, and remember `.gitattributes` already forces `eol=lf` on all text.
+- **Add a config file to the ISO:** place under `airootfs/` matching the target path, add permissions to `profiledef.sh`'s `file_permissions` array, and remember `.gitattributes` already forces `eol=lf` on all text. Do **not** write `declare -A file_permissions` inside `profiledef.sh` — mkarchiso sources it from inside a function, so a `declare -A` makes the map function-local and silently resets every permission back to 0644; `build-iso.sh`'s `assert_profile_permissions` reproduces that scoping and fails the build if it happens.
 - **Add/modify a runtime script:** update the script (must be `100755` in git — verify with `git ls-files -s`, fix with `git update-index --chmod=+x`), add its `file_permissions` entry, and add it to `runtime_scripts`/`bash_scripts` arrays in `build-iso.sh` (and the `verify-iso.sh` payload) or the build won't pass.
 - **Modify the desktop look:** `airootfs/etc/xdg/hypr/hyprland.conf` (compositor), `waybar/config` + `waybar/style.css` (top bar), `darkos-shell.py` (dock/HUD/side panels).
 
