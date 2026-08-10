@@ -22,8 +22,8 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 
-for command in bash chown curl find git grep head id install makepkg mkdir mktemp \
-    pacman repo-add rm runuser sha256sum sed useradd usermod; do
+for command in bash chown curl find git grep head install makepkg mkdir mktemp \
+    pacman repo-add rm runuser sha256sum sed useradd userdel; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         printf 'Required command not found: %s\n' "${command}" >&2
         exit 1
@@ -96,7 +96,21 @@ readonly BUILD_DEPENDENCIES=(
 pacman -S --needed --noconfirm "${BUILD_DEPENDENCIES[@]}"
 
 work_root="$(mktemp -d /tmp/darkos-calamares-build.XXXXXX)"
-trap 'rm -rf -- "${work_root}"' EXIT
+builder="darkos-pkgbuild-$$"
+builder_created=0
+
+cleanup() {
+    local status=$?
+
+    if [[ "${builder_created}" == 1 ]]; then
+        if ! userdel --remove "${builder}" >/dev/null 2>&1; then
+            printf 'Warning: could not remove temporary build user: %s\n' "${builder}" >&2
+        fi
+    fi
+    rm -rf -- "${work_root}"
+    return "${status}"
+}
+trap cleanup EXIT
 aur_dir="${work_root}/calamares"
 srcdest="${work_root}/srcdest"
 build_home="${work_root}/home"
@@ -126,11 +140,12 @@ pkgbuild_sha="$(sed -nE "s/^sha256sums=\('[[:space:]]*([0-9a-f]{64})'[[:space:]]
         "${pkgbuild_sha:-<missing>}" "${CALAMARES_SOURCE_SHA256}" >&2
     exit 1
 }
-grep -Fxq 'url="https://codeberg.org/Calamares/calamares"' "${pkgbuild}" && \
-    grep -Fq 'releases/download/v$pkgver/$_pkgname-$pkgver.$_pkgext' "${pkgbuild}" || {
+# shellcheck disable=SC2016 # Match literal variables in the pinned URL template.
+if ! grep -Fxq 'url="https://codeberg.org/Calamares/calamares"' "${pkgbuild}" \
+    || ! grep -Fq 'releases/download/v$pkgver/$_pkgname-$pkgver.$_pkgext' "${pkgbuild}"; then
     printf 'Unexpected source URL in the AUR PKGBUILD\n' >&2
     exit 1
-}
+fi
 
 # Download and verify the release archive ourselves.  makepkg will verify it
 # again, but doing this before the build makes a changed/malicious AUR recipe
@@ -140,16 +155,14 @@ curl --fail --location --retry 3 --retry-delay 2 --retry-all-errors --silent --s
     --output "${source_archive}" "${CALAMARES_SOURCE_URL}"
 printf '%s  %s\n' "${CALAMARES_SOURCE_SHA256}" "${source_archive}" | sha256sum --check --strict -
 
-# makepkg refuses to run as root.  Use a throw-away unprivileged account and a
-# private HOME/SRCDEST so no package cache or build files leak into the image.
-builder="darkos-pkgbuild"
-if ! id "${builder}" >/dev/null 2>&1; then
-    useradd --system --create-home --home-dir "${build_home}" --shell /bin/bash "${builder}"
-else
-    usermod --home "${build_home}" "${builder}"
-fi
+# makepkg refuses to run as root. Use a per-run unprivileged account and a
+# private HOME/SRCDEST so neither package files nor an account leak from a
+# successful or failed local build.
+useradd --system --create-home --home-dir "${build_home}" --shell /bin/bash "${builder}"
+builder_created=1
 chown -R "${builder}:${builder}" "${work_root}"
 
+# shellcheck disable=SC2016 # $1 is expanded by the child Bash, not this one.
 runuser --user "${builder}" -- env HOME="${build_home}" SRCDEST="${srcdest}" \
     bash -c 'cd -- "$1" && exec makepkg --noconfirm --cleanbuild --clean --nocheck' \
     bash "${aur_dir}"

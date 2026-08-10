@@ -8,7 +8,7 @@
 #
 # Detects the installed root (ext4) and ESP (vfat) itself, mounts both,
 # verifies each mount with `mountpoint -q` (aborts loudly instead of
-# checking an empty dir), reports the four checks, and always unmounts.
+# checking an empty dir), reports the five checks, and always unmounts.
 
 set -u
 set -o pipefail
@@ -90,9 +90,9 @@ else
 fi
 log ""
 
-log "=== 3. ESP contents (ls -laR of EFI/) ==="
+log "=== 3. ESP contents ==="
 if [ -d "$MNT/boot/efi/EFI" ]; then
-    ls -laR "$MNT/boot/efi/EFI/" | tee -a "$LOG"
+    find "$MNT/boot/efi/EFI" -printf '%M %u %g %s %p\n' | sort | tee -a "$LOG"
 else
     log "EFI/ directory does not exist on the ESP — nothing was written to it"
 fi
@@ -112,8 +112,12 @@ fi
 log ""
 
 log "=== 5. Repair service enabled (installed system) ==="
-ls -la "$MNT/etc/systemd/system/multi-user.target.wants/" 2>/dev/null | tee -a "$LOG" | grep -i grub \
-    || log "(darkos-grub-repair not enabled in multi-user.target.wants)"
+service_link="$MNT/etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service"
+if [ -L "$service_link" ]; then
+    printf '%s -> %s\n' "$service_link" "$(readlink "$service_link")" | tee -a "$LOG"
+else
+    log "(darkos-grub-repair not enabled in multi-user.target.wants)"
+fi
 log ""
 
 log "=== Done — full log: $LOG ==="

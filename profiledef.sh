@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck shell=bash disable=SC2034
 
 iso_name="darkos"
 iso_label="DARKOS"

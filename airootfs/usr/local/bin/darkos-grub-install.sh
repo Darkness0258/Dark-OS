@@ -79,6 +79,7 @@ fail() {
     log "--- repair failed; completion marker was not written ---"
     exit 1
 }
+# shellcheck disable=SC2329 # Invoked by the EXIT trap below.
 cleanup() {
     [ -z "$GRUB_CFG_TMP" ] || rm -f -- "$GRUB_CFG_TMP"
     [ -z "$MARKER_TMP" ] || rm -f -- "$MARKER_TMP"

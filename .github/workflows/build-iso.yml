@@ -20,7 +20,28 @@ jobs:
       - name: Check out profile
         uses: actions/checkout@v4
       - name: Install ISO and AUR build dependencies
-        run: pacman -Syu --needed --noconfirm archiso base-devel curl git python
+        run: pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git pacman-contrib python python-yaml
+      - name: Validate profile sources
+        run: |
+          set -euo pipefail
+          bash -n build-iso.sh ci/build-calamares.sh ci/verify-iso.sh profiledef.sh
+          while IFS= read -r script; do
+            bash -n "$script"
+          done < <(find airootfs/usr/local/bin -maxdepth 1 -type f ! -name '*.py' -print)
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          shell = Path("airootfs/usr/local/bin/darkos-shell.py")
+          compile(shell.read_text(encoding="utf-8"), str(shell), "exec")
+          paths = list(Path("airootfs/etc/calamares").rglob("*.conf"))
+          paths.append(Path("airootfs/usr/share/calamares/branding/darkos/branding.desc"))
+          for path in paths:
+              yaml.safe_load(path.read_text(encoding="utf-8"))
+          PY
+          for desktop in airootfs/usr/share/applications/*.desktop; do
+            desktop-file-validate "$desktop"
+          done
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
           set -euo pipefail
@@ -54,5 +75,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: DarkOS Build #${{ github.run_number }}
+          name: "DarkOS Build #${{ github.run_number }}"
           files: out/darkos-iso-part-*

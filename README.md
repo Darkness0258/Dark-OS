@@ -46,6 +46,10 @@ bash build-iso.sh
 
 Output is written to `out/darkos-*.iso`.
 
+After verification, the build also refreshes `out/darkos.iso`. This stable
+path is what the VMware test machine uses, so it always points to the most
+recent verified build rather than a stale installer image.
+
 ### Run in a VM
 
 ```bash

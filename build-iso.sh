@@ -6,13 +6,14 @@ project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly project_dir
 readonly releng_profile="/usr/share/archiso/configs/releng"
 readonly out_dir="${project_dir}/out"
+readonly vmware_iso="${out_dir}/darkos.iso"
 
 if (( EUID != 0 )); then
     printf 'DarkOS ISO builds must run as root. Use: sudo bash build-iso.sh\n' >&2
     exit 1
 fi
 
-for command in awk bash chmod cmp cp find grep head install mkarchiso mktemp pacman rm stat unsquashfs; do
+for command in awk bash chmod cmp cp find grep head install ln mkarchiso mktemp pacman rm stat unsquashfs; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         printf 'Required build command not found: %s\n' "${command}" >&2
         printf 'Run this build on an up-to-date Arch Linux host with archiso and base-devel installed.\n' >&2
@@ -238,5 +239,15 @@ done
 
 printf 'Verifying the payload embedded in the final ISO...\n'
 bash "${project_dir}/ci/verify-iso.sh" "${expected_iso}"
+
+# VMware's checked-in test machine always points at out/darkos.iso. Update
+# that stable name only after the versioned image has passed every payload
+# check, so a local VM can never silently keep booting an older installer.
+printf 'Publishing verified VMware ISO at %s...\n' "${vmware_iso}"
+ln -f "${expected_iso}" "${vmware_iso}"
+cmp -s "${expected_iso}" "${vmware_iso}" || {
+    printf 'Verified VMware ISO does not match the versioned build artifact.\n' >&2
+    exit 1
+}
 
 printf 'Build complete and packaged executables verified. Output written to %s/\n' "${out_dir}"
