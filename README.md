@@ -36,12 +36,12 @@ DarkOS is a real startup product — not a demo, not a theme pack, not a Windows
 
 ### Build the ISO
 
-Requires `archiso` on an Arch Linux system or container.
+Requires `archiso` and `mkinitcpio` on an Arch Linux system or privileged container.
 
 ```bash
 git clone https://github.com/Darkness0258/Dark-OS.git
 cd Dark-OS
-bash build-iso.sh
+sudo bash build-iso.sh
 ```
 
 Output is written to `out/darkos-*.iso`.
@@ -53,10 +53,13 @@ recent verified build rather than a stale installer image.
 ### Run in a VM
 
 ```bash
-qemu-system-x86_64 -cdrom out/darkos-*.iso -m 4096 -enable-kvm
+cp /usr/share/edk2/x64/OVMF_VARS.4m.fd /tmp/darkos-vars.fd
+qemu-system-x86_64 -m 4096 -enable-kvm -cdrom out/darkos.iso \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \
+  -drive if=pflash,format=raw,file=/tmp/darkos-vars.fd
 ```
 
-UEFI boot only — the live ISO boots via systemd-boot. On the installed system, GRUB is installed automatically on first boot by the `darkos-grub-repair` service.
+UEFI boot only — the live ISO boots via systemd-boot. Calamares installs GRUB in the target system; `darkos-grub-repair` retries it on the first installed boot only when the verified completion marker is absent.
 
 ### Launch the Installer
 
@@ -138,8 +141,8 @@ Full details in [build-plan.md](build-plan.md).
 ## Status
 
 - **Phase 1 is building** — CI produces bootable ISOs published as GitHub Releases (main branch only)
-- **Calamares installer** wizard completes successfully in VM testing (partitioning, unpackfs, user/root password). GRUB is installed by the `darkos-grub-repair` service on the first boot of the installed system, since Calamares' bootloader modules can't run on the read-only live squashfs.
-- **Not yet verified:** the installed system booting after install — the `/boot/grub/install.log` from the first-boot repair service is the proof point
+- **Calamares installer** runs its guarded bootloader wrapper after partitioning, unpackfs, and user setup. It invokes `darkos-grub-install.sh` through Bash in the target chroot; the first-boot service is a marker-gated fallback.
+- **Not yet verified:** the installed system booting after install — inspect `/boot/grub/install.log` and `/var/lib/darkos-grub-repair.done` after the first installed boot
 - **Phase 2 shell** (HUD, panels, dock, lock screen) is the next milestone
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).

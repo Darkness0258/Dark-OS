@@ -114,7 +114,8 @@ trap cleanup EXIT
 aur_dir="${work_root}/calamares"
 srcdest="${work_root}/srcdest"
 build_home="${work_root}/home"
-mkdir -p "${srcdest}" "${build_home}"
+build_tmp="${work_root}/tmp"
+mkdir -p "${srcdest}" "${build_home}" "${build_tmp}"
 
 printf 'Fetching Calamares AUR revision %s...\n' "${AUR_COMMIT}"
 git clone --filter=blob:none --no-checkout "${AUR_URL}" "${aur_dir}"
@@ -164,6 +165,7 @@ chown -R "${builder}:${builder}" "${work_root}"
 
 # shellcheck disable=SC2016 # $1 is expanded by the child Bash, not this one.
 runuser --user "${builder}" -- env HOME="${build_home}" SRCDEST="${srcdest}" \
+    TMPDIR="${build_tmp}" \
     bash -c 'cd -- "$1" && exec makepkg --noconfirm --cleanbuild --clean --nocheck' \
     bash "${aur_dir}"
 

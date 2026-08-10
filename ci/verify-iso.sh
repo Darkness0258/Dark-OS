@@ -11,7 +11,7 @@ if [[ -z "$iso_path" || ! -s "$iso_path" ]]; then
     exit 2
 fi
 
-for command in awk bash bsdtar grep mktemp python stat unsquashfs; do
+for command in awk bash bsdtar grep lsinitcpio mktemp python readlink stat unsquashfs; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'ISO verification requires %s\n' "$command" >&2
         exit 127
@@ -22,10 +22,24 @@ verify_root="$(mktemp -d /tmp/darkos-iso-verify.XXXXXX)"
 trap 'rm -rf -- "$verify_root"' EXIT
 squashfs="$verify_root/airootfs.sfs"
 extracted="$verify_root/root"
+initramfs="$verify_root/initramfs-linux.img"
 
 printf 'Extracting airootfs.sfs from %s...\n' "$iso_path"
 bsdtar -xOf "$iso_path" arch/x86_64/airootfs.sfs >"$squashfs"
 [[ -s "$squashfs" ]] || { printf 'ISO contains no non-empty airootfs.sfs\n' >&2; exit 1; }
+
+bsdtar -xOf "$iso_path" arch/boot/x86_64/initramfs-linux.img >"$initramfs"
+[[ -s "$initramfs" ]] || { printf 'ISO contains no non-empty live initramfs\n' >&2; exit 1; }
+initramfs_files="$verify_root/initramfs-files.txt"
+lsinitcpio -l "$initramfs" >"$initramfs_files"
+for relative in usr/bin/ipconfig usr/bin/memdiskfind usr/bin/nbd-client \
+    usr/bin/nfsmount usr/bin/pv; do
+    grep -Fxq "$relative" "$initramfs_files" || {
+        printf 'Required ArchISO hook file is absent from the initramfs: /%s\n' \
+            "$relative" >&2
+        exit 1
+    }
+done
 
 payload=(
     etc/calamares/settings.conf
@@ -40,7 +54,9 @@ payload=(
     etc/systemd/system/multi-user.target.wants/NetworkManager.service
     etc/systemd/system/multi-user.target.wants/bluetooth.service
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
+    etc/systemd/system/multi-user.target.wants/pacman-init.service
     etc/systemd/system/multi-user.target.wants/seatd.service
+    etc/systemd/system/pacman-init.service
     root/.automated_script.sh
     root/.gnupg
     usr/bin/calamares
@@ -72,6 +88,7 @@ required_files=(
     etc/pacman.d/chaotic-mirrorlist
     etc/passwd
     etc/shadow
+    etc/systemd/system/pacman-init.service
     usr/bin/calamares
     usr/share/applications/darkos-installer.desktop
     usr/share/pacman/keyrings/blackarch.gpg
@@ -174,11 +191,32 @@ for relative in "${scripts[@]}"; do
     esac
 done
 
-for service in NetworkManager bluetooth darkos-grub-repair seatd; do
-    if [[ ! -L "$extracted/etc/systemd/system/multi-user.target.wants/${service}.service" ]]; then
+declare -A service_targets=(
+    [NetworkManager]="/usr/lib/systemd/system/NetworkManager.service"
+    [bluetooth]="/usr/lib/systemd/system/bluetooth.service"
+    [darkos-grub-repair]="../darkos-grub-repair.service"
+    [pacman-init]="../pacman-init.service"
+    [seatd]="/usr/lib/systemd/system/seatd.service"
+)
+for service in "${!service_targets[@]}"; do
+    link="$extracted/etc/systemd/system/multi-user.target.wants/${service}.service"
+    if [[ ! -L "$link" ]]; then
         printf '%s live-session enablement is not a symlink\n' "$service" >&2
         exit 1
     fi
+    if [[ "$(readlink "$link")" != "${service_targets[$service]}" ]]; then
+        printf '%s live-session enablement has the wrong target\n' "$service" >&2
+        exit 1
+    fi
+done
+
+pacman_init="$extracted/etc/systemd/system/pacman-init.service"
+for command in 'ExecStart=/usr/bin/pacman-key --init' \
+    'ExecStart=/usr/bin/pacman-key --populate'; do
+    grep -Fxq "$command" "$pacman_init" || {
+        printf 'Live pacman-init service is missing command: %s\n' "$command" >&2
+        exit 1
+    }
 done
 
 runtime_pacman="$extracted/etc/pacman.conf"
@@ -206,7 +244,8 @@ fi
 pkglist="$verify_root/pkglist.x86_64.txt"
 bsdtar -xOf "$iso_path" arch/pkglist.x86_64.txt >"$pkglist"
 for package in blackarch-keyring blackarch-mirrorlist calamares chaotic-keyring \
-    chaotic-mirrorlist firefox neovim python-cairo ranger; do
+    chaotic-mirrorlist firefox mkinitcpio-nfs-utils nbd neovim pv python-cairo \
+    ranger syslinux; do
     grep -Eq "^${package}[[:space:]]" "$pkglist" || {
         printf 'Required package is absent from the ISO package list: %s\n' "$package" >&2
         exit 1

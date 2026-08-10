@@ -20,7 +20,7 @@ jobs:
       - name: Check out profile
         uses: actions/checkout@v4
       - name: Install ISO and AUR build dependencies
-        run: pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git pacman-contrib python python-yaml
+        run: pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git mkinitcpio pacman-contrib python python-yaml
       - name: Validate profile sources
         run: |
           set -euo pipefail
@@ -60,6 +60,14 @@ jobs:
           curl --fail --location --retry 3 --retry-all-errors --output strap.sh https://blackarch.org/strap.sh
           chmod +x strap.sh
           ./strap.sh
+          # strap.sh can finish successfully even when its selected mirror
+          # timed out. Use the canonical HTTPS endpoint and require a usable
+          # sync database before allowing any package transaction to continue.
+          printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
+          for attempt in 1 2 3; do
+            pacman -Syy --noconfirm && test -s /var/lib/pacman/sync/blackarch.db && break
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+          done
 
       - name: Record tool versions (diagnose rolling-repo breaks)
         run: |

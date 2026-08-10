@@ -6,6 +6,10 @@ linux-headers
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
+mkinitcpio-nfs-utils
+nbd
+pv
+syslinux
 networkmanager
 network-manager-applet
 bluez

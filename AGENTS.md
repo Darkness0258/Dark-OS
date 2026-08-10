@@ -10,7 +10,7 @@ The live ISO payload lives under `airootfs/`. Runtime scripts belong in `airootf
 
 - `sudo bash build-iso.sh`: builds a clean ISO with ArchISO, builds the pinned Calamares package, repairs executable modes, and verifies the final artifact.
 - `bash ci/verify-iso.sh out/darkos-*.iso`: checks critical payload files, permissions, package list entries, service symlinks, and script syntax inside a built ISO.
-- `qemu-system-x86_64 -cdrom out/darkos-*.iso -m 4096 -enable-kvm`: boots the ISO locally for VM validation.
+- `cp /usr/share/edk2/x64/OVMF_VARS.4m.fd /tmp/darkos-vars.fd`, then `qemu-system-x86_64 -m 4096 -enable-kvm -cdrom out/darkos.iso -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd -drive if=pflash,format=raw,file=/tmp/darkos-vars.fd`: boots the verified ISO in UEFI mode.
 - `bash -n <script>`: syntax-checks shell scripts before committing.
 - `python -m py_compile airootfs/usr/local/bin/darkos-shell.py`: syntax-checks Python runtime scripts.
 

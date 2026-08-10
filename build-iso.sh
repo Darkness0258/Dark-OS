@@ -13,10 +13,10 @@ if (( EUID != 0 )); then
     exit 1
 fi
 
-for command in awk bash chmod cmp cp find grep head install ln mkarchiso mktemp pacman rm stat unsquashfs; do
+for command in awk bash chmod cmp cp find grep head install ln lsinitcpio mkarchiso mktemp pacman readlink rm stat tee unsquashfs; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         printf 'Required build command not found: %s\n' "${command}" >&2
-        printf 'Run this build on an up-to-date Arch Linux host with archiso and base-devel installed.\n' >&2
+        printf 'Run this build on Arch Linux with archiso, base-devel, and mkinitcpio installed.\n' >&2
         exit 1
     fi
 done
@@ -53,6 +53,75 @@ readonly bash_scripts=(
     usr/local/bin/start-hyprland
     usr/local/bin/darkos-firstboot-tools
 )
+
+readonly archiso_hook_packages=(
+    mkinitcpio-nfs-utils
+    nbd
+    pv
+    syslinux
+)
+
+readonly runtime_symlinks=(
+    etc/systemd/system/multi-user.target.wants/NetworkManager.service
+    etc/systemd/system/multi-user.target.wants/bluetooth.service
+    etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
+    etc/systemd/system/multi-user.target.wants/seatd.service
+)
+
+declare -Ar runtime_symlink_targets=(
+    [etc/systemd/system/multi-user.target.wants/NetworkManager.service]="/usr/lib/systemd/system/NetworkManager.service"
+    [etc/systemd/system/multi-user.target.wants/bluetooth.service]="/usr/lib/systemd/system/bluetooth.service"
+    [etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service]="../darkos-grub-repair.service"
+    [etc/systemd/system/multi-user.target.wants/seatd.service]="/usr/lib/systemd/system/seatd.service"
+)
+
+assert_source_symlinks() {
+    local relative path actual
+    for relative in "${runtime_symlinks[@]}"; do
+        path="${project_dir}/airootfs/${relative}"
+        if [[ -L "${path}" ]]; then
+            actual="$(readlink "${path}")"
+        elif [[ -f "${path}" ]]; then
+            IFS= read -r actual < "${path}" || true
+            actual="${actual%$'\r'}"
+        else
+            printf 'Missing runtime symlink source: /%s\n' "${relative}" >&2
+            return 1
+        fi
+        [[ "${actual}" == "${runtime_symlink_targets[${relative}]}" ]] || {
+            printf 'Wrong runtime symlink target for /%s: %s (expected %s)\n' \
+                "${relative}" "${actual:-<empty>}" \
+                "${runtime_symlink_targets[${relative}]}" >&2
+            return 1
+        }
+    done
+}
+
+repair_staged_symlinks() {
+    local root="$1"
+    local relative path target
+    for relative in "${runtime_symlinks[@]}"; do
+        path="${root}/${relative}"
+        target="${runtime_symlink_targets[${relative}]}"
+        rm -f -- "${path}"
+        ln -s -- "${target}" "${path}"
+        [[ -L "${path}" && "$(readlink "${path}")" == "${target}" ]] || {
+            printf 'Could not stage runtime symlink: /%s -> %s\n' \
+                "${relative}" "${target}" >&2
+            return 1
+        }
+    done
+}
+
+assert_archiso_hook_packages() {
+    local package
+    for package in "${archiso_hook_packages[@]}"; do
+        grep -Eq "^${package}([[:space:]]|$)" "${project_dir}/packages.x86_64" || {
+            printf 'packages.x86_64 is missing ArchISO hook dependency: %s\n' "${package}" >&2
+            return 1
+        }
+    done
+}
 
 assert_profile_permissions() (
     # Reproduce mkarchiso's loading scope. A `declare -A file_permissions` in
@@ -127,6 +196,8 @@ assert_runtime_scripts() {
 }
 
 printf 'Checking DarkOS runtime executables before staging...\n'
+assert_archiso_hook_packages
+assert_source_symlinks
 assert_profile_permissions
 assert_runtime_scripts "${project_dir}/airootfs" 'source profile' repair
 for relative in "${bash_scripts[@]}"; do
@@ -152,6 +223,7 @@ printf 'Staging a fresh Archiso releng profile...\n'
 cp -a "${releng_profile}/airootfs" "${stage_profile}/"
 cp -a "${releng_profile}/efiboot" "${stage_profile}/"
 cp -a "${project_dir}/airootfs/." "${stage_profile}/airootfs/"
+repair_staged_symlinks "${stage_profile}/airootfs"
 
 # Allow future custom boot assets without losing the releng defaults.
 for asset in efiboot syslinux grub; do
@@ -211,7 +283,15 @@ if [[ -e "${expected_iso}" ]]; then
     rm -f -- "${expected_iso}"
 fi
 printf 'Building DarkOS ISO from a clean work directory...\n'
-mkarchiso -v -C "${stage_profile}/pacman.conf" -w "${work_dir}" -o "${out_dir}" "${stage_profile}"
+build_log="${verify_parent}/mkarchiso.log"
+mkarchiso -v -C "${stage_profile}/pacman.conf" -w "${work_dir}" -o "${out_dir}" "${stage_profile}" \
+    2>&1 | tee "${build_log}"
+if grep -Eq '^==> ERROR:|^==> WARNING: errors were encountered during the build\.' "${build_log}"; then
+    printf 'mkarchiso reported an incomplete initramfs; refusing to publish the ISO.\n' >&2
+    grep -E '^==> ERROR:|^==> WARNING: errors were encountered during the build\.' \
+        "${build_log}" >&2
+    exit 1
+fi
 [[ -s "${expected_iso}" ]] || {
     printf 'mkarchiso did not produce the expected ISO: %s\n' "${expected_iso}" >&2
     exit 1
