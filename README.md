@@ -63,11 +63,28 @@ UEFI boot only — the live ISO boots via systemd-boot. Calamares installs GRUB 
 
 ### Launch the Installer
 
-On a booted live system, open a terminal (Super+Q) and run:
+On a booted live system, open **Install DarkOS** from the application menu or
+run the session-aware wrapper from a terminal:
 
 ```bash
-sudo QT_QPA_PLATFORM=wayland XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=$WAYLAND_DISPLAY QT_QUICK_BACKEND=software calamares
+darkos-installer
 ```
+
+The wrapper preserves the active Wayland session, hides the DarkOS shell
+overlays while Calamares is open, and restores them when the installer exits.
+
+## Phase 1 Verification
+
+Phase 1 was validated with the ISO produced by
+[Actions run 31371511319](https://github.com/Darkness0258/Dark-OS/actions/runs/31371511319)
+from commit `e933f489` and published as release `v96`. The reconstructed ISO
+has SHA-256 `CEB95BACC1AC69C783A89CB411239CBDD7AB278FEF3C83A8A09206E0CE032B25`.
+
+- The live ISO reports `-rwxr-xr-x` for `darkos-grub-install.sh`.
+- A fresh UEFI Erase-disk installation completed all 34 Calamares jobs.
+- `mkinitcpio`, `grub-install`, and `grub-mkconfig` each exited with status 0.
+- With the ISO disconnected, the installed disk reached the `darkos-vm` login prompt.
+- `/boot/grub/install.log` ends with `repair complete; validated config and marker written`.
 
 ## Project Structure
 
@@ -127,7 +144,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 
 | Phase | Goal |
 |---|---|
-| 1 | Bootable Arch + Hyprland + BlackArch ISO ✓ |
+| 1 | Bootable and installable Arch + Hyprland + BlackArch ISO ✓ |
 | 2 | Core shell chrome (HUD, panels, dock) |
 | 3 | AI assistant (STT/TTS/brain, OS control) |
 | 4 | Daily-use native apps |
@@ -140,10 +157,10 @@ Full details in [build-plan.md](build-plan.md).
 
 ## Status
 
-- **Phase 1 is building** — CI produces bootable ISOs published as GitHub Releases (main branch only)
-- **Calamares installer** runs its guarded bootloader wrapper after partitioning, unpackfs, and user setup. It invokes `darkos-grub-install.sh` through Bash in the target chroot; the first-boot service is a marker-gated fallback.
-- **Not yet verified:** the installed system booting after install — inspect `/boot/grub/install.log` and `/var/lib/darkos-grub-repair.done` after the first installed boot
-- **Phase 2 shell** (HUD, panels, dock, lock screen) is the next milestone
+- **Phase 1 is complete and VM-verified** — CI produces installable UEFI ISOs published as GitHub Releases from `main`.
+- **Calamares installation is verified** — the guarded bootloader wrapper completes successfully and writes its validation marker and log to the installed system.
+- **Installed-system boot is verified** — a clean virtual disk booted to a real login prompt with the ISO disconnected.
+- **Phase 2 shell** (HUD, panels, dock, lock screen) is the next milestone.
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).
 
