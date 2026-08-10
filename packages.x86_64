@@ -31,6 +31,7 @@ polkit-kde-agent
 qt5-wayland
 qt6-wayland
 calamares
+ckbcomp
 chaotic-keyring
 chaotic-mirrorlist
 blackarch-keyring
@@ -47,6 +48,7 @@ nvidia-utils
 nvidia-open-dkms
 open-vm-tools
 parted
+lvm2
 gptfdisk
 dosfstools
 ntfs-3g
@@ -56,6 +58,7 @@ rsync
 grub
 os-prober
 arch-install-scripts
+squashfs-tools
 python
 python-gobject
 python-cairo

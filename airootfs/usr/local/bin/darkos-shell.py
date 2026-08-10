@@ -555,6 +555,7 @@ class DarkOSApplication(Gtk.Application):
         self.dock = None
         self.hud = None
         self.controls = None
+        self.installer_visibility = None
 
     def do_activate(self):
         if self.dock is not None:
@@ -574,12 +575,31 @@ class DarkOSApplication(Gtk.Application):
         else:
             window.show_all()
 
+    def set_installer_mode(self, enabled):
+        overlays = (self.dock, self.hud, self.controls)
+        if enabled:
+            if self.installer_visibility is None:
+                self.installer_visibility = tuple(window.is_visible() for window in overlays)
+            for window in overlays:
+                window.hide()
+            return
+
+        if self.installer_visibility is None:
+            return
+        for window, was_visible in zip(overlays, self.installer_visibility):
+            if was_visible:
+                window.show_all()
+            else:
+                window.hide()
+        self.installer_visibility = None
+
     def do_command_line(self, command_line):
         parser = argparse.ArgumentParser(description="DarkOS Shell Controller")
         parser.add_argument("--toggle-hud", action="store_true", help="Toggle AI HUD Radar Overlay")
         parser.add_argument("--toggle-ai", action="store_true", help="Show and focus the AI prompt")
         parser.add_argument("--toggle-side-panels", action="store_true", help="Toggle Quick Control Panel")
         parser.add_argument("--toggle-control", action="store_true", help="Toggle Control Center")
+        parser.add_argument("--installer-mode", choices=("on", "off"), help="Hide overlays while installing")
         try:
             args = parser.parse_args(command_line.get_arguments()[1:])
         except SystemExit as error:
@@ -587,6 +607,8 @@ class DarkOSApplication(Gtk.Application):
 
         self.activate()
 
+        if args.installer_mode:
+            self.set_installer_mode(args.installer_mode == "on")
         if args.toggle_side_panels or args.toggle_control:
             self.toggle(self.controls)
         if args.toggle_hud:

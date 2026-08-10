@@ -36,8 +36,25 @@ else
     exit 1
 fi
 
+shell_suspended=0
+shell_controller=/usr/local/bin/darkos-shell.py
+if [[ $EUID -ne 0 ]] && command -v python >/dev/null 2>&1 \
+    && pgrep -u "$session_uid" -f "$shell_controller" >/dev/null 2>&1; then
+    if python "$shell_controller" --installer-mode on >/dev/null 2>&1; then
+        shell_suspended=1
+    fi
+fi
+
+restore_shell() {
+    if ((shell_suspended)); then
+        python "$shell_controller" --installer-mode off >/dev/null 2>&1 || true
+    fi
+}
+trap restore_shell EXIT
+
 if [[ $EUID -eq 0 ]]; then
-    exec calamares "$@"
+    calamares "$@"
+    exit $?
 fi
 
 if ! command -v sudo >/dev/null 2>&1; then
@@ -48,4 +65,4 @@ fi
 # Preserve only the display/session values Calamares needs. Passing an
 # explicit list avoids sudo -E's broad environment preservation.
 preserve_env='XDG_RUNTIME_DIR,WAYLAND_DISPLAY,DISPLAY,XAUTHORITY,DBUS_SESSION_BUS_ADDRESS,QT_QPA_PLATFORM,QT_QUICK_BACKEND,XDG_CURRENT_DESKTOP,XDG_SESSION_TYPE'
-exec sudo --preserve-env="$preserve_env" -- calamares "$@"
+sudo --preserve-env="$preserve_env" -- calamares "$@"
