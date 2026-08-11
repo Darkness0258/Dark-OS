@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+renderer="${DARKOS_HYPRLOCK_RENDERER:-auto}"
+
+case "${renderer}" in
+    auto)
+        if [[ -d /sys/module/vmwgfx ]] \
+            || { [[ -r /sys/class/dmi/id/sys_vendor ]] \
+                && grep -Fqi VMware /sys/class/dmi/id/sys_vendor; }; then
+            # Mesa's vmwgfx EGL path can invalidate hyprlock's wl_surface on
+            # the first buffer attach. llvmpipe preserves session-lock safety.
+            export LIBGL_ALWAYS_SOFTWARE=1
+        fi
+        ;;
+    software)
+        export LIBGL_ALWAYS_SOFTWARE=1
+        ;;
+    hardware)
+        unset LIBGL_ALWAYS_SOFTWARE
+        ;;
+    *)
+        printf 'Invalid DARKOS_HYPRLOCK_RENDERER value: %s\n' "${renderer}" >&2
+        exit 2
+        ;;
+esac
+
+exec /usr/bin/hyprlock "$@"

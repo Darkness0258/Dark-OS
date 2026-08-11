@@ -1,57 +1,31 @@
-# CLAUDE.md
+# Repository Guidelines
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Structure & Module Organization
 
-## Project Overview
+DarkOS is an ArchISO profile for an AI-first Arch Linux respin. Root-level project docs describe product direction and design: `README.md`, `architecture.md`, `build-plan.md`, `project-overview.md`, `ui-rules.md`, and `ui-tokens.md`.
 
-DarkOS is an original, AI-first Linux OS.
+The live ISO payload lives under `airootfs/`. Runtime scripts belong in `airootfs/usr/local/bin/`, desktop launchers in `airootfs/usr/share/applications/`, Hyprland and Waybar config in `airootfs/etc/xdg/`, Calamares installer modules in `airootfs/etc/calamares/`, and systemd enablement under `airootfs/etc/systemd/system/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`; generated ISOs and split release artifacts go to `out/`.
 
-## Build System & Commands
+## Build, Test, and Development Commands
 
-Detailed build pipeline information and commands for building, running, and verifying the ISO.
+- `sudo bash build-iso.sh`: builds a clean ISO with ArchISO, builds the pinned Calamares package, repairs executable modes, and verifies the final artifact.
+- `bash ci/verify-iso.sh out/darkos-*.iso`: checks critical payload files, permissions, package list entries, service symlinks, and script syntax inside a built ISO.
+- `cp /usr/share/edk2/x64/OVMF_VARS.4m.fd /tmp/darkos-vars.fd`, then `qemu-system-x86_64 -m 4096 -enable-kvm -cdrom out/darkos.iso -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd -drive if=pflash,format=raw,file=/tmp/darkos-vars.fd`: boots the verified ISO in UEFI mode.
+- `bash -n <script>`: syntax-checks shell scripts before committing.
+- `python -m py_compile airootfs/usr/local/bin/darkos-shell.py`: syntax-checks Python runtime scripts.
 
-### Commands
+## Coding Style & Naming Conventions
 
-*   **Build ISO locally:** `sudo bash build-iso.sh`
-*   **Run built ISO in VM:** `qemu-system-x86_64 -cdrom out/darkos-*.iso -m 4096 -enable-kvm`
-*   **Syntax-check shell script:** `bash -n <file>`
-*   **Syntax-check Python script:** `python -m py_compile <file>`
-*   **Trigger CI build:** Push to `main` or run `workflow_dispatch`.
+Shell scripts use Bash with `set -Eeuo pipefail` for build and verification paths. Keep runtime scripts executable, shebang-led, and LF-only; the build rejects missing execute bits and CRLF bytes. Use lowercase `darkos-*` names for project scripts and launchers. Keep installer, systemd, and package changes scoped to their existing directories.
 
-## Code Architecture and Structure
+## Testing Guidelines
 
-High-level overview of the DarkOS architecture.
+There are no unit tests. Correctness is enforced through syntax checks, full ISO builds, and `ci/verify-iso.sh`. For changes under `airootfs/usr/local/bin/`, run the relevant `bash -n` or `python -m py_compile` check. For installer, package, permission, or boot payload changes, run a full `sudo bash build-iso.sh` and boot the resulting ISO in QEMU.
 
-### Tech Stack
+## Commit & Pull Request Guidelines
 
-*   Arch base (pacman + AUR)
-*   BlackArch (opt-in tool groups)
-*   Hyprland (Wayland compositor)
-*   Calamares installer
+Recent commit history is informal, so prefer clear imperative commit subjects such as `Fix ISO runtime script permissions` or `Add Calamares package verification`. Pull requests should explain the user-visible change, list validation performed, link related issues, and include screenshots or VM notes for desktop, installer, or boot-flow changes. Mention any unverified real-hardware or installed-system boot behavior explicitly.
 
-### AI Control Mechanism
+## Security & Configuration Tips
 
-AI control is managed via D-Bus + `hyprctl` at the OS level, AT-SPI for in-app control, and screen understanding through periodic screenshots + vision models. Raw input injection (xdotool/spoofing) is explicitly not used.
-
-### Application Strategy
-
-The system features approximately 27 native applications, with most of the roughly 90 features organized as tabs within central hubs. "Settings" is presented as a single application with multiple tabs.
-
-### Key Directories
-
-*   `airootfs/`: Contains the root filesystem for the ISO.
-*   `airootfs/usr/local/bin/`: Location for runtime scripts.
-*   `ci/`: Continuous Integration scripts.
-*   `out/`: Build output directory.
-
-## Linting, Formatting, and Testing
-
-*   **Linting/Formatting:** No specific configuration files for linting or formatting were found in the codebase.
-*   **Testing:** The project explicitly states "There are no unit tests — correctness is enforced at build time". Syntax checks for shell and Python scripts are integrated into the build process.
-
-## Current Project Status
-
-*   **Phase 1 (bootable foundation) is complete:** CI publishes ISOs.
-*   **Phase 2 (core shell chrome) is active:** `darkos-shell.py` provides the dock/HUD overlay.
-*   **Phase 3 (AI assistant) is upcoming:** The AI backend is not yet wired.
-*   **Installed-system boot:** Still unverified, with checks focused on `/boot/grub/install.log` and successful login.
+Do not weaken runtime package-signature checks; `ci/verify-iso.sh` rejects `TrustAll` in packaged `pacman.conf`. Preserve secure modes for `/etc/shadow`, `/etc/gshadow`, `/root/.gnupg`, and sudoers files. Treat BlackArch and Chaotic-AUR mirror/keyring changes as security-sensitive.
