@@ -15,9 +15,9 @@
         "clock"
     ],
     "modules-right": [
-        "cpu",
-        "memory",
-        "disk",
+        "tray",
+        "backlight",
+        "custom/bluetooth",
         "network",
         "pulseaudio",
         "battery",
@@ -49,21 +49,18 @@
         "interval": 1,
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     },
-    "cpu": {
-        "format": " {usage}%",
-        "interval": 2,
-        "tooltip": true
+    "tray": {
+        "icon-size": 16,
+        "spacing": 8
     },
-    "memory": {
-        "format": " {percentage}%",
-        "interval": 3,
-        "tooltip-format": "RAM Used: {used:0.1f}GiB / {total:0.1f}GiB"
+    "backlight": {
+        "format": "󰃠 {percent}%",
+        "tooltip": false
     },
-    "disk": {
-        "format": "󰋊 {percentage_used}%",
-        "path": "/",
-        "interval": 10,
-        "tooltip-format": "Disk Used: {used} / {total}"
+    "custom/bluetooth": {
+        "exec": "timeout 2 bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && printf '󰂯 On' || printf '󰂲 Off'",
+        "interval": 5,
+        "tooltip": false
     },
     "network": {
         "format-wifi": "󰤨 {signalStrength}%",
@@ -99,7 +96,7 @@
     },
     "custom/avatar": {
         "format": "󰀉 darkos",
-        "tooltip": false
+        "tooltip-text": "Account controls remain part of the future Settings app"
     },
     "custom/power": {
         "format": "⏻",

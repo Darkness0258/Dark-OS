@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=DarkOS
+Comment=DarkOS Hyprland Session
+Exec=dbus-run-session -- /usr/local/bin/start-hyprland
+Type=Application
+DesktopNames=Hyprland

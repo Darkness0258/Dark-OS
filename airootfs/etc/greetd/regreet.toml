@@ -1,0 +1,31 @@
+skip_selection = false
+
+[background]
+path = "/usr/share/backgrounds/darkos/darkos-wallpaper.png"
+fit = "Cover"
+
+[env]
+XDG_CURRENT_DESKTOP = "Hyprland"
+XDG_SESSION_DESKTOP = "Hyprland"
+XDG_SESSION_TYPE = "wayland"
+
+[GTK]
+application_prefer_dark_theme = true
+cursor_theme_name = "Adwaita"
+cursor_blink = true
+font_name = "Inter 15"
+icon_theme_name = "Adwaita"
+theme_name = "Adwaita"
+
+[commands]
+reboot = ["systemctl", "reboot"]
+poweroff = ["systemctl", "poweroff"]
+x11_prefix = ["startx", "/usr/bin/env"]
+
+[appearance]
+greeting_msg = "CONTROL EVERYTHING"
+
+[widget.clock]
+format = "%A  %H:%M"
+resolution = "1s"
+label_width = 260

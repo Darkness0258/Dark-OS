@@ -7,11 +7,12 @@
 - **Security tools:** BlackArch repository layered onto the Arch base (one `pacman.conf` entry) — the real equivalent of "integrate Kali," since Kali's Debian base can't sit on a pacman system
 - **Compositor/shell base:** Hyprland (Wayland) — its animation/blur/rounded-corner pipeline delivers the cinematic look, and its IPC socket (`hyprctl`) gives the assistant a real control surface. Hyprland's native workspaces are also the backing implementation for Mission/Spaces below
 - **Installer:** Calamares (graphical), so this installs like a real OS
+- **Login / session lock / boot:** greetd + ReGreet under Cage for installed login, `hyprlock` + `hypridle` for `ext-session-lock-v1` locking, and Plymouth for early-boot feedback
 - **Voice assistant (fresh build, not Akane's codebase):**
   - STT: TBD — Groq Whisper API (proven on Akane) or a local Whisper.cpp-class model for offline use
   - Brain: TBD — OpenRouter free-tier LLMs worked for Akane; reusing the choice isn't reusing the code
   - TTS: TBD — edge-tts (cloud) or Piper (local, CPU-friendly, fully offline)
-  - App layer: Qt/PyQt6, rendered as `wlr-layer-shell` surfaces (HUD overlay, not a normal window)
+  - App layer: GTK3 (PyGObject) + `gtk-layer-shell`, rendered as Wayland layer-shell surfaces (HUD overlay, not a normal window)
 - **Windows compatibility (bolted on, not built):** Wine 11 / Bottles for general Windows apps, Proton for Steam games, QEMU/KVM as the fallback for anything with kernel-level anti-cheat or driver hooks. These projects already exist and are mature — this is integration work.
 - **macOS compatibility:** does not exist as a real option (see app catalog note below) — macOS influence here is original UI inspired by its UX patterns only.
 
@@ -90,6 +91,9 @@ graph LR
 ```
 
 ## Key decisions log
+- 2026-08-11: Phase 2 shell chrome uses independent TOP-layer rail, left-panel, right-panel, HUD, and dock windows; `DarkOSApplication` owns shared toggle/theme state so separately anchored surfaces cannot drift out of sync
+- 2026-08-11: Session locking uses upstream `hyprlock` + `hypridle` and installed login uses greetd/ReGreet under Cage; a layer-shell overlay is not accepted as a security boundary because it does not implement `ext-session-lock-v1`
+- 2026-08-11: The shell app layer is GTK3 (PyGObject) + `gtk-layer-shell`, not PyQt6; native Wayland layer-shell support matches the existing shell and avoids a parallel toolkit rewrite
 - 2026-07-22: Arch respin chosen over a from-scratch OS
 - 2026-07-22: BlackArch chosen over literal Kali (Debian base incompatible with pacman)
 - 2026-07-22: Hyprland chosen over GNOME/KDE

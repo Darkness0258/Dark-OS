@@ -13,13 +13,20 @@ if (( EUID != 0 )); then
     exit 1
 fi
 
-for command in awk bash chmod cmp cp find grep head install ln lsinitcpio mkarchiso mktemp pacman readlink rm stat tee unsquashfs; do
+for command in awk bash chmod cmp cp find git grep head install ln lsinitcpio mkarchiso mktemp pacman readlink rm stat tee unsquashfs; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         printf 'Required build command not found: %s\n' "${command}" >&2
         printf 'Run this build on Arch Linux with archiso, base-devel, and mkinitcpio installed.\n' >&2
         exit 1
     fi
 done
+
+build_sha="$(git -C "${project_dir}" rev-parse --short=8 HEAD 2>/dev/null || true)"
+if [[ ! "${build_sha}" =~ ^[0-9a-f]{7,40}$ ]]; then
+    printf 'Could not determine a valid Git build SHA from %s.\n' "${project_dir}" >&2
+    exit 1
+fi
+readonly build_sha
 
 [[ -d "${releng_profile}/airootfs" && -d "${releng_profile}/efiboot" ]] || {
     printf 'The Archiso releng profile is incomplete at %s; reinstall archiso.\n' "${releng_profile}" >&2
@@ -37,6 +44,7 @@ readonly runtime_scripts=(
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-installer
+    usr/local/bin/darkos-lock
     usr/local/bin/darkos-shell.py
     usr/local/bin/the-void.sh
     usr/local/bin/start-hyprland
@@ -49,6 +57,7 @@ readonly bash_scripts=(
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-installer
+    usr/local/bin/darkos-lock
     usr/local/bin/the-void.sh
     usr/local/bin/start-hyprland
     usr/local/bin/darkos-firstboot-tools
@@ -135,6 +144,7 @@ assert_profile_permissions() (
         ["/root"]="0:0:750"
         ["/root/.automated_script.sh"]="0:0:755"
         ["/root/.gnupg"]="0:0:700"
+        ["/etc/darkos-build-sha"]="0:0:644"
         ["/usr/local/bin/choose-mirror"]="0:0:755"
         ["/usr/local/bin/Installation_guide"]="0:0:755"
         ["/usr/local/bin/livecd-sound"]="0:0:755"
@@ -225,6 +235,55 @@ cp -a "${releng_profile}/efiboot" "${stage_profile}/"
 cp -a "${project_dir}/airootfs/." "${stage_profile}/airootfs/"
 repair_staged_symlinks "${stage_profile}/airootfs"
 
+# Reuse the canonical DarkOS logo in Plymouth without storing a second binary
+# copy in Git. Both the live initramfs and the installed system consume this
+# staged theme directory.
+install -Dm0644 \
+    "${project_dir}/airootfs/usr/share/calamares/branding/darkos/icons/darkos.png" \
+    "${stage_profile}/airootfs/usr/share/plymouth/themes/darkos/darkos.png"
+
+# The releng profile owns the live initramfs config. Add Plymouth after udev
+# in the staged copy so upstream Archiso defaults remain intact in the repo.
+archiso_mkinitcpio="${stage_profile}/airootfs/etc/mkinitcpio.conf.d/archiso.conf"
+[[ -f "${archiso_mkinitcpio}" ]] || {
+    printf 'Staged Archiso mkinitcpio configuration is missing: %s\n' \
+        "${archiso_mkinitcpio}" >&2
+    exit 1
+}
+if ! grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]plymouth[[:space:])]' \
+    "${archiso_mkinitcpio}"; then
+    sed -i -E \
+        '/^[[:space:]]*HOOKS=/ s/([[:space:](])udev([[:space:])])/\1udev plymouth\2/' \
+        "${archiso_mkinitcpio}"
+fi
+grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]plymouth[[:space:])]' \
+    "${archiso_mkinitcpio}" || {
+    printf 'Could not enable Plymouth in the live Archiso initramfs\n' >&2
+    exit 1
+}
+
+# systemd-boot reads these entries directly from the live EFI image. Request
+# the splash there as well as in the GRUB config generated for installations.
+mapfile -d '' -t live_loader_entries < <(
+    find "${stage_profile}/efiboot/loader/entries" -maxdepth 1 -type f \
+        -name '*linux.conf' -print0
+)
+[[ "${#live_loader_entries[@]}" -gt 0 ]] || {
+    printf 'No live systemd-boot Linux entries were staged\n' >&2
+    exit 1
+}
+for loader_entry in "${live_loader_entries[@]}"; do
+    sed -i -E \
+        '/^options[[:space:]]/ { /(^|[[:space:]])splash([[:space:]]|$)/! s/$/ quiet splash/; }' \
+        "${loader_entry}"
+    grep -Eq '^options[[:space:]].*[[:space:]]quiet[[:space:]]+splash([[:space:]]|$)' \
+        "${loader_entry}" || {
+        printf 'Live boot entry has no quiet splash options: %s\n' \
+            "${loader_entry}" >&2
+        exit 1
+    }
+done
+
 # Allow future custom boot assets without losing the releng defaults.
 for asset in efiboot syslinux grub; do
     if [[ -d "${project_dir}/${asset}" ]]; then
@@ -234,6 +293,8 @@ for asset in efiboot syslinux grub; do
 done
 install -m 0644 "${project_dir}/packages.x86_64" "${stage_profile}/packages.x86_64"
 install -m 0644 "${project_dir}/profiledef.sh" "${stage_profile}/profiledef.sh"
+printf '%s\n' "${build_sha}" > "${stage_profile}/airootfs/etc/darkos-build-sha"
+chmod 0644 "${stage_profile}/airootfs/etc/darkos-build-sha"
 
 expected_iso="$(bash -c '
     set -Eeuo pipefail

@@ -10,33 +10,32 @@
 }
 
 window#waybar {
-    background: rgba(0, 0, 0, 0.65);
+    background: rgba(22, 24, 28, 0.78);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 16px;
     color: #f2f5f7;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
 }
 
 /* Left Section */
 #custom-logo {
     color: #00e5ff;
     font-weight: 900;
-    padding: 0 14px;
-    font-size: 14px;
-    letter-spacing: 0.5px;
+    padding: 0 16px;
+    font-size: 15px;
     text-shadow: 0 0 12px rgba(0, 229, 255, 0.7);
 }
 
 #workspaces {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    margin: 4px 2px;
+    border-radius: 8px;
+    margin: 4px;
     padding: 0 4px;
 }
 
 #workspaces button {
-    padding: 2px 8px;
+    padding: 4px 8px;
     color: #9aa4ad;
     border-radius: 8px;
     transition: all 0.2s ease-in-out;
@@ -56,9 +55,9 @@ window#waybar {
 
 #window {
     color: #9aa4ad;
-    padding: 0 12px;
+    padding: 0 8px;
     font-weight: 500;
-    font-size: 12px;
+    font-size: 13px;
 }
 
 /* Center Section */
@@ -68,33 +67,33 @@ window#waybar {
     padding: 4px 16px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(0, 229, 255, 0.25);
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
     margin: 4px 0;
 }
 
 /* Right Section Widgets */
-#cpu, #memory, #disk, #network, #pulseaudio, #battery, #custom-avatar, #custom-control {
-    padding: 2px 10px;
-    margin: 4px 2px;
-    border-radius: 10px;
+#tray, #backlight, #custom-bluetooth, #network, #pulseaudio, #battery, #custom-avatar, #custom-control {
+    padding: 4px 8px;
+    margin: 4px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: #00e5ff;
     transition: all 0.2s ease;
 }
 
-#cpu:hover, #memory:hover, #disk:hover, #network:hover, #pulseaudio:hover, #battery:hover, #custom-avatar:hover, #custom-control:hover {
+#tray:hover, #backlight:hover, #custom-bluetooth:hover, #network:hover, #pulseaudio:hover, #battery:hover, #custom-avatar:hover, #custom-control:hover {
     background: rgba(0, 229, 255, 0.12);
     border-color: rgba(0, 229, 255, 0.35);
     box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
 }
 
-#memory {
+#backlight {
     color: #2d7bff;
 }
 
-#disk {
+#custom-bluetooth {
     color: #a855f7;
 }
 
@@ -122,10 +121,10 @@ window#waybar {
 
 #custom-power {
     color: #ff3b3b;
-    padding: 0 12px;
-    margin: 4px 2px;
+    padding: 0 8px;
+    margin: 4px;
     font-size: 15px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: rgba(255, 59, 59, 0.1);
     border: 1px solid rgba(255, 59, 59, 0.25);
     transition: all 0.2s ease;

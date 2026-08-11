@@ -11,7 +11,7 @@ if [[ -z "$iso_path" || ! -s "$iso_path" ]]; then
     exit 2
 fi
 
-for command in awk bash grep lsinitcpio mktemp python readlink stat unsquashfs xorriso; do
+for command in awk bash grep lsinitcpio mktemp python readlink stat tr unsquashfs xorriso; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'ISO verification requires %s\n' "$command" >&2
         exit 127
@@ -43,20 +43,41 @@ for relative in usr/bin/ipconfig usr/bin/memdiskfind usr/bin/nbd-client \
         exit 1
     }
 done
+for relative in usr/bin/plymouthd \
+    usr/share/plymouth/themes/darkos/darkos.png \
+    usr/share/plymouth/themes/darkos/darkos.plymouth \
+    usr/share/plymouth/themes/darkos/darkos.script; do
+    grep -Fxq "$relative" "$initramfs_files" || {
+        printf 'DarkOS boot-animation file is absent from the initramfs: /%s\n' \
+            "$relative" >&2
+        exit 1
+    }
+done
 
 payload=(
     etc/calamares/settings.conf
+    etc/darkos-build-sha
     etc/calamares/modules/partition.conf
+    etc/calamares/modules/services-systemd.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
     etc/calamares/modules/shellprocess@pacman-keyring.conf
     etc/calamares/modules/welcome.conf
     etc/group
     etc/gshadow
+    etc/greetd/config.toml
+    etc/greetd/regreet.css
+    etc/greetd/regreet.toml
     etc/pacman.conf
     etc/pacman.d/blackarch-mirrorlist
     etc/pacman.d/chaotic-mirrorlist
     etc/passwd
     etc/shadow
+    etc/plymouth/plymouthd.conf
+    etc/xdg/hypr/hypridle.conf
+    etc/xdg/hypr/hyprland.conf
+    etc/xdg/hypr/hyprlock.conf
+    etc/xdg/waybar/config
+    etc/xdg/waybar/style.css
     etc/systemd/system/multi-user.target.wants/NetworkManager.service
     etc/systemd/system/multi-user.target.wants/bluetooth.service
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
@@ -66,7 +87,12 @@ payload=(
     root/.automated_script.sh
     root/.gnupg
     usr/bin/calamares
+    usr/bin/cage
     usr/bin/ckbcomp
+    usr/bin/hypridle
+    usr/bin/hyprlock
+    usr/bin/plymouth-set-default-theme
+    usr/bin/regreet
     usr/bin/unsquashfs
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
@@ -74,6 +100,7 @@ payload=(
     usr/local/bin/darkos-firstboot-tools
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-installer
+    usr/local/bin/darkos-lock
     usr/local/bin/darkos-shell.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
@@ -81,7 +108,13 @@ payload=(
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
     usr/share/applications/darkos-installer.desktop
+    usr/share/backgrounds/darkos/darkos-wallpaper.png
+    usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
+    usr/share/plymouth/themes/darkos/darkos.png
+    usr/share/plymouth/themes/darkos/darkos.plymouth
+    usr/share/plymouth/themes/darkos/darkos.script
+    usr/share/wayland-sessions/darkos.desktop
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
 )
@@ -89,23 +122,45 @@ unsquashfs -no-progress -d "$extracted" "$squashfs" "${payload[@]}" >/dev/null
 
 required_files=(
     etc/calamares/settings.conf
+    etc/darkos-build-sha
     etc/calamares/modules/partition.conf
+    etc/calamares/modules/services-systemd.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
     etc/calamares/modules/shellprocess@pacman-keyring.conf
     etc/calamares/modules/welcome.conf
     etc/group
     etc/gshadow
+    etc/greetd/config.toml
+    etc/greetd/regreet.css
+    etc/greetd/regreet.toml
     etc/pacman.conf
     etc/pacman.d/blackarch-mirrorlist
     etc/pacman.d/chaotic-mirrorlist
     etc/passwd
     etc/shadow
+    etc/plymouth/plymouthd.conf
+    etc/xdg/hypr/hypridle.conf
+    etc/xdg/hypr/hyprland.conf
+    etc/xdg/hypr/hyprlock.conf
+    etc/xdg/waybar/config
+    etc/xdg/waybar/style.css
     etc/systemd/system/pacman-init.service
     usr/bin/calamares
+    usr/bin/cage
     usr/bin/ckbcomp
+    usr/bin/hypridle
+    usr/bin/hyprlock
+    usr/bin/plymouth-set-default-theme
+    usr/bin/regreet
     usr/bin/unsquashfs
     usr/share/applications/darkos-installer.desktop
+    usr/share/backgrounds/darkos/darkos-wallpaper.png
+    usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
+    usr/share/plymouth/themes/darkos/darkos.png
+    usr/share/plymouth/themes/darkos/darkos.plymouth
+    usr/share/plymouth/themes/darkos/darkos.script
+    usr/share/wayland-sessions/darkos.desktop
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
 )
@@ -116,12 +171,125 @@ for relative in "${required_files[@]}"; do
     fi
 done
 
-for relative in usr/bin/calamares usr/bin/ckbcomp usr/bin/unsquashfs; do
+build_sha="$(tr -d '\r\n' < "$extracted/etc/darkos-build-sha")"
+if [[ ! "$build_sha" =~ ^[0-9a-f]{7,40}$ ]]; then
+    printf 'ISO build identity is missing or invalid: %s\n' "$build_sha" >&2
+    exit 1
+fi
+if ! grep -Fq "printf 'built_from=%s\\n'" "$extracted/usr/local/bin/darkos-grub-install.sh"; then
+    printf 'Bootloader repair script does not write the build identity marker\n' >&2
+    exit 1
+fi
+
+for relative in usr/bin/calamares usr/bin/cage usr/bin/ckbcomp usr/bin/hypridle \
+    usr/bin/hyprlock usr/bin/plymouth-set-default-theme usr/bin/regreet \
+    usr/bin/unsquashfs; do
     if [[ ! -x "$extracted/$relative" ]]; then
         printf 'Required ISO executable is not executable: /%s\n' "$relative" >&2
         exit 1
     fi
 done
+
+python - "$extracted" <<'PY'
+import json
+from pathlib import Path
+import sys
+import tomllib
+
+root = Path(sys.argv[1])
+waybar = json.loads((root / "etc/xdg/waybar/config").read_text(encoding="utf-8"))
+required_modules = {
+    "tray",
+    "backlight",
+    "custom/bluetooth",
+    "network",
+    "pulseaudio",
+    "battery",
+    "custom/avatar",
+}
+missing_modules = required_modules.difference(waybar["modules-right"])
+if missing_modules:
+    raise SystemExit(f"Waybar is missing required top-bar modules: {sorted(missing_modules)}")
+if "timeout 2 bluetoothctl show" not in waybar["custom/bluetooth"].get("exec", ""):
+    raise SystemExit("Waybar Bluetooth status query is not time-bounded")
+
+greetd = tomllib.loads((root / "etc/greetd/config.toml").read_text(encoding="utf-8"))
+command = greetd["default_session"]["command"]
+if "cage" not in command or "regreet" not in command:
+    raise SystemExit("greetd does not launch ReGreet under Cage")
+if "GDK_DISABLE=dmabuf,vulkan" not in command or "GSK_RENDERER=cairo" not in command:
+    raise SystemExit("greetd is missing the verified VMware-safe ReGreet renderer settings")
+if greetd["default_session"].get("user") != "greeter":
+    raise SystemExit("greetd does not run ReGreet as the greeter account")
+
+regreet = tomllib.loads((root / "etc/greetd/regreet.toml").read_text(encoding="utf-8"))
+if regreet.get("background", {}).get("path") != "/usr/share/backgrounds/darkos/darkos-wallpaper.png":
+    raise SystemExit("ReGreet does not use the DarkOS wallpaper")
+PY
+
+cmp -s \
+    "$extracted/usr/share/calamares/branding/darkos/icons/darkos.png" \
+    "$extracted/usr/share/plymouth/themes/darkos/darkos.png" || {
+    printf 'Plymouth does not contain the canonical DarkOS logo\n' >&2
+    exit 1
+}
+
+hyprland_config="$extracted/etc/xdg/hypr/hyprland.conf"
+# shellcheck disable=SC2016 # $mainMod is literal Hyprland configuration.
+for setting in 'exec-once = hypridle' 'exec-once = nm-applet --indicator' \
+    'exec-once = blueman-applet' 'bind = $mainMod, L, exec, loginctl lock-session' \
+    'match:namespace ^(waybar|darkos-(dock|hud|rail|left|right))$' \
+    'blur on' 'ignore_alpha 0.08'; do
+    grep -Fq "$setting" "$hyprland_config" || {
+        printf 'Hyprland shell configuration is missing: %s\n' "$setting" >&2
+        exit 1
+    }
+done
+if grep -Eq '^exec-once = (pipewire|pipewire-pulse|wireplumber)$' "$hyprland_config"; then
+    printf 'Hyprland must not race systemd user activation for the PipeWire stack\n' >&2
+    exit 1
+fi
+
+hypridle_config="$extracted/etc/xdg/hypr/hypridle.conf"
+for setting in 'lock_cmd = pidof hyprlock || /usr/local/bin/darkos-lock' \
+    'before_sleep_cmd = loginctl lock-session' \
+    'on-timeout = loginctl lock-session'; do
+    grep -Fq "$setting" "$hypridle_config" || {
+        printf 'hypridle configuration is missing: %s\n' "$setting" >&2
+        exit 1
+    }
+done
+lock_launcher="$extracted/usr/local/bin/darkos-lock"
+for setting in '/sys/module/vmwgfx' 'LIBGL_ALWAYS_SOFTWARE=1' \
+    'exec /usr/bin/hyprlock "$@"'; do
+    grep -Fq "$setting" "$lock_launcher" || {
+        printf 'DarkOS lock launcher is missing: %s\n' "$setting" >&2
+        exit 1
+    }
+done
+grep -Fq 'screencopy_mode = 1' "$extracted/etc/xdg/hypr/hyprlock.conf" || {
+    printf 'hyprlock does not use the VMware-safe CPU screencopy mode\n' >&2
+    exit 1
+}
+if grep -Fq 'hyprctl dispatch dpms off' "$hypridle_config"; then
+    printf 'hypridle must not disable outputs while hyprlock owns the session lock\n' >&2
+    exit 1
+fi
+
+grep -Fq 'Theme=darkos' "$extracted/etc/plymouth/plymouthd.conf" || {
+    printf 'Plymouth does not select the DarkOS theme\n' >&2
+    exit 1
+}
+grep -Fq 'Exec=dbus-run-session -- /usr/local/bin/start-hyprland' \
+    "$extracted/usr/share/wayland-sessions/darkos.desktop" || {
+    printf 'DarkOS Wayland session does not launch the supported wrapper\n' >&2
+    exit 1
+}
+grep -Fq 'exec /usr/bin/start-hyprland "$@"' \
+    "$extracted/usr/local/bin/start-hyprland" || {
+    printf 'DarkOS session wrapper does not delegate to the upstream launcher\n' >&2
+    exit 1
+}
 
 [[ "$(stat -c '%a' "$extracted/etc/shadow")" == 600 ]] || {
     printf 'Live /etc/shadow does not have mode 0600\n' >&2
@@ -181,6 +349,7 @@ scripts=(
     usr/local/bin/darkos-firstboot-tools
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-installer
+    usr/local/bin/darkos-lock
     usr/local/bin/darkos-shell.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
@@ -316,15 +485,64 @@ grep -Fq 'internetCheckUrl: https://ping.archlinux.org/nm-check.txt' \
     exit 1
 }
 
-grep -Fq 'overlays = (self.dock, self.hud, self.controls)' \
-    "$extracted/usr/local/bin/darkos-shell.py" || {
+services_config="$extracted/etc/calamares/modules/services-systemd.conf"
+grep -Fq '  - name: greetd' "$services_config" || {
+    printf 'Calamares does not enable the installed-system login greeter\n' >&2
+    exit 1
+}
+
+shell_source="$extracted/usr/local/bin/darkos-shell.py"
+grep -Fq 'overlays = (self.dock, self.hud, self.rail, self.left, self.right)' \
+    "$shell_source" || {
     printf 'DarkOS shell does not hide every overlay during installation\n' >&2
+    exit 1
+}
+for component in 'class DarkOSIconRail' 'class DarkOSLeftPanels' \
+    'class DarkOSRightPanels' 'class AIRadarCanvas' \
+    'class RingGauge' 'class AIOrbCanvas'; do
+    grep -Fq "$component" "$shell_source" || {
+        printf 'DarkOS shell component is missing: %s\n' "$component" >&2
+        exit 1
+    }
+done
+if grep -Fq 'class DarkOSSidePanels' "$shell_source"; then
+    printf 'Legacy combined DarkOSSidePanels still exists\n' >&2
+    exit 1
+fi
+grep -Fq '("sleeping", "listening", "thinking", "speaking", "error")' \
+    "$shell_source" || {
+    printf 'AI Orb does not expose all five required click states\n' >&2
+    exit 1
+}
+grep -Fq 'self.toggle_state = {' "$shell_source" || {
+    printf 'Shell shared toggle state is not owned by DarkOSApplication\n' >&2
+    exit 1
+}
+grep -Fq '["playerctl", "metadata", "--format"' "$shell_source" || {
+    printf 'Media panel does not read live playerctl metadata\n' >&2
+    exit 1
+}
+grep -Fq 'Not executed: connect an AI backend' "$shell_source" || {
+    printf 'AI preview does not state that requests are unexecuted\n' >&2
+    exit 1
+}
+
+grep -Fq 'plymouth-set-default-theme darkos' \
+    "$extracted/usr/local/bin/darkos-grub-install.sh" || {
+    printf 'Installed-system initramfs does not select the DarkOS Plymouth theme\n' >&2
+    exit 1
+}
+grep -Fq "set_grub_option GRUB_CMDLINE_LINUX_DEFAULT" \
+    "$extracted/usr/local/bin/darkos-grub-install.sh" || {
+    printf 'Installed GRUB configuration does not request the boot splash\n' >&2
     exit 1
 }
 
 for package in blackarch-keyring blackarch-mirrorlist calamares ckbcomp \
-    chaotic-keyring chaotic-mirrorlist firefox lvm2 mkinitcpio-nfs-utils nbd \
-    neovim pv python-cairo ranger squashfs-tools syslinux; do
+    cage chaotic-keyring chaotic-mirrorlist firefox greetd greetd-regreet \
+    hypridle hyprlock inter-font lvm2 mkinitcpio-nfs-utils nbd neovim \
+    pipewire pipewire-pulse plymouth pv python-cairo ranger rtkit \
+    squashfs-tools syslinux wireplumber blueman; do
     grep -Eq "^${package}[[:space:]]" "$pkglist" || {
         printf 'Required package is absent from the ISO package list: %s\n' "$package" >&2
         exit 1

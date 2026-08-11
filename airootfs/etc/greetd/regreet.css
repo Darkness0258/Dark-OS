@@ -1,0 +1,59 @@
+* {
+    font-family: Inter, "Noto Sans", sans-serif;
+    font-size: 15px;
+    color: #f2f5f7;
+}
+
+window {
+    background-color: #000000;
+}
+
+frame.background {
+    background-color: rgba(22, 24, 28, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    padding: 16px;
+}
+
+entry,
+passwordentry,
+combobox button {
+    background-color: rgba(0, 0, 0, 0.64);
+    border: 1px solid rgba(0, 229, 255, 0.40);
+    border-radius: 8px;
+    color: #f2f5f7;
+    min-height: 40px;
+}
+
+button {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #f2f5f7;
+    min-height: 40px;
+}
+
+button:hover,
+button:focus {
+    border-color: #00e5ff;
+    box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.55);
+}
+
+button.suggested-action {
+    background-color: rgba(0, 229, 255, 0.18);
+    border-color: #00e5ff;
+    color: #00e5ff;
+}
+
+button.destructive-action {
+    background-color: rgba(255, 59, 59, 0.12);
+    border-color: rgba(255, 59, 59, 0.45);
+    color: #ff3b3b;
+}
+
+infobar {
+    background-color: rgba(255, 138, 0, 0.16);
+    border: 1px solid rgba(255, 138, 0, 0.45);
+    border-radius: 8px;
+}

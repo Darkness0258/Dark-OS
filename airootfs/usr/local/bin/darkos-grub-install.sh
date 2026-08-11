@@ -9,12 +9,21 @@ umask 022
 
 LOG=/boot/grub/install.log
 MARKER=/var/lib/darkos-grub-repair.done
+BUILD_SHA_FILE=/etc/darkos-build-sha
 LOCK=/run/lock/darkos-grub-repair.lock
 ESP_MOUNT=/boot/efi
 ESP_DEVICE=
 FALLBACK_ESP=
 GRUB_CFG_TMP=
 MARKER_TMP=
+BUILD_SHA=unknown
+
+if [ -r "$BUILD_SHA_FILE" ]; then
+    IFS= read -r BUILD_SHA < "$BUILD_SHA_FILE" || true
+    if [[ ! "$BUILD_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+        BUILD_SHA=unknown
+    fi
+fi
 
 # --- Calamares compatibility ------------------------------------------------
 # Calamares' bootloader module invokes this script with:
@@ -51,7 +60,8 @@ fi
 # deliberately not duplicated here.
 
 for command in awk cat findfs findmnt flock grep grub-install grub-mkconfig \
-    lsblk mkinitcpio mount mountpoint mv readlink rm sed tee; do
+    lsblk mkinitcpio mount mountpoint mv plymouth-set-default-theme readlink \
+    rm sed tee; do
     if ! command -v "$command" >/dev/null 2>&1; then
         stderr "ERROR: required command is missing: $command"
         exit 1
@@ -271,6 +281,33 @@ if [ ! -f /etc/mkinitcpio.conf ]; then
     fail "/etc/mkinitcpio.conf is missing"
 fi
 
+log "--- Enabling the DarkOS Plymouth boot theme ---"
+if ! grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]plymouth[[:space:])]' \
+    /etc/mkinitcpio.conf; then
+    if grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]udev[[:space:])]' \
+        /etc/mkinitcpio.conf; then
+        sed -i -E \
+            '/^[[:space:]]*HOOKS=/ s/([[:space:](])udev([[:space:])])/\1udev plymouth\2/' \
+            /etc/mkinitcpio.conf || fail "could not add Plymouth after udev"
+    elif grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]systemd[[:space:])]' \
+        /etc/mkinitcpio.conf; then
+        sed -i -E \
+            '/^[[:space:]]*HOOKS=/ s/([[:space:](])systemd([[:space:])])/\1systemd plymouth\2/' \
+            /etc/mkinitcpio.conf || fail "could not add Plymouth after systemd"
+    else
+        sed -i -E \
+            '/^[[:space:]]*HOOKS=/ s/HOOKS=\(/HOOKS=(plymouth /' \
+            /etc/mkinitcpio.conf || fail "could not add the Plymouth hook"
+    fi
+fi
+if ! grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]plymouth[[:space:])]' \
+    /etc/mkinitcpio.conf; then
+    fail "mkinitcpio configuration does not contain the Plymouth hook"
+fi
+if ! plymouth-set-default-theme darkos >>"$LOG" 2>&1; then
+    fail "could not select the DarkOS Plymouth theme"
+fi
+
 log "--- Building initramfs (mkinitcpio -P) ---"
 mkinitcpio -P >>"$LOG" 2>&1
 status=$?
@@ -294,6 +331,7 @@ if [ ! -f /etc/default/grub ] || [ -L /etc/default/grub ]; then
 fi
 set_grub_option GRUB_TERMINAL_OUTPUT console
 set_grub_option GRUB_GFXPAYLOAD_LINUX text
+set_grub_option GRUB_CMDLINE_LINUX_DEFAULT '"quiet splash loglevel=3 rd.udev.log_level=3"'
 
 log "--- Locating and validating the EFI System Partition ---"
 if mountpoint -q "$ESP_MOUNT"; then
@@ -383,6 +421,7 @@ if ! {
     printf 'completed_at=%s\n' "$(date --iso-8601=seconds 2>/dev/null || date)"
     printf 'esp_device=%s\n' "$ESP_DEVICE"
     printf 'efi_loader=%s\n' 'EFI/BOOT/BOOTX64.EFI'
+    printf 'built_from=%s\n' "$BUILD_SHA"
 } >"$MARKER_TMP"; then
     fail "could not write temporary completion marker"
 fi

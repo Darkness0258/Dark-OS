@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=DarkOS
+Description=DarkOS boot progress
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/darkos
+ScriptFile=/usr/share/plymouth/themes/darkos/darkos.script

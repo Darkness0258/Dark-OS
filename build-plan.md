@@ -7,7 +7,7 @@ Goal — a real, installable Arch + Hyprland + BlackArch OS, even with zero AI o
 - [x] Archiso profile: base packages, Hyprland, PipeWire, NetworkManager, Calamares installer
 - [x] BlackArch repo wired into `pacman.conf`, tool groups selectable at setup
 - [x] Base Hyprland config: tiling, animations, blur, rounded corners
-- [x] Calamares install wizard completes in a VM (partition, unpackfs, user/root password, bootloader, reboot prompt) — `darkos-tool-groups` is now wired into the first-boot flow via `darkos-firstboot-tools` (wofi dialog on first Hyprland start, skips on live ISO and after first run). `start-hyprland` wrapper script was missing (both `.bash_profile` files called a non-existent command) — now created at `/usr/local/bin/start-hyprland`. Boot test still pending: nobody has rebooted into the installed system yet to confirm it actually boots and the passwordless live-session setup is gone.
+- [x] Calamares install wizard completes in a VM (partition, unpackfs, user/root password, bootloader, reboot prompt) — `darkos-tool-groups` is now wired into the first-boot flow via `darkos-firstboot-tools` (wofi dialog on first Hyprland start, skips on live ISO and after first run). `start-hyprland` wrapper script was missing (both `.bash_profile` files called a non-existent command) — now created at `/usr/local/bin/start-hyprland`. Phase 1 verification evidence: see [README.md#phase-1-verification](README.md#phase-1-verification).
 
 ## Phase 2: Core shell (chrome only)
 Goal — the reference mockup's look exists and runs, AI still stubbed
