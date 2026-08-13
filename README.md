@@ -18,7 +18,7 @@ DarkOS is a real startup product — not a demo, not a theme pack, not a Windows
 - **Arch Linux under the hood** — rolling releases, pacman + AUR, full software ecosystem
 - **BlackArch layered in** — 2,900+ security tools available as opt-in groups at install time
 - **Hyprland compositor** — Wayland-native, GPU-accelerated, tiling + floating, spring animations, blur and rounded corners
-- **Cinematic glassmorphism shell** — pure black backgrounds, glass panels with `backdrop-filter: blur(24px)`, electric cyan `#00e5ff` primary, neon blue `#2d7bff` secondary
+- **Cinematic glassmorphism shell** — pure black backgrounds, glass panels with compositor-rendered blur, electric cyan `#00e5ff` primary, neon blue `#2d7bff` secondary
 - **Voice-controlled AI assistant** (in development) — STT/TTS/brain, OS control via D-Bus + `hyprctl`, generic in-app control via AT-SPI
 - **~27 native apps** (Settings hub, File Explorer, Terminal, Notes, Calendar, etc.) + unmodified hosted software (Firefox, mpv, Docker, Steam)
 - **Calamares graphical installer**
@@ -85,6 +85,7 @@ has SHA-256 `CEB95BACC1AC69C783A89CB411239CBDD7AB278FEF3C83A8A09206E0CE032B25`.
 - `mkinitcpio`, `grub-install`, and `grub-mkconfig` each exited with status 0.
 - With the ISO disconnected, the installed disk reached the `darkos-vm` login prompt.
 - `/boot/grub/install.log` ends with `repair complete; validated config and marker written`.
+- The installed system's `/etc/mkinitcpio.conf` is modified at first boot by `darkos-grub-install.sh` to include the `plymouth` hook, then `mkinitcpio -P` builds the initramfs with the DarkOS splash.
 
 ## Project Structure
 
@@ -145,7 +146,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 | Phase | Goal |
 |---|---|
 | 1 | Bootable and installable Arch + Hyprland + BlackArch ISO ✓ |
-| 2 | Core shell chrome (HUD, panels, dock) |
+| 2 | Core shell chrome (HUD, panels, dock, lock, login, boot animation) ✓ |
 | 3 | AI assistant (STT/TTS/brain, OS control) |
 | 4 | Daily-use native apps |
 | 5 | System management (Settings, Network, Security) |
@@ -160,7 +161,7 @@ Full details in [build-plan.md](build-plan.md).
 - **Phase 1 is complete and VM-verified** — CI produces installable UEFI ISOs published as GitHub Releases from `main`.
 - **Calamares installation is verified** — the guarded bootloader wrapper completes successfully and writes its validation marker and log to the installed system.
 - **Installed-system boot is verified** — a clean virtual disk booted to a real login prompt with the ISO disconnected.
-- **Phase 2 shell** (HUD, panels, dock, lock screen) is the next milestone.
+- **Phase 2 shell chrome is code-complete** — HUD, panels, dock, lock screen (hyprlock + hypridle), ReGreet login, and Plymouth boot animation are all implemented. Awaiting fresh VM verification before claiming full Phase 2 closure.
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).
 
