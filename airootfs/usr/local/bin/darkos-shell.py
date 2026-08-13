@@ -133,11 +133,14 @@ CSS_STYLE = f"""
     text-shadow: none;
 }}
 
+.icon-button image, .dock-icon-button image, .orb-button image {{
+    -gtk-icon-size: 24px;
+}}
+
 .icon-button label, .dock-icon-button label, .orb-button label,
 .action-button label, .toggle-button label {{
     color: inherit;
-    font-family: "JetBrainsMono Nerd Font", "Font Awesome 7 Free", Inter,
-        "Noto Sans", sans-serif;
+    font-family: Inter, "Noto Sans", sans-serif;
     text-shadow: none;
 }}
 
@@ -280,8 +283,11 @@ def make_label(text, class_name=None, align=Gtk.Align.START, wrap=False):
     return widget
 
 
-def make_icon_button(icon, name, callback, class_name="icon-button", size=40):
-    button = Gtk.Button(label=icon)
+def make_icon_button(icon_name, name, callback, class_name="icon-button", size=40):
+    button = Gtk.Button()
+    image = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.LARGE_TOOLBAR)
+    image.set_pixel_size(size // 2)
+    button.add(image)
     add_class(button, class_name)
     button.set_tooltip_text(name)
     button.set_size_request(size, size)
@@ -711,14 +717,14 @@ class DarkOSDockWindow(Gtk.Window):
         dock.set_halign(Gtk.Align.CENTER)
 
         left_apps = (
-            ("󰋜", "Files", ["kitty", "-e", "ranger"]),
-            ("󰞷", "Terminal", ["/usr/local/bin/the-void.sh"]),
-            ("󰈹", "Browser", ["firefox"]),
+            ("folder", "Files", ["kitty", "-e", "ranger"]),
+            ("terminal", "Terminal", ["/usr/local/bin/the-void.sh"]),
+            ("web-browser", "Browser", ["firefox"]),
         )
         right_apps = (
-            ("󰠮", "Notes", ["kitty", "-e", "nvim"]),
-            ("󰄨", "Store", ["wofi", "--show", "drun"]),
-            ("󰒓", "Settings", ["wofi", "--show", "drun"]),
+            ("text-editor", "Notes", ["kitty", "-e", "nvim"]),
+            ("system-software-install", "Store", ["wofi", "--show", "drun"]),
+            ("preferences-system", "Settings", ["wofi", "--show", "drun"]),
         )
 
         for icon, name, command in left_apps:
@@ -843,16 +849,16 @@ class DarkOSIconRail(Gtk.Window):
         add_class(rail, "rail")
         rail.set_valign(Gtk.Align.CENTER)
         actions = (
-            ("󰚩", "AI", "ai"),
-            ("󰉋", "Files", "files"),
-            ("󰆍", "Terminal", "terminal"),
-            ("󰒓", "Settings", "settings"),
-            ("󰈹", "Browser", "browser"),
-            ("󰄄", "Gallery", "gallery"),
-            ("󰏓", "Store", "store"),
-            ("󰠮", "Notes", "notes"),
-            ("󰎈", "Music", "music"),
-            ("󰊗", "Gaming", "gaming"),
+            ("chat", "AI", "ai"),
+            ("folder", "Files", "files"),
+            ("terminal", "Terminal", "terminal"),
+            ("preferences-system", "Settings", "settings"),
+            ("web-browser", "Browser", "browser"),
+            ("image-x-generic", "Gallery", "gallery"),
+            ("system-software-install", "Store", "store"),
+            ("text-editor", "Notes", "notes"),
+            ("audio-x-generic", "Music", "music"),
+            ("applications-games", "Gaming", "gaming"),
         )
         for icon, name, action in actions:
             rail.pack_start(
@@ -923,7 +929,7 @@ class DarkOSLeftPanels(Gtk.Window):
         self.entry.set_hexpand(True)
         self.entry.connect("activate", self.on_submit)
         entry_row.pack_start(self.entry, True, True, 0)
-        submit = make_icon_button("󰄬", "Submit AI preview request", self.on_submit)
+        submit = make_icon_button("send", "Submit AI preview request", self.on_submit)
         entry_row.pack_start(submit, False, False, 0)
         panel.pack_start(entry_row, False, False, 0)
 
@@ -1154,13 +1160,13 @@ class DarkOSRightPanels(Gtk.Window):
         controls.set_halign(Gtk.Align.CENTER)
         self.media_buttons = (
             make_icon_button(
-                "󰒮", "Previous track", lambda _button: launch(["playerctl", "previous"])
+                "media-skip-backward", "Previous track", lambda _button: launch(["playerctl", "previous"])
             ),
             make_icon_button(
-                "󰏤", "Play or pause", lambda _button: launch(["playerctl", "play-pause"])
+                "media-playback-pause", "Play or pause", lambda _button: launch(["playerctl", "play-pause"])
             ),
             make_icon_button(
-                "󰒭", "Next track", lambda _button: launch(["playerctl", "next"])
+                "media-skip-forward", "Next track", lambda _button: launch(["playerctl", "next"])
             ),
         )
         for button in self.media_buttons:
