@@ -21,14 +21,13 @@ window#waybar {
 #custom-logo {
     color: #00e5ff;
     font-weight: 900;
+    letter-spacing: 2px;
     padding: 0 16px;
     font-size: 15px;
     text-shadow: 0 0 12px rgba(0, 229, 255, 0.7);
 }
 
 #workspaces {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     margin: 4px;
     padding: 0 4px;
@@ -43,9 +42,6 @@ window#waybar {
 
 #workspaces button.active {
     color: #00e5ff;
-    background: rgba(0, 229, 255, 0.15);
-    border: 1px solid rgba(0, 229, 255, 0.4);
-    box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
 }
 
 #workspaces button:hover {
@@ -65,10 +61,7 @@ window#waybar {
     color: #f2f5f7;
     font-weight: 700;
     padding: 4px 16px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(0, 229, 255, 0.25);
     border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
     margin: 4px 0;
 }
 
@@ -77,15 +70,20 @@ window#waybar {
     padding: 4px 8px;
     margin: 4px;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
     color: #00e5ff;
     transition: all 0.2s ease;
 }
 
+#network {
+    color: #22e07a;
+}
+
+#network.disconnected {
+    color: #9aa4ad;
+}
+
 #tray:hover, #backlight:hover, #custom-bluetooth:hover, #network:hover, #pulseaudio:hover, #battery:hover, #custom-avatar:hover, #custom-control:hover {
-    background: rgba(0, 229, 255, 0.12);
-    border-color: rgba(0, 229, 255, 0.35);
+    background-color: rgba(0, 229, 255, 0.12);
     box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
 }
 
@@ -99,6 +97,24 @@ window#waybar {
 
 #pulseaudio {
     color: #00e5ff;
+    background-image: -gtk-icontheme("audio-volume-high-symbolic");
+    background-position: left center;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    padding-left: 24px;
+}
+
+#pulseaudio.muted {
+    background-image: -gtk-icontheme("audio-volume-muted-symbolic");
+    color: #9aa4ad;
+}
+
+#custom-control {
+    background-image: -gtk-icontheme("preferences-system-symbolic");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    min-width: 20px;
 }
 
 #battery {
@@ -115,22 +131,23 @@ window#waybar {
 
 #custom-avatar {
     color: #f2f5f7;
-    background: rgba(168, 85, 247, 0.15);
-    border-color: rgba(168, 85, 247, 0.3);
 }
 
 #custom-power {
     color: #ff3b3b;
+    background-image: -gtk-icontheme("system-shutdown-symbolic");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
     padding: 0 8px;
     margin: 4px;
     font-size: 15px;
+    min-width: 20px;
     border-radius: 8px;
-    background: rgba(255, 59, 59, 0.1);
-    border: 1px solid rgba(255, 59, 59, 0.25);
     transition: all 0.2s ease;
 }
 
 #custom-power:hover {
-    background: rgba(255, 59, 59, 0.3);
+    background-color: rgba(255, 59, 59, 0.3);
     box-shadow: 0 0 12px rgba(255, 59, 59, 0.5);
 }

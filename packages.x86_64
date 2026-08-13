@@ -72,6 +72,7 @@ python
 python-gobject
 python-cairo
 gtk3
+adwaita-icon-theme
 gtk-layer-shell
 swaybg
 mako

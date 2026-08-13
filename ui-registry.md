@@ -8,7 +8,7 @@
 - Notes: The avatar is informational and does not create a second settings surface.
 
 ## AICoreHUD
-- Purpose: Central assistant radar, ring state, and "Control Everything" identity.
+- Purpose: Central assistant radar, ring state, and "Dark OS / Control Everything" identity.
 - Variants: Idle, listening, thinking, speaking, error.
 - Tokens used: `color-primary`, `color-secondary`, `color-danger`, text colors, ring/gauge language.
 - Used in: `AIRadarCanvas` and `DarkOSHUDOverlay` in `darkos-shell.py`.

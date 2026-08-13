@@ -21,16 +21,20 @@ for command in awk bash chmod cmp cp find git grep head install ln lsinitcpio mk
     fi
 done
 
-build_sha="$(
-    git -C "${project_dir}" rev-parse --short=8 HEAD 2>/dev/null \
-        || git -C "${project_dir}" log -1 --format='%h' 2>/dev/null \
-        || printf '%s' "${GITHUB_SHA:-}" \
-        || true
-)"
-if [[ -z "${build_sha}" ]]; then
-    build_sha="unknown"
-    printf 'WARNING: no Git build SHA available from %s; using "unknown".\n' "${project_dir}" >&2
+build_sha_candidate="${DARKOS_BUILD_SHA:-${GITHUB_SHA:-}}"
+if [[ -z "${build_sha_candidate}" ]]; then
+    build_sha_candidate="$(
+        git -c safe.directory="${project_dir}" -C "${project_dir}" \
+            rev-parse --verify HEAD 2>/dev/null || true
+    )"
 fi
+build_sha_candidate="${build_sha_candidate,,}"
+if [[ ! "${build_sha_candidate}" =~ ^[0-9a-f]{8}([0-9a-f]{32}|[0-9a-f]{56})?$ ]]; then
+    printf '%s\n' \
+        'Could not determine Git build identity; build from a checkout or set DARKOS_BUILD_SHA.' >&2
+    exit 1
+fi
+build_sha="${build_sha_candidate:0:8}"
 readonly build_sha
 
 [[ -d "${releng_profile}/airootfs" && -d "${releng_profile}/efiboot" ]] || {

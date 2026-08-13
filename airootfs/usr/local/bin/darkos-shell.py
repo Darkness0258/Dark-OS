@@ -46,13 +46,12 @@ CAIRO_TEXT = (0.949, 0.961, 0.969)
 CAIRO_MUTED = (0.604, 0.643, 0.678)
 CAIRO_DANGER = (1.0, 0.231, 0.231)
 
-# Glow technique: layered strokes, decreasing alpha outward.
-# 3 layers: sharp core (1.0 alpha, thin), mid glow (0.4 alpha, medium),
-# outer haze (0.12 alpha, wide). Applied to all Cairo-drawn elements.
-GLOW_LAYERS = (
-    (2.0, 1.0),
-    (5.0, 0.40),
+# Glow technique: paint outside-in so the wide haze never washes out the core.
+# Alpha decreases away from the source: 0.12 outer, 0.40 mid, 1.0 core.
+GLOW_STROKES_OUTSIDE_IN = (
     (10.0, 0.12),
+    (5.0, 0.40),
+    (2.0, 1.0),
 )
 
 SPACE_XS = 4
@@ -88,6 +87,14 @@ CSS_STYLE = f"""
     padding: {SPACE_SM}px;
 }}
 
+.hud-wordmark {{
+    color: {COLOR_TEXT};
+    font-family: "Space Grotesk", Inter, "Noto Sans", sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}}
+
 .section-title {{
     color: {COLOR_PRIMARY};
     font-family: Inter, "Noto Sans", sans-serif;
@@ -100,6 +107,7 @@ CSS_STYLE = f"""
     color: {COLOR_TEXT_MUTED};
     font-size: 13px;
     font-weight: 600;
+    letter-spacing: 0.5px;
 }}
 
 .body-muted {{
@@ -133,10 +141,6 @@ CSS_STYLE = f"""
     text-shadow: none;
 }}
 
-.icon-button image, .dock-icon-button image, .orb-button image {{
-    -gtk-icon-size: 24px;
-}}
-
 .icon-button label, .dock-icon-button label, .orb-button label,
 .action-button label, .toggle-button label {{
     color: inherit;
@@ -149,10 +153,18 @@ CSS_STYLE = f"""
     font-size: 20px;
 }}
 
+.orb-button {{
+    background-color: alpha({COLOR_BG}, 0.30);
+    border-color: alpha({COLOR_PRIMARY}, 0.42);
+    border-radius: 999px;
+    box-shadow: 0 0 16px alpha({COLOR_PRIMARY}, 0.30);
+    padding: {SPACE_XS}px;
+}}
+
 .icon-button:hover, .dock-icon-button:hover, .orb-button:hover {{
     background-color: alpha({COLOR_PRIMARY}, 0.14);
     border-color: alpha({COLOR_PRIMARY}, 0.35);
-    box-shadow: 0 0 12px alpha({COLOR_PRIMARY}, 0.25);
+    box-shadow: 0 0 16px alpha({COLOR_PRIMARY}, 0.34);
     color: {COLOR_PRIMARY};
 }}
 
@@ -207,7 +219,7 @@ CSS_STYLE = f"""
 .toggle-button:checked {{
     background-color: alpha({COLOR_PRIMARY}, 0.20);
     border-color: {COLOR_PRIMARY};
-    box-shadow: 0 0 8px alpha({COLOR_PRIMARY}, 0.20);
+    box-shadow: 0 0 12px alpha({COLOR_PRIMARY}, 0.32);
     color: {COLOR_PRIMARY};
 }}
 
@@ -294,6 +306,29 @@ def make_icon_button(icon_name, name, callback, class_name="icon-button", size=4
     button.get_accessible().set_name(name)
     button.connect("clicked", callback)
     return button
+
+
+def make_icon_label(icon_name, text, icon_size=16):
+    """Build a labelled control face from the active GTK symbolic icon theme."""
+    content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_XS)
+    content.set_halign(Gtk.Align.CENTER)
+    image = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.BUTTON)
+    image.set_pixel_size(icon_size)
+    content.pack_start(image, False, False, 0)
+    content.pack_start(Gtk.Label(label=text), False, False, 0)
+    return content
+
+
+def stroke_glow(cr, color, alpha=1.0, width_scale=1.0):
+    """Stroke the current Cairo path as outer haze, mid glow, then crisp core."""
+    final_index = len(GLOW_STROKES_OUTSIDE_IN) - 1
+    for index, (line_width, alpha_scale) in enumerate(GLOW_STROKES_OUTSIDE_IN):
+        cr.set_line_width(line_width * width_scale)
+        cr.set_source_rgba(*color, min(1.0, alpha * alpha_scale))
+        if index == final_index:
+            cr.stroke()
+        else:
+            cr.stroke_preserve()
 
 
 def apply_css():
@@ -415,13 +450,13 @@ class AIOrbCanvas(Gtk.DrawingArea):
         cr.set_source(gradient)
         cr.fill()
 
+        cr.arc(cx, cy, radius + 3, 0, 2 * math.pi)
+        stroke_glow(cr, color, alpha * 0.72)
+
         if self.state != "sleeping":
             start = self.anim_phase * 1.8
-            for line_width, alpha_scale in GLOW_LAYERS:
-                cr.set_line_width(line_width)
-                cr.set_source_rgba(*color, 0.86 * alpha_scale)
-                cr.arc(cx, cy, radius + 4, start, start + math.pi * 0.72)
-                cr.stroke()
+            cr.arc(cx, cy, radius + 5, start, start + math.pi * 0.72)
+            stroke_glow(cr, color, 0.86)
         return False
 
 
@@ -466,7 +501,7 @@ class AIRadarCanvas(Gtk.DrawingArea):
         height = widget.get_allocated_height()
         cx, cy = width / 2.0, height / 2.0 - 8
         active = self.activity != "idle"
-        intensity = 0.88 if active else 0.46
+        intensity = 0.88 if active else 0.62
         ring_color = CAIRO_DANGER if self.activity == "error" else CAIRO_PRIMARY
 
         for index, radius in enumerate((54, 88, 122)):
@@ -476,11 +511,8 @@ class AIRadarCanvas(Gtk.DrawingArea):
             base_width = 2.0 if active and index == 1 else 1.5
             offset = self.rotation * (24.0 if index % 2 == 0 else -18.0)
             cr.set_dash((12.0, 6.0), offset)
-            for line_width, alpha_scale in GLOW_LAYERS:
-                cr.set_line_width(line_width * (base_width / 2.0))
-                cr.set_source_rgba(*color, base_alpha * alpha_scale)
-                cr.arc(cx, cy, radius, 0, 2 * math.pi)
-                cr.stroke()
+            cr.arc(cx, cy, radius, 0, 2 * math.pi)
+            stroke_glow(cr, color, base_alpha, base_width / 2.0)
             cr.restore()
 
         cr.save()
@@ -490,9 +522,12 @@ class AIRadarCanvas(Gtk.DrawingArea):
             outer = 124 if angle % 45 == 0 else 121
             cr.move_to(cx + inner * math.cos(radians), cy + inner * math.sin(radians))
             cr.line_to(cx + outer * math.cos(radians), cy + outer * math.sin(radians))
-            cr.set_source_rgba(*ring_color, intensity if angle % 45 == 0 else 0.26)
-            cr.set_line_width(2.0 if angle % 45 == 0 else 1.0)
-            cr.stroke()
+            if angle % 45 == 0:
+                stroke_glow(cr, ring_color, intensity * 0.90, 0.75)
+            else:
+                cr.set_source_rgba(*ring_color, 0.26)
+                cr.set_line_width(1.0)
+                cr.stroke()
         cr.restore()
 
         pulse = 20 + (5 if active else 3) * math.sin(self.rotation * 4.0)
@@ -574,15 +609,13 @@ class RingGauge(Gtk.DrawingArea):
         start = -math.pi / 2.0
 
         cr.set_line_width(5.0)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
         cr.set_source_rgba(*CAIRO_TEXT, 0.08)
         cr.arc(cx, cy, radius, 0, 2 * math.pi)
         cr.stroke()
         if self.value is not None:
-            for line_width, alpha_scale in GLOW_LAYERS:
-                cr.set_line_width(line_width)
-                cr.set_source_rgba(*self.color, 0.92 * alpha_scale)
-                cr.arc(cx, cy, radius, start, start + 2 * math.pi * self.value / 100.0)
-                cr.stroke()
+            cr.arc(cx, cy, radius, start, start + 2 * math.pi * self.value / 100.0)
+            stroke_glow(cr, self.color, 0.92)
 
         cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(15)
@@ -717,14 +750,34 @@ class DarkOSDockWindow(Gtk.Window):
         dock.set_halign(Gtk.Align.CENTER)
 
         left_apps = (
-            ("folder", "Files", ["kitty", "-e", "ranger"]),
-            ("terminal", "Terminal", ["/usr/local/bin/the-void.sh"]),
-            ("web-browser", "Browser", ["firefox"]),
+            (
+                "folder-symbolic",
+                "Files",
+                ["/usr/local/bin/the-void.sh", "-e", "ranger"],
+            ),
+            (
+                "utilities-terminal-symbolic",
+                "Terminal",
+                ["/usr/local/bin/the-void.sh"],
+            ),
+            ("web-browser-symbolic", "Browser", ["firefox"]),
         )
         right_apps = (
-            ("text-editor", "Notes", ["kitty", "-e", "nvim"]),
-            ("system-software-install", "Store", ["wofi", "--show", "drun"]),
-            ("preferences-system", "Settings", ["wofi", "--show", "drun"]),
+            (
+                "accessories-text-editor-symbolic",
+                "Notes",
+                ["/usr/local/bin/the-void.sh", "-e", "nvim"],
+            ),
+            (
+                "system-software-install-symbolic",
+                "Store",
+                ["wofi", "--show", "drun"],
+            ),
+            (
+                "preferences-system-symbolic",
+                "Settings",
+                ["wofi", "--show", "drun"],
+            ),
         )
 
         for icon, name, command in left_apps:
@@ -805,6 +858,9 @@ class DarkOSHUDOverlay(Gtk.Window):
         self.radar = AIRadarCanvas()
         stage.pack_start(self.radar, False, False, 0)
 
+        wordmark = make_label("DARK OS", "hud-wordmark", Gtk.Align.CENTER)
+        wordmark.set_xalign(0.5)
+        stage.pack_start(wordmark, False, False, 0)
         tagline = make_label("CONTROL EVERYTHING", "section-title", Gtk.Align.CENTER)
         tagline.set_xalign(0.5)
         stage.pack_start(tagline, False, False, 0)
@@ -849,16 +905,16 @@ class DarkOSIconRail(Gtk.Window):
         add_class(rail, "rail")
         rail.set_valign(Gtk.Align.CENTER)
         actions = (
-            ("chat", "AI", "ai"),
-            ("folder", "Files", "files"),
-            ("terminal", "Terminal", "terminal"),
-            ("preferences-system", "Settings", "settings"),
-            ("web-browser", "Browser", "browser"),
-            ("image-x-generic", "Gallery", "gallery"),
-            ("system-software-install", "Store", "store"),
-            ("text-editor", "Notes", "notes"),
-            ("audio-x-generic", "Music", "music"),
-            ("applications-games", "Gaming", "gaming"),
+            ("system-run-symbolic", "AI", "ai"),
+            ("folder-symbolic", "Files", "files"),
+            ("utilities-terminal-symbolic", "Terminal", "terminal"),
+            ("preferences-system-symbolic", "Settings", "settings"),
+            ("web-browser-symbolic", "Browser", "browser"),
+            ("image-x-generic-symbolic", "Gallery", "gallery"),
+            ("system-software-install-symbolic", "Store", "store"),
+            ("accessories-text-editor-symbolic", "Notes", "notes"),
+            ("audio-x-generic-symbolic", "Music", "music"),
+            ("applications-games-symbolic", "Gaming", "gaming"),
         )
         for icon, name, action in actions:
             rail.pack_start(
@@ -929,7 +985,9 @@ class DarkOSLeftPanels(Gtk.Window):
         self.entry.set_hexpand(True)
         self.entry.connect("activate", self.on_submit)
         entry_row.pack_start(self.entry, True, True, 0)
-        submit = make_icon_button("send", "Submit AI preview request", self.on_submit)
+        submit = make_icon_button(
+            "mail-send-symbolic", "Submit AI preview request", self.on_submit
+        )
         entry_row.pack_start(submit, False, False, 0)
         panel.pack_start(entry_row, False, False, 0)
 
@@ -947,7 +1005,9 @@ class DarkOSLeftPanels(Gtk.Window):
         add_class(panel, "glass-panel")
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_SM)
         header.pack_start(make_label("WEATHER", "section-title"), True, True, 0)
-        header.pack_end(make_label("󰖐  --", "status-text"), False, False, 0)
+        weather_status = make_icon_label("weather-clear-symbolic", "--")
+        add_class(weather_status, "status-text")
+        header.pack_end(weather_status, False, False, 0)
         panel.pack_start(header, False, False, 0)
         panel.pack_start(
             make_label(
@@ -1071,7 +1131,8 @@ class DarkOSRightPanels(Gtk.Window):
         add_class(panel, "glass-panel")
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_SM)
         header.pack_start(make_label("NOTIFICATIONS", "section-title"), True, True, 0)
-        clear_button = Gtk.Button(label="󰆴  Clear All")
+        clear_button = Gtk.Button()
+        clear_button.add(make_icon_label("edit-clear-all-symbolic", "Clear All"))
         add_class(clear_button, "action-button")
         clear_button.set_tooltip_text("Dismiss visible Mako notifications")
         clear_button.connect("clicked", self.clear_notifications)
@@ -1103,19 +1164,20 @@ class DarkOSRightPanels(Gtk.Window):
         grid.set_row_spacing(SPACE_SM)
         grid.set_column_homogeneous(True)
         toggle_specs = (
-            ("wifi", "󰤨  Wi-Fi"),
-            ("bluetooth", "󰂯  Bluetooth"),
-            ("dark_mode", "󰔎  Dark Mode"),
-            ("night_light", "󰌵  Night Light"),
-            ("focus", "󰍦  Focus"),
-            ("airplane", "󰀝  Airplane"),
+            ("wifi", "network-wireless-signal-excellent-symbolic", "Wi-Fi"),
+            ("bluetooth", "bluetooth-active-symbolic", "Bluetooth"),
+            ("dark_mode", "weather-clear-night-symbolic", "Dark Mode"),
+            ("night_light", "display-brightness-symbolic", "Night Light"),
+            ("focus", "notifications-disabled-symbolic", "Focus"),
+            ("airplane", "airplane-mode-symbolic", "Airplane"),
         )
         self.toggle_buttons = {}
-        for index, (name, label) in enumerate(toggle_specs):
-            button = Gtk.ToggleButton(label=label)
+        for index, (name, icon_name, label) in enumerate(toggle_specs):
+            button = Gtk.ToggleButton()
+            button.add(make_icon_label(icon_name, label))
             add_class(button, "toggle-button")
             button.connect("toggled", self.on_toggle, name)
-            button.get_accessible().set_name(label.replace("  ", " "))
+            button.get_accessible().set_name(label)
             grid.attach(button, index % 2, index // 2, 1, 1)
             self.toggle_buttons[name] = button
         self.toggle_buttons["dark_mode"].set_sensitive(False)
@@ -1153,20 +1215,28 @@ class DarkOSRightPanels(Gtk.Window):
         add_class(panel, "glass-panel")
         panel.pack_start(make_label("NOW PLAYING", "section-title"), False, False, 0)
         self.media_title = make_label("No active media", "media-title", wrap=True)
-        self.media_artist = make_label("Start a player to populate this widget.", "body-muted", wrap=True)
+        self.media_artist = make_label(
+            "Start a player to populate this widget.", "body-muted", wrap=True
+        )
         panel.pack_start(self.media_title, False, False, 0)
         panel.pack_start(self.media_artist, False, False, 0)
         controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_MD)
         controls.set_halign(Gtk.Align.CENTER)
         self.media_buttons = (
             make_icon_button(
-                "media-skip-backward", "Previous track", lambda _button: launch(["playerctl", "previous"])
+                "media-skip-backward-symbolic",
+                "Previous track",
+                lambda _button: launch(["playerctl", "previous"]),
             ),
             make_icon_button(
-                "media-playback-pause", "Play or pause", lambda _button: launch(["playerctl", "play-pause"])
+                "media-playback-pause-symbolic",
+                "Play or pause",
+                lambda _button: launch(["playerctl", "play-pause"]),
             ),
             make_icon_button(
-                "media-skip-forward", "Next track", lambda _button: launch(["playerctl", "next"])
+                "media-skip-forward-symbolic",
+                "Next track",
+                lambda _button: launch(["playerctl", "next"]),
             ),
         )
         for button in self.media_buttons:
@@ -1339,12 +1409,12 @@ class DarkOSApplication(Gtk.Application):
 
     def handle_rail_action(self, action):
         commands = {
-            "files": ["kitty", "-e", "ranger"],
+            "files": ["/usr/local/bin/the-void.sh", "-e", "ranger"],
             "terminal": ["/usr/local/bin/the-void.sh"],
             "settings": ["wofi", "--show", "drun"],
             "browser": ["firefox"],
             "store": ["wofi", "--show", "drun"],
-            "notes": ["kitty", "-e", "nvim"],
+            "notes": ["/usr/local/bin/the-void.sh", "-e", "nvim"],
         }
         if action == "ai":
             if not self.left.is_visible():

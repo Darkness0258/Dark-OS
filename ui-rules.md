@@ -5,7 +5,7 @@
 ## Layout
 - Top bar: logo + wordmark (left), date/time (center), system tray — display, sound, Bluetooth, Wi-Fi, battery %, avatar (right)
 - Left icon rail: AI, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming — icon-only, always visible
-- Center stage: the AI Core — circular radar/dial HUD (concentric rings, segmented labeled arcs, cyan glow on black), tagline beneath it ("Control Everything") — nothing else competes with it for visual weight
+- Center stage: the AI Core — circular radar/dial HUD (concentric rings, segmented labeled arcs, cyan glow on black), "Dark OS" wordmark and "Control Everything" tagline beneath it — nothing else competes with it for visual weight
 - Floating glass panels, left-of-center: AI chat card (greeting + waveform + input box), weather, system overview (CPU/GPU/RAM/storage as circular gauges with specifics, network up/down)
 - Floating glass panels, right-of-center: notifications (grouped, "Clear All"), connectivity (Wi-Fi/Bluetooth status cards + Dark Mode/Airplane/Night Light/Focus toggles + brightness/volume sliders), media widget, calendar
 - App windows (Files, Terminal, etc.) float freely above this base layer — glass, rounded, glow border, closable/minimizable/resizable

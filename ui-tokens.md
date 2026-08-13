@@ -36,12 +36,15 @@
 --text-base: 15px;
 --text-lg: 20px;
 --text-xl: 32px;
+--letter-spacing-uppercase: 0.5px;
 ```
+
+Apply `--letter-spacing-uppercase` to uppercase section and subsection labels. Product wordmarks are a deliberate exception and may use wider brand tracking (the desktop HUD uses `2px`).
 
 ## Radius / elevation
 - Corner radius: 8px (compact controls/cards), 16px (panels), 24px (dialogs / AI Orb container), fully round (dock icons, AI Orb itself)
 - Glass: GTK surfaces achieve blur through Hyprland compositor layerrules (`blur on`, `blur_passes`, `blur_size`), not CSS `backdrop-filter` (GTK3 doesn't support it). The 24px token represents the target visual equivalent; actual blur is rendered by the compositor. `--color-surface` fill, `--color-border` 1px edge
-- Glow: implemented as layered strokes with decreasing alpha outward. Cairo surfaces (orb, radar, gauges): 3 layers — sharp core (1.0 alpha, 2px), mid glow (0.4 alpha, 5px), outer haze (0.12 alpha, 10px). GTK widgets (buttons, toggles): CSS `box-shadow` with `alpha(color, 0.20)` — right tool for real widgets. Reserved for focus/active states and the AI orb; a glow on every element reads as noise, not premium. `--letter-spacing: 0.5px` on uppercase section headers.
+- Glow: use exactly three same-color Cairo strokes, painted outside-in so the haze cannot soften the core: outer haze `10px × 0.12 alpha`, mid glow `5px × 0.40`, sharp core `2px × 1.00`. Multiply that curve by the component's base alpha; keep the ratios unchanged. Preserve one path between strokes (`stroke_preserve`) instead of reconstructing three slightly different paths. GTK widgets are real controls, so use CSS blur instead: resting AI orb `0 0 16px alpha(primary, 0.30)`, active toggle `0 0 12px alpha(primary, 0.32)`, and hover/focus may strengthen the same hue. Reserve glow for AI, focus, and active states; applying it everywhere destroys hierarchy.
 - Elevation: 3 levels — resting (no shadow), raised (soft 24px blur shadow), active (glow + raised)
 
 ## Rings / gauges

@@ -5,13 +5,20 @@
 
 set -Eeuo pipefail
 
-iso_path="${1:-}"
-if [[ -z "$iso_path" || ! -s "$iso_path" ]]; then
+if (($# != 1)); then
+    printf 'Expected exactly one ISO path; got %d\n' "$#" >&2
     printf 'Usage: %s /path/to/darkos.iso\n' "$0" >&2
     exit 2
 fi
 
-for command in awk bash grep lsinitcpio mktemp python readlink stat tr unsquashfs xorriso; do
+iso_path="$1"
+if [[ ! -s "$iso_path" ]]; then
+    printf 'Usage: %s /path/to/darkos.iso\n' "$0" >&2
+    exit 2
+fi
+
+for command in awk bash grep lsinitcpio mktemp python readlink stat \
+    unsquashfs wc xorriso; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'ISO verification requires %s\n' "$command" >&2
         exit 127
@@ -171,15 +178,34 @@ for relative in "${required_files[@]}"; do
     fi
 done
 
-build_sha="$(tr -d '\r\n' < "$extracted/etc/darkos-build-sha")"
-if [[ ! "$build_sha" =~ ^[0-9a-f]{7,40}$ ]]; then
+build_sha_file="$extracted/etc/darkos-build-sha"
+if [[ "$(wc -l < "$build_sha_file")" -ne 1 ]]; then
+    printf 'ISO build identity must contain exactly one line\n' >&2
+    exit 1
+fi
+IFS= read -r build_sha < "$build_sha_file" || {
+    printf 'Could not read ISO build identity\n' >&2
+    exit 1
+}
+if [[ ! "$build_sha" =~ ^[0-9a-f]{8}$ ]]; then
     printf 'ISO build identity is missing or invalid: %s\n' "$build_sha" >&2
     exit 1
 fi
-if ! grep -Fq "printf 'built_from=%s\\n'" "$extracted/usr/local/bin/darkos-grub-install.sh"; then
-    printf 'Bootloader repair script does not write the build identity marker\n' >&2
+[[ "$(stat -c '%a' "$build_sha_file")" == 644 ]] || {
+    printf 'ISO build identity does not have mode 0644\n' >&2
     exit 1
-fi
+}
+grub_repair="$extracted/usr/local/bin/darkos-grub-install.sh"
+for build_identity_wiring in \
+    'BUILD_SHA_FILE=/etc/darkos-build-sha' \
+    'IFS= read -r BUILD_SHA < "$BUILD_SHA_FILE"' \
+    "printf 'built_from=%s\\n' \"\$BUILD_SHA\""; do
+    grep -Fq "$build_identity_wiring" "$grub_repair" || {
+        printf 'Bootloader repair build identity is not wired: %s\n' \
+            "$build_identity_wiring" >&2
+        exit 1
+    }
+done
 
 for relative in usr/bin/calamares usr/bin/cage usr/bin/ckbcomp usr/bin/hypridle \
     usr/bin/hyprlock usr/bin/plymouth-set-default-theme usr/bin/regreet \
@@ -509,11 +535,22 @@ if grep -Fq 'class DarkOSSidePanels' "$shell_source"; then
     printf 'Legacy combined DarkOSSidePanels still exists\n' >&2
     exit 1
 fi
+if grep -Fq -- '-gtk-icon-size:' "$shell_source"; then
+    printf 'DarkOS shell uses the invalid GTK3 CSS property -gtk-icon-size\n' >&2
+    exit 1
+fi
 grep -Fq '("sleeping", "listening", "thinking", "speaking", "error")' \
     "$shell_source" || {
     printf 'AI Orb does not expose all five required click states\n' >&2
     exit 1
 }
+for hud_text in 'make_label("DARK OS", "hud-wordmark"' \
+    'make_label("CONTROL EVERYTHING", "section-title"'; do
+    grep -Fq "$hud_text" "$shell_source" || {
+        printf 'DarkOS HUD identity is missing: %s\n' "$hud_text" >&2
+        exit 1
+    }
+done
 grep -Fq 'self.toggle_state = {' "$shell_source" || {
     printf 'Shell shared toggle state is not owned by DarkOSApplication\n' >&2
     exit 1
@@ -538,7 +575,7 @@ grep -Fq "set_grub_option GRUB_CMDLINE_LINUX_DEFAULT" \
     exit 1
 }
 
-for package in blackarch-keyring blackarch-mirrorlist calamares ckbcomp \
+for package in adwaita-icon-theme blackarch-keyring blackarch-mirrorlist calamares ckbcomp \
     cage chaotic-keyring chaotic-mirrorlist firefox greetd greetd-regreet \
     hypridle hyprlock inter-font lvm2 mkinitcpio-nfs-utils nbd neovim \
     pipewire pipewire-pulse plymouth pv python-cairo ranger rtkit \

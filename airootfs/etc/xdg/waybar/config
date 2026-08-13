@@ -70,12 +70,8 @@
         "tooltip-format-ethernet": "{ifname} ({ipaddr})"
     },
     "pulseaudio": {
-        "format": "{icon} {volume}%",
-        "format-muted": "󰝟 Muted",
-        "format-icons": {
-            "headphone": "",
-            "default": ["󰕿", "󰖀", "󰕾"]
-        },
+        "format": "{volume}%",
+        "format-muted": "Muted",
         "scroll-step": 5,
         "on-click": "pamixer -t"
     },
@@ -90,7 +86,7 @@
         "format-icons": ["󰂎", "󰁺", "󰁼", "󰁾", "󰂀", "󰁹"]
     },
     "custom/control": {
-        "format": "󰒓",
+        "format": " ",
         "tooltip-text": "Control Center",
         "on-click": "python /usr/local/bin/darkos-shell.py --toggle-control"
     },
@@ -99,8 +95,8 @@
         "tooltip-text": "Account controls remain part of the future Settings app"
     },
     "custom/power": {
-        "format": "⏻",
-        "tooltip": false,
+        "format": " ",
+        "tooltip-text": "Power menu",
         "on-click": "wlogout || systemctl poweroff"
     }
 }
