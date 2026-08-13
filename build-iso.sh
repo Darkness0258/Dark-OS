@@ -242,8 +242,12 @@ install -Dm0644 \
     "${project_dir}/airootfs/usr/share/calamares/branding/darkos/icons/darkos.png" \
     "${stage_profile}/airootfs/usr/share/plymouth/themes/darkos/darkos.png"
 
-# The releng profile owns the live initramfs config. Add Plymouth after udev
-# in the staged copy so upstream Archiso defaults remain intact in the repo.
+# The releng profile owns the live initramfs config. Add Plymouth after
+# udev in the staged copy so the live-USB boot shows the splash. This
+# file (archiso.conf) is live-ISO-only; the INSTALLED system gets the
+# mkinitcpio package's stock /etc/mkinitcpio.conf, which darkos-grub-
+# install.sh handles at first boot (with its own udev/systemd fallback
+# and a grep assertion, then mkinitcpio -P).
 archiso_mkinitcpio="${stage_profile}/airootfs/etc/mkinitcpio.conf.d/archiso.conf"
 [[ -f "${archiso_mkinitcpio}" ]] || {
     printf 'Staged Archiso mkinitcpio configuration is missing: %s\n' \
@@ -252,15 +256,22 @@ archiso_mkinitcpio="${stage_profile}/airootfs/etc/mkinitcpio.conf.d/archiso.conf
 }
 if ! grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]plymouth[[:space:])]' \
     "${archiso_mkinitcpio}"; then
+    # Anchor on udev, which is the first block-device hook in the Archiso
+    # releng HOOKS array. sed exits 0 on zero matches, so the grep below
+    # is the real assertion: a silent no-op must fail the build.
     sed -i -E \
         '/^[[:space:]]*HOOKS=/ s/([[:space:](])udev([[:space:])])/\1udev plymouth\2/' \
-        "${archiso_mkinitcpio}"
+        "${archiso_mkinitcpio}" || {
+        printf 'sed failed while adding Plymouth to live initramfs HOOKS\n' >&2
+        exit 1
+    }
 fi
-grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]plymouth[[:space:])]' \
-    "${archiso_mkinitcpio}" || {
+# Fail closed: confirm the resolved HOOKS= line actually contains plymouth.
+if ! grep -Eq '^[[:space:]]*HOOKS=.*[[:space:](]plymouth[[:space:])]' \
+    "${archiso_mkinitcpio}"; then
     printf 'Could not enable Plymouth in the live Archiso initramfs\n' >&2
     exit 1
-}
+fi
 
 # systemd-boot reads these entries directly from the live EFI image. Request
 # the splash there as well as in the GRUB config generated for installations.

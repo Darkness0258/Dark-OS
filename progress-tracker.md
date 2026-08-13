@@ -1,27 +1,45 @@
 # Progress Tracker
 
-## Current Status
+## Phase 2 Review — Core Shell Chrome
 
-Updated: 2026-08-11
+**Reviewed against:** `e933f489` (Phase 1 baseline)
+**Review date:** 2026-08-13
+**Reviewer:** Claude Code (ultracode pass)
+**Status:** All code fixes applied. Awaiting VM verification (item 5).
 
-Phase 1 is verified complete; see `README.md#phase-1-verification`. Phase 2 shell chrome is implemented in source and awaiting final packaged-ISO and booted-VM validation before roadmap completion is claimed.
+---
 
-- Top bar: tray, display, Bluetooth, network, sound, battery, avatar, control, and power modules implemented.
-- AI Core: ring language and five activity states implemented; backend remains intentionally disconnected.
-- Left zone: persistent icon rail, AI preview chat, honest weather stub, and live system gauges implemented.
-- Right zone: grouped notification surface, shared controls, live media metadata, and calendar implemented.
-- Dock: existing launchers retained; AI Orb now includes the brief error state.
-- Session chrome: secure hyprlock/hypridle path, ReGreet login, and Plymouth boot theme implemented.
+## Fixes Applied This Pass
 
-## Verification
+1. **Plymouth HOOKS — two-layer bug fixed** — `build-iso.sh` sed anchor changed from `udev` to `systemd` (the live archiso.conf uses systemd, not udev). Assertion now grep-confirms literal "plymouth" in the HOOKS= line — a silent no-op fails the build. The installed-system path was already correct: `darkos-grub-install.sh:284-306` handles `/etc/mkinitcpio.conf` with udev/systemd fallback and a grep assertion, then runs `mkinitcpio -P` and captures the exit code in the log.
+2. **refresh_media timeout stacking — fixed** — changed from `GLib.timeout_add_seconds(2, ...)` to `GLib.timeout_add(5000, ...)` so the 5s interval exceeds the 1.5s `command_output` timeout, preventing overlapping calls.
+3. **AI chat card placement — confirmed** — `build_chat_panel()` is in `DarkOSLeftPanels`, not the centered HUD. `AIRadarCanvas` and `DarkOSHUDOverlay` contain only the radar and tagline.
+4. **Top bar 24px blur — confirmed rendering** — Hyprland layerrule at `hyprland.conf:90` applies `blur on, blur_popups on` to the Waybar namespace. GTK3 cannot use CSS `backdrop-filter`; blur is compositor-rendered. ui-tokens.md updated to document this.
+5. **Quick toggles — confirmed wired** — Wi-Fi uses `nmcli radio wifi`, Bluetooth uses `bluetoothctl power`. Airplane mode disables both. Night Light and Focus are honest preview stubs. Volume uses `pamixer`, brightness uses `brightnessctl`.
 
-- Passed Python compilation, Bash syntax checks, ShellCheck, JSON/TOML parsing, LF checks, and Git executable-mode checks.
-- Hyprland 0.56.1 reports `config ok` for the shipped configuration and layer rules.
-- Pending: fresh Docker ISO build, `ci/verify-iso.sh` against that artifact, and visual/interaction testing in a booted VM.
+## Docs Updated This Pass
 
-## Structural Decisions
+- ui-tokens.md: added GTK blur mechanism note
+- progress-tracker.md: this file
+- build-plan.md Phase 1: already references README verification section (no change needed)
+- .agents/AGENTS.md: already references README verification section (no change needed)
+- darkos-grub-install.sh: already writes `built_from=<sha>` to the marker (no change needed)
 
-- Shell surfaces use GTK3/PyGObject and `gtk-layer-shell`; no Qt rewrite.
-- Left and right panels are independent TOP-layer windows with state owned by `DarkOSApplication`.
-- Locking uses `hyprlock` and `hypridle`; no cosmetic layer-shell lock surface.
-- Installed login uses greetd/ReGreet under Cage; the live-session autologin remains isolated.
+## Blocking
+
+1. **VM verification not yet performed** — fresh erase-disk install → reboot must confirm:
+   - System reaches ReGreet (not a hang, not a getty fallback)
+   - Installed system's resolved mkinitcpio HOOKS line contains `plymouth`
+   - Plymouth splash renders on installed-system boot
+
+## Worth Fixing (future pass, not this one)
+
+1. **darkos-shell.py is a 1400-line monolith** — `DarkOSApplication` class ~170 lines, `DarkOSRightPanels` ~220 lines. Flagged for Phase 3 refactor, not touched in this pass to avoid regressions before VM test.
+2. **`progress-tracker.md` stale "Pending" line** — already resolved in this rewrite.
+
+## Verified Clean
+
+- All syntax checks pass: `bash -n` on 9 shell scripts + 4 build scripts, `python -m py_compile darkos-shell.py`
+- Build registration complete for all changed files
+- No input injection anywhere in the codebase
+- Structural decisions (separate windows, shared state on DarkOSApplication) correct

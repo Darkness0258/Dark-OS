@@ -40,7 +40,7 @@
 
 ## Radius / elevation
 - Corner radius: 8px (compact controls/cards), 16px (panels), 24px (dialogs / AI Orb container), fully round (dock icons, AI Orb itself)
-- Glass: `backdrop-filter: blur(24px)`, `--color-surface` fill, `--color-border` 1px edge
+- Glass: GTK surfaces achieve blur through Hyprland compositor layerrules (`blur on`, `blur_passes`, `blur_size`), not CSS `backdrop-filter` (GTK3 doesn't support it). The 24px token represents the target visual equivalent; actual blur is rendered by the compositor. `--color-surface` fill, `--color-border` 1px edge
 - Glow: soft outer glow in `--color-primary` or `--color-accent`, low opacity, reserved for focus/active states — a glow on every element reads as noise, not premium
 - Elevation: 3 levels — resting (no shadow), raised (soft 24px blur shadow), active (glow + raised)
 

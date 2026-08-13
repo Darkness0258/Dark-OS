@@ -1039,7 +1039,9 @@ class DarkOSRightPanels(Gtk.Window):
         self.application.register_state_listener(self)
         self.sync_from_application()
         self.show_all()
-        GLib.timeout_add_seconds(2, self.refresh_media)
+        # Use a 5s interval (not 2s) so overlapping playerctl calls can't
+        # stack if a slow player hangs near the 1.5s command_output timeout.
+        GLib.timeout_add(5000, self.refresh_media)
 
     def build_notifications(self):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
