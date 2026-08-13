@@ -1182,7 +1182,7 @@ class DarkOSRightPanels(Gtk.Window):
             self.toggle_buttons[name] = button
         self.toggle_buttons["dark_mode"].set_sensitive(False)
         self.toggle_buttons["dark_mode"].set_tooltip_text(
-            "Dark is the only shell theme in Phase 2"
+            "Dark mode is the only shell theme in Phase 2"
         )
         panel.pack_start(grid, False, False, 0)
 
@@ -1193,7 +1193,7 @@ class DarkOSRightPanels(Gtk.Window):
         )
         self.brightness_scale.connect("value-changed", self.on_brightness_changed)
         self.control_status = make_label(
-            "Night Light and Focus are preview controls only.",
+            "Dark Mode, Night Light, and Focus are preview controls only.",
             "stub-text",
             wrap=True,
         )
