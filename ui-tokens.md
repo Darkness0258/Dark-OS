@@ -41,7 +41,7 @@
 ## Radius / elevation
 - Corner radius: 8px (compact controls/cards), 16px (panels), 24px (dialogs / AI Orb container), fully round (dock icons, AI Orb itself)
 - Glass: GTK surfaces achieve blur through Hyprland compositor layerrules (`blur on`, `blur_passes`, `blur_size`), not CSS `backdrop-filter` (GTK3 doesn't support it). The 24px token represents the target visual equivalent; actual blur is rendered by the compositor. `--color-surface` fill, `--color-border` 1px edge
-- Glow: soft outer glow in `--color-primary` or `--color-accent`, low opacity, reserved for focus/active states — a glow on every element reads as noise, not premium
+- Glow: implemented as layered strokes with decreasing alpha outward. Cairo surfaces (orb, radar, gauges): 3 layers — sharp core (1.0 alpha, 2px), mid glow (0.4 alpha, 5px), outer haze (0.12 alpha, 10px). GTK widgets (buttons, toggles): CSS `box-shadow` with `alpha(color, 0.20)` — right tool for real widgets. Reserved for focus/active states and the AI orb; a glow on every element reads as noise, not premium. `--letter-spacing: 0.5px` on uppercase section headers.
 - Elevation: 3 levels — resting (no shadow), raised (soft 24px blur shadow), active (glow + raised)
 
 ## Rings / gauges

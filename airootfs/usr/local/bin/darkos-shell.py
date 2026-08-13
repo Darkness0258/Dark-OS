@@ -46,6 +46,15 @@ CAIRO_TEXT = (0.949, 0.961, 0.969)
 CAIRO_MUTED = (0.604, 0.643, 0.678)
 CAIRO_DANGER = (1.0, 0.231, 0.231)
 
+# Glow technique: layered strokes, decreasing alpha outward.
+# 3 layers: sharp core (1.0 alpha, thin), mid glow (0.4 alpha, medium),
+# outer haze (0.12 alpha, wide). Applied to all Cairo-drawn elements.
+GLOW_LAYERS = (
+    (2.0, 1.0),
+    (5.0, 0.40),
+    (10.0, 0.12),
+)
+
 SPACE_XS = 4
 SPACE_SM = 8
 SPACE_MD = 16
@@ -84,6 +93,7 @@ CSS_STYLE = f"""
     font-family: Inter, "Noto Sans", sans-serif;
     font-size: 15px;
     font-weight: 700;
+    letter-spacing: 0.5px;
 }}
 
 .eyebrow {{
@@ -139,6 +149,7 @@ CSS_STYLE = f"""
 .icon-button:hover, .dock-icon-button:hover, .orb-button:hover {{
     background-color: alpha({COLOR_PRIMARY}, 0.14);
     border-color: alpha({COLOR_PRIMARY}, 0.35);
+    box-shadow: 0 0 12px alpha({COLOR_PRIMARY}, 0.25);
     color: {COLOR_PRIMARY};
 }}
 
@@ -193,6 +204,7 @@ CSS_STYLE = f"""
 .toggle-button:checked {{
     background-color: alpha({COLOR_PRIMARY}, 0.20);
     border-color: {COLOR_PRIMARY};
+    box-shadow: 0 0 8px alpha({COLOR_PRIMARY}, 0.20);
     color: {COLOR_PRIMARY};
 }}
 
@@ -398,11 +410,12 @@ class AIOrbCanvas(Gtk.DrawingArea):
         cr.fill()
 
         if self.state != "sleeping":
-            cr.set_line_width(2.0)
-            cr.set_source_rgba(*color, 0.86)
             start = self.anim_phase * 1.8
-            cr.arc(cx, cy, radius + 4, start, start + math.pi * 0.72)
-            cr.stroke()
+            for line_width, alpha_scale in GLOW_LAYERS:
+                cr.set_line_width(line_width)
+                cr.set_source_rgba(*color, 0.86 * alpha_scale)
+                cr.arc(cx, cy, radius + 4, start, start + math.pi * 0.72)
+                cr.stroke()
         return False
 
 
@@ -452,13 +465,16 @@ class AIRadarCanvas(Gtk.DrawingArea):
 
         for index, radius in enumerate((54, 88, 122)):
             cr.save()
-            cr.set_line_width(2.0 if active and index == 1 else 1.5)
             color = ring_color if index % 2 == 0 else CAIRO_SECONDARY
-            cr.set_source_rgba(*color, intensity - index * 0.07)
+            base_alpha = intensity - index * 0.07
+            base_width = 2.0 if active and index == 1 else 1.5
             offset = self.rotation * (24.0 if index % 2 == 0 else -18.0)
             cr.set_dash((12.0, 6.0), offset)
-            cr.arc(cx, cy, radius, 0, 2 * math.pi)
-            cr.stroke()
+            for line_width, alpha_scale in GLOW_LAYERS:
+                cr.set_line_width(line_width * (base_width / 2.0))
+                cr.set_source_rgba(*color, base_alpha * alpha_scale)
+                cr.arc(cx, cy, radius, 0, 2 * math.pi)
+                cr.stroke()
             cr.restore()
 
         cr.save()
@@ -474,12 +490,11 @@ class AIRadarCanvas(Gtk.DrawingArea):
         cr.restore()
 
         pulse = 20 + (5 if active else 3) * math.sin(self.rotation * 4.0)
-        cr.arc(cx, cy, pulse + 12, 0, 2 * math.pi)
-        cr.set_source_rgba(*ring_color, 0.18 if active else 0.10)
-        cr.fill()
-        cr.arc(cx, cy, pulse, 0, 2 * math.pi)
-        cr.set_source_rgba(*ring_color, 0.88 if active else 0.66)
-        cr.fill()
+        for glow_radius, glow_alpha in ((pulse + 12, 0.18 if active else 0.10),
+                                         (pulse, 0.88 if active else 0.66)):
+            cr.arc(cx, cy, glow_radius, 0, 2 * math.pi)
+            cr.set_source_rgba(*ring_color, glow_alpha)
+            cr.fill()
 
         self.draw_centered_text(cr, "OBSERVE", cx, cy - 138, 11, CAIRO_MUTED, 0.88)
         self.draw_centered_text(cr, "REASON", cx - 142, cy + 4, 11, CAIRO_MUTED, 0.88)
@@ -557,9 +572,11 @@ class RingGauge(Gtk.DrawingArea):
         cr.arc(cx, cy, radius, 0, 2 * math.pi)
         cr.stroke()
         if self.value is not None:
-            cr.set_source_rgba(*self.color, 0.92)
-            cr.arc(cx, cy, radius, start, start + 2 * math.pi * self.value / 100.0)
-            cr.stroke()
+            for line_width, alpha_scale in GLOW_LAYERS:
+                cr.set_line_width(line_width)
+                cr.set_source_rgba(*self.color, 0.92 * alpha_scale)
+                cr.arc(cx, cy, radius, start, start + 2 * math.pi * self.value / 100.0)
+                cr.stroke()
 
         cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(15)
