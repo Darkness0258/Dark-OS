@@ -21,10 +21,15 @@ for command in awk bash chmod cmp cp find git grep head install ln lsinitcpio mk
     fi
 done
 
-build_sha="$(git -C "${project_dir}" rev-parse --short=8 HEAD 2>/dev/null || true)"
-if [[ ! "${build_sha}" =~ ^[0-9a-f]{7,40}$ ]]; then
-    printf 'Could not determine a valid Git build SHA from %s.\n' "${project_dir}" >&2
-    exit 1
+build_sha="$(
+    git -C "${project_dir}" rev-parse --short=8 HEAD 2>/dev/null \
+        || git -C "${project_dir}" log -1 --format='%h' 2>/dev/null \
+        || printf '%s' "${GITHUB_SHA:-}" \
+        || true
+)"
+if [[ -z "${build_sha}" ]]; then
+    build_sha="unknown"
+    printf 'WARNING: no Git build SHA available from %s; using "unknown".\n' "${project_dir}" >&2
 fi
 readonly build_sha
 
