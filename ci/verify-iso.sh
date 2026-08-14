@@ -116,12 +116,14 @@ payload=(
     usr/local/bin/livecd-sound
     usr/share/applications/darkos-installer.desktop
     usr/share/backgrounds/darkos/darkos-wallpaper.png
+    usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
     usr/share/plymouth/themes/darkos/darkos.png
     usr/share/plymouth/themes/darkos/darkos.plymouth
     usr/share/plymouth/themes/darkos/darkos.script
     usr/share/wayland-sessions/darkos.desktop
+    var/lib/AccountsService/users/greeter
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
 )
@@ -162,12 +164,14 @@ required_files=(
     usr/bin/unsquashfs
     usr/share/applications/darkos-installer.desktop
     usr/share/backgrounds/darkos/darkos-wallpaper.png
+    usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
     usr/share/plymouth/themes/darkos/darkos.png
     usr/share/plymouth/themes/darkos/darkos.plymouth
     usr/share/plymouth/themes/darkos/darkos.script
     usr/share/wayland-sessions/darkos.desktop
+    var/lib/AccountsService/users/greeter
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
 )
@@ -251,6 +255,10 @@ if greetd["default_session"].get("user") != "greeter":
 regreet = tomllib.loads((root / "etc/greetd/regreet.toml").read_text(encoding="utf-8"))
 if regreet.get("background", {}).get("path") != "/usr/share/backgrounds/darkos/darkos-wallpaper.png":
     raise SystemExit("ReGreet does not use the DarkOS wallpaper")
+
+greeter_avatar = (root / "var/lib/AccountsService/users/greeter").read_text(encoding="utf-8")
+if "Icon=/usr/share/icons/darkos/darkos.png" not in greeter_avatar:
+    raise SystemExit("ReGreet greeter account does not use the DarkOS app icon as avatar")
 PY
 
 cmp -s \
