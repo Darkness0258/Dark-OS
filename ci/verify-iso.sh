@@ -587,7 +587,7 @@ for package in adwaita-icon-theme blackarch-keyring blackarch-mirrorlist calamar
     cage chaotic-keyring chaotic-mirrorlist firefox greetd greetd-regreet \
     hypridle hyprlock inter-font lvm2 mkinitcpio-nfs-utils nbd neovim \
     pipewire pipewire-pulse plymouth pv python-cairo ranger rtkit \
-    squashfs-tools syslinux wireplumber blueman; do
+    squashfs-tools syslinux wireplumber blueman accountsservice; do
     grep -Eq "^${package}[[:space:]]" "$pkglist" || {
         printf 'Required package is absent from the ISO package list: %s\n' "$package" >&2
         exit 1
