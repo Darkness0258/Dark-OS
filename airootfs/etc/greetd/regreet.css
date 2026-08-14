@@ -6,9 +6,6 @@
 
 window {
     background-color: #000000;
-    background-image: url("file:///usr/share/backgrounds/darkos/darkos-wallpaper.png");
-    background-size: cover;
-    background-position: center;
 }
 
 frame.background {
