@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The build pipeline checks every artifact at multiple stages before accepting the ISO.
 
-- `sudo bash build-iso.sh` -- full build: stages a clean archiso releng profile, pins executable modes and symlinks, builds the pinned Calamares package into a local pacman repo, runs `mkarchiso`, extracts the built SquashFS and verifies executables match source byte-for-byte, then runs `ci/verify-iso.sh`. Publishes `out/darkos.iso` only after every check passes. Set `DARKOS_KEEP_WORK=1` to preserve temp directories for debugging.
+- `sudo bash build-iso.sh` -- full build: stages a clean archiso releng profile, pins executable modes and symlinks, builds the pinned Calamares package into a local pacman repo, runs `mkarchiso`, extracts the built SquashFS and verifies executables match source byte-for-byte, then runs `ci/verify-iso.sh`. Publishes a versioned ISO (`out/darkos-YYYY.MM.DD-x86_64.iso`) only after every check passes. A stable symlink `out/darkos.iso` is atomically updated to point at the verified image -- the VMware test machine always boots from this path. Set `DARKOS_KEEP_WORK=1` to preserve temp directories for debugging.
 - `bash ci/verify-iso.sh out/darkos-*.iso` -- standalone post-build artifact verification: extracts the ISO squashfs and initramfs, checks critical payload files, permissions, executable modes, script syntax, Waybar module set, greetd/ReGreet config, Hyprland/hypridle/hyprlock settings, Plymouth theme, pacman.conf signature checks, systemd symlinks, package list entries, and byte-identical payload scripts.
 - `bash ci/build-calamares.sh /tmp/repo` -- builds the pinned Calamares AUR package (commit `167151beb`, version 3.4.2) and publishes a local pacman repo. Accepts `DARKOS_CALAMARES_PACKAGE` + `DARKOS_CALAMARES_PACKAGE_SHA256` to reuse a verified cache.
 - `bash -n <script>` -- syntax-check shell scripts. The CI workflow checks all `airootfs/usr/local/bin/*.sh` plus `build-iso.sh`, `ci/build-calamares.sh`, `ci/verify-iso.sh`, and `profiledef.sh`.
@@ -99,7 +99,9 @@ The build enforces a strict list of 11 runtime executables, their permissions (m
 - Byte-identical between `airootfs/` source and the packaged squashfs (`cmp -s`).
 - Shell scripts pass `bash -n`; the Python shell passes `python -m py_compile`.
 
-`profiledef.sh` declares `file_permissions` as a plain associative array (not `declare -A`), because mkarchiso sources it from inside a function -- `declare -A` would make the map function-local and silently reset every permission to 0644.
+`profiledef.sh` declares `file_permissions` as a plain associative array (not `declare -A`), because mkarchiso sources it from inside a function -- `declare -A` would make the map function-local and silently reset every permission to 0644. It also derives `iso_version` from `date +%Y.%m.%d`, so each build gets a date-stamped version.
+
+`build-iso.sh` validates that ~18 required commands are present (`awk`, `bash`, `chmod`, `cmp`, `find`, `git`, `grep`, `head`, `install`, `ln`, `lsinitcpio`, `mkarchiso`, `mktemp`, `pacman`, `readlink`, `rm`, `stat`, `tee`, `unsquashfs`, `xorriso`) and derives a build SHA from the git checkout (or `DARKOS_BUILD_SHA` / `GITHUB_SHA`). The first 8 hex chars are written into `etc/darkos-build-sha` in the staged profile. Build environment issues almost always trace to a missing command or a checkout outside a git repository.
 
 ## Live ISO vs Installed System
 
@@ -150,4 +152,4 @@ Visual design tokens live in `ui-tokens.md`, layout/motion rules in `ui-rules.md
 
 ## Phased Roadmap
 
-Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 builds the core shell chrome (top bar, AI Core HUD, dock, rail, side panels). Phases 3-8 cover the assistant, daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.
+Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 is the active phase: core shell chrome (top bar, AI Core HUD, dock, rail, side panels, lock screen, login, boot animation) is code-complete and awaiting fresh VM verification before claiming full closure. Phases 3-8 cover the assistant, daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.

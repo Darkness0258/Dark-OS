@@ -146,7 +146,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 | Phase | Goal |
 |---|---|
 | 1 | Bootable and installable Arch + Hyprland + BlackArch ISO ✓ |
-| 2 | Core shell chrome (HUD, panels, dock, lock, login, boot animation) ✓ |
+| 2 | Core shell chrome (HUD, panels, dock, lock, login, boot animation) *(in progress -- code-complete, awaiting VM verification)* |
 | 3 | AI assistant (STT/TTS/brain, OS control) |
 | 4 | Daily-use native apps |
 | 5 | System management (Settings, Network, Security) |
