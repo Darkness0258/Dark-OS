@@ -272,7 +272,7 @@ hyprland_config="$extracted/etc/xdg/hypr/hyprland.conf"
 # shellcheck disable=SC2016 # $mainMod is literal Hyprland configuration.
 for setting in 'exec-once = hypridle' 'exec-once = nm-applet --indicator' \
     'exec-once = blueman-applet' 'bind = $mainMod, L, exec, loginctl lock-session' \
-    'match:namespace ^(waybar|darkos-(dock|hud|rail|left|right|calendar))$' \
+    'match:namespace ^(waybar|darkos-(dock|hud|rail|left|right))$' \
     'blur on' 'ignore_alpha 0.08'; do
     grep -Fq "$setting" "$hyprland_config" || {
         printf 'Hyprland shell configuration is missing: %s\n' "$setting" >&2
@@ -526,15 +526,14 @@ grep -Fq '  - name: greetd' "$services_config" || {
 }
 
 shell_source="$extracted/usr/local/bin/darkos-shell.py"
-grep -Fq 'overlays = (self.dock, self.hud, self.rail, self.left, self.right, self.calendar)' \
+grep -Fq 'overlays = (self.dock, self.hud, self.rail, self.left, self.right)' \
     "$shell_source" || {
     printf 'DarkOS shell does not hide every overlay during installation\n' >&2
     exit 1
 }
 for component in 'class DarkOSIconRail' 'class DarkOSLeftPanels' \
     'class DarkOSRightPanels' 'class AIRadarCanvas' \
-    'class RingGauge' 'class AIOrbCanvas' \
-    'class DarkOSCalendarWindow'; do
+    'class RingGauge' 'class AIOrbCanvas'; do
     grep -Fq "$component" "$shell_source" || {
         printf 'DarkOS shell component is missing: %s\n' "$component" >&2
         exit 1

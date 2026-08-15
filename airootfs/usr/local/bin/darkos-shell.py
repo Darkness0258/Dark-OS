@@ -1100,25 +1100,31 @@ class DarkOSRightPanels(Gtk.Window):
             keyboard=True,
         )
 
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
+        outer.set_size_request(360, -1)
+
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroller.set_overlay_scrolling(True)
         screen = Gdk.Screen.get_default()
         screen_height = screen.get_height() if screen is not None else 1080
-        # Reserve 274 px (calendar 260 px + 14 px bottom margin) so the
-        # right panel never bleeds into the calendar's zone.
-        panel_height = max(480, min(760, screen_height - 158 - 274))
-        scroller.set_propagate_natural_height(False)
-        scroller.set_min_content_height(panel_height)
-        scroller.set_max_content_height(panel_height)
-        scroller.set_size_request(360, panel_height)
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
-        root.set_size_request(340, -1)
-        root.pack_start(self.build_notifications(), False, False, 0)
-        root.pack_start(self.build_connectivity(), False, False, 0)
-        root.pack_start(self.build_media(), False, False, 0)
-        scroller.add(root)
-        self.add(scroller)
+        # Cap outer window height to screen_height - 32 (16px top + 16px bottom margin).
+        # Scroller gets remaining height after calendar (~260px) + spacing (16px) + margins (32px).
+        max_scroller_height = max(180, screen_height - 32 - 260 - SPACE_SM)
+        scroller.set_propagate_natural_height(True)
+        scroller.set_max_content_height(max_scroller_height)
+
+        scroll_root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
+        scroll_root.pack_start(self.build_notifications(), False, False, 0)
+        scroll_root.pack_start(self.build_connectivity(), False, False, 0)
+        scroll_root.pack_start(self.build_media(), False, False, 0)
+        scroller.add(scroll_root)
+
+        # Scroller expands to fill available space; calendar stays fixed below it.
+        outer.pack_start(scroller, True, True, 0)
+        outer.pack_start(self.build_calendar(), False, False, 0)
+
+        self.add(outer)
         self.application.register_state_listener(self)
         self.sync_from_application()
         self.show_all()
@@ -1279,6 +1285,17 @@ class DarkOSRightPanels(Gtk.Window):
         return panel
 
     @staticmethod
+    def build_calendar():
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
+        add_class(panel, "glass-panel")
+        panel.pack_start(make_label("CALENDAR", "section-title"), False, False, 0)
+        calendar_widget = Gtk.Calendar()
+        add_class(calendar_widget, "calendar")
+        calendar_widget.set_hexpand(True)
+        panel.pack_start(calendar_widget, False, False, 0)
+        return panel
+
+    @staticmethod
     def on_media_art_draw(widget, cr):
         """Draw a placeholder album-art tile: radial gradient with a music note glyph."""
         width = widget.get_allocated_width()
@@ -1386,45 +1403,6 @@ class DarkOSRightPanels(Gtk.Window):
         return True
 
 
-class DarkOSCalendarWindow(Gtk.Window):
-    """Always-visible calendar panel anchored bottom-right, independent of the right panel scroller."""
-
-    def __init__(self, application):
-        super().__init__(type=Gtk.WindowType.TOPLEVEL)
-        self.application = application
-        self.set_title("DarkOS Calendar")
-        self.set_decorated(False)
-        self.set_app_paintable(True)
-        add_class(self, "darkos-window")
-        configure_layer_window(
-            self,
-            "darkos-calendar",
-            GtkLayerShell.Layer.TOP if HAS_LAYER_SHELL else None,
-            (GtkLayerShell.Edge.BOTTOM, GtkLayerShell.Edge.RIGHT)
-            if HAS_LAYER_SHELL
-            else (),
-            {
-                GtkLayerShell.Edge.BOTTOM: 14,
-                GtkLayerShell.Edge.RIGHT: 14,
-            }
-            if HAS_LAYER_SHELL
-            else {},
-            keyboard=True,
-        )
-
-        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
-        add_class(panel, "glass-panel")
-        panel.pack_start(make_label("CALENDAR", "section-title"), False, False, 0)
-        calendar_widget = Gtk.Calendar()
-        add_class(calendar_widget, "calendar")
-        calendar_widget.set_hexpand(True)
-        panel.pack_start(calendar_widget, False, False, 0)
-
-        self.add(panel)
-        self.set_size_request(360, 260)
-        self.show_all()
-
-
 class DarkOSApplication(Gtk.Application):
     """Single-instance controller and shared shell state owner."""
 
@@ -1482,8 +1460,7 @@ class DarkOSApplication(Gtk.Application):
         self.rail = DarkOSIconRail(self)
         self.left = DarkOSLeftPanels(self)
         self.right = DarkOSRightPanels(self)
-        self.calendar = DarkOSCalendarWindow(self)
-        for window in (self.dock, self.hud, self.rail, self.left, self.right, self.calendar):
+        for window in (self.dock, self.hud, self.rail, self.left, self.right):
             self.add_window(window)
 
     @staticmethod
@@ -1588,7 +1565,7 @@ class DarkOSApplication(Gtk.Application):
         )
 
     def set_installer_mode(self, enabled):
-        overlays = (self.dock, self.hud, self.rail, self.left, self.right, self.calendar)
+        overlays = (self.dock, self.hud, self.rail, self.left, self.right)
         if enabled:
             if self.installer_visibility is None:
                 self.installer_visibility = tuple(
