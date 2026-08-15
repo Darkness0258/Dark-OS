@@ -1,0 +1,10 @@
+#!/bin/bash
+# DarkOS live ISO — choose the fastest pacman mirror.
+# Minimal stub that refreshes the mirrorlist.
+
+set -euo pipefail
+reflector --country 'United States,Canada,Germany,France,UK' \
+    --protocol https --sort rate --latest 20 \
+    --save /etc/pacman.d/mirrorlist 2>/dev/null || {
+    echo "Mirror selection unavailable; using default mirrorlist." >&2
+}

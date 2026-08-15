@@ -1,0 +1,10 @@
+#!/bin/bash
+# DarkOS live ISO — show installation guide in a terminal.
+# Minimal stub: the full guide lives in the ISO documentation.
+
+cat <<'EOF'
+DarkOS Installation
+===================
+Boot the live ISO, connect to Wi-Fi, then click "Install DarkOS"
+in the desktop or run:  darkos-installer
+EOF

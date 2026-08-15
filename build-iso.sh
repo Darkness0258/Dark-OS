@@ -13,7 +13,7 @@ if (( EUID != 0 )); then
     exit 1
 fi
 
-for command in awk bash chmod cmp cp find git grep head install ln lsinitcpio mkarchiso mktemp pacman readlink rm stat tee unsquashfs; do
+for command in awk bash chmod cmp cp find git grep head install ln lsinitcpio mkarchiso mktemp pacman readlink rm stat tee unsquashfs xorriso; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         printf 'Required build command not found: %s\n' "${command}" >&2
         printf 'Run this build on Arch Linux with archiso, base-devel, and mkinitcpio installed.\n' >&2
@@ -70,6 +70,9 @@ readonly bash_scripts=(
     usr/local/bin/the-void.sh
     usr/local/bin/start-hyprland
     usr/local/bin/darkos-firstboot-tools
+)
+readonly python_scripts=(
+    usr/local/bin/darkos-shell.py
 )
 
 readonly archiso_hook_packages=(
@@ -222,6 +225,9 @@ assert_runtime_scripts "${project_dir}/airootfs" 'source profile' repair
 for relative in "${bash_scripts[@]}"; do
     bash -n "${project_dir}/airootfs/${relative}"
 done
+for relative in "${python_scripts[@]}"; do
+    python -m py_compile "${project_dir}/airootfs/${relative}"
+done
 
 stage_profile="$(mktemp -d /tmp/darkos-archiso-profile.XXXXXX)"
 work_dir="$(mktemp -d /tmp/darkos-archiso-work.XXXXXX)"
@@ -339,6 +345,9 @@ assert_runtime_scripts "${stage_profile}/airootfs" 'staged profile' repair
 for relative in "${bash_scripts[@]}"; do
     bash -n "${stage_profile}/airootfs/${relative}"
 done
+for relative in "${python_scripts[@]}"; do
+    python -m py_compile "${stage_profile}/airootfs/${relative}"
+done
 
 printf 'Building the pinned Calamares package and local pacman repository...\n'
 bash "${project_dir}/ci/build-calamares.sh" "${repo_dir}"
@@ -393,7 +402,7 @@ printf 'Verifying executable modes inside the built SquashFS...\n'
 verify_root="${verify_parent}/rootfs"
 unsquashfs -quiet -dest "${verify_root}" "${rootfs_images[0]}" "${runtime_scripts[@]}"
 assert_runtime_scripts "${verify_root}" 'built SquashFS' check
-for relative in "${runtime_scripts[@]}"; do
+for relative in "${runtime_scripts[@]}" "usr/local/bin/Installation_guide" "usr/local/bin/choose-mirror" "usr/local/bin/livecd-sound" "root/.automated_script.sh"; do
     cmp -s "${project_dir}/airootfs/${relative}" "${verify_root}/${relative}" || {
         printf 'Packaged runtime executable differs from source: /%s\n' "${relative}" >&2
         exit 1
@@ -401,6 +410,9 @@ for relative in "${runtime_scripts[@]}"; do
 done
 for relative in "${bash_scripts[@]}"; do
     bash -n "${verify_root}/${relative}"
+done
+for relative in "${python_scripts[@]}"; do
+    python -m py_compile "${verify_root}/${relative}"
 done
 
 printf 'Verifying the payload embedded in the final ISO...\n'

@@ -1,0 +1,21 @@
+#!/bin/bash
+# DarkOS live ISO — sound setup for the live session.
+# Starts PipeWire user services and sets default audio routing.
+
+set -euo pipefail
+
+# Start user-level PipeWire if not already running.
+if ! systemctl --user is-active --quiet pipewire 2>/dev/null; then
+    systemctl --user start pipewire pipewire-pulse wireplumber 2>/dev/null || true
+fi
+
+# Set a reasonable default output (first available sink).
+if command -v pactl >/dev/null 2>&1; then
+    default_sink=$(pactl get-default-sink 2>/dev/null || true)
+    if [ -z "$default_sink" ]; then
+        first_sink=$(pactl list short sinks 2>/dev/null | head -1 | cut -f1 || true)
+        if [ -n "$first_sink" ]; then
+            pactl set-default-sink "$first_sink" 2>/dev/null || true
+        fi
+    fi
+fi

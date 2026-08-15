@@ -38,6 +38,7 @@ COLOR_ACCENT = "#a855f7"
 COLOR_WARNING = "#ff8a00"
 COLOR_DANGER = "#ff3b3b"
 COLOR_SUCCESS = "#22e07a"
+COLOR_BORDER = "#ffffff"
 
 CAIRO_PRIMARY = (0.0, 0.898, 1.0)
 CAIRO_SECONDARY = (0.176, 0.482, 1.0)
@@ -273,9 +274,10 @@ CSS_STYLE = f"""
     text-shadow: none;
 }}
 
-.calendar:selected {{
+.calendar button:checked {{
     background-color: alpha({COLOR_PRIMARY}, 0.24);
     color: {COLOR_TEXT};
+    border-radius: 999px;
 }}
 
 scale trough {{
@@ -944,10 +946,14 @@ class DarkOSLeftPanels(Gtk.Window):
             self,
             "darkos-left",
             GtkLayerShell.Layer.TOP if HAS_LAYER_SHELL else None,
-            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.LEFT)
+            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.BOTTOM)
             if HAS_LAYER_SHELL
             else (),
-            {GtkLayerShell.Edge.TOP: 16, GtkLayerShell.Edge.LEFT: 16}
+            {
+                GtkLayerShell.Edge.TOP: 16,
+                GtkLayerShell.Edge.LEFT: 16,
+                GtkLayerShell.Edge.BOTTOM: 96,
+            }
             if HAS_LAYER_SHELL
             else {},
             keyboard=True,
@@ -1091,10 +1097,14 @@ class DarkOSRightPanels(Gtk.Window):
             self,
             "darkos-right",
             GtkLayerShell.Layer.TOP if HAS_LAYER_SHELL else None,
-            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.RIGHT)
+            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.RIGHT, GtkLayerShell.Edge.BOTTOM)
             if HAS_LAYER_SHELL
             else (),
-            {GtkLayerShell.Edge.TOP: 16, GtkLayerShell.Edge.RIGHT: 14}
+            {
+                GtkLayerShell.Edge.TOP: 16,
+                GtkLayerShell.Edge.RIGHT: 14,
+                GtkLayerShell.Edge.BOTTOM: 96,
+            }
             if HAS_LAYER_SHELL
             else {},
             keyboard=True,
@@ -1106,13 +1116,10 @@ class DarkOSRightPanels(Gtk.Window):
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroller.set_overlay_scrolling(True)
-        screen = Gdk.Screen.get_default()
-        screen_height = screen.get_height() if screen is not None else 1080
-        # Cap outer window height to screen_height - 32 (16px top + 16px bottom margin).
-        # Scroller gets remaining height after calendar (~260px) + spacing (16px) + margins (32px).
-        max_scroller_height = max(180, screen_height - 32 - 260 - SPACE_SM)
+        # With TOP+BOTTOM anchors, the window fills the available vertical space.
+        # Cap the scroller content height so panels scroll internally on tall content.
         scroller.set_propagate_natural_height(True)
-        scroller.set_max_content_height(max_scroller_height)
+        scroller.set_max_content_height(640)
 
         scroll_root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
         scroll_root.pack_start(self.build_notifications(), False, False, 0)
@@ -1622,8 +1629,14 @@ class DarkOSApplication(Gtk.Application):
 
 
 def main():
-    application = DarkOSApplication()
-    return application.run(sys.argv)
+    try:
+        application = DarkOSApplication()
+        return application.run(sys.argv)
+    except Exception as error:
+        print(f"DarkOS shell fatal error: {error}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
