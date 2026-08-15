@@ -1105,9 +1105,9 @@ class DarkOSRightPanels(Gtk.Window):
         scroller.set_overlay_scrolling(True)
         screen = Gdk.Screen.get_default()
         screen_height = screen.get_height() if screen is not None else 1080
-        # Reserve 254 px (calendar 240 px + 14 px bottom margin) so the
+        # Reserve 274 px (calendar 260 px + 14 px bottom margin) so the
         # right panel never bleeds into the calendar's zone.
-        panel_height = max(480, min(760, screen_height - 158 - 254))
+        panel_height = max(480, min(760, screen_height - 158 - 274))
         scroller.set_propagate_natural_height(False)
         scroller.set_min_content_height(panel_height)
         scroller.set_max_content_height(panel_height)
@@ -1421,7 +1421,7 @@ class DarkOSCalendarWindow(Gtk.Window):
         panel.pack_start(calendar_widget, False, False, 0)
 
         self.add(panel)
-        self.set_size_request(360, 240)
+        self.set_size_request(360, 260)
         self.show_all()
 
 
