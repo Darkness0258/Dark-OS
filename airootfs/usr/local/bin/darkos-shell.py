@@ -488,97 +488,6 @@ class AIOrbCanvas(Gtk.DrawingArea):
         return False
 
 
-class AIRadarCanvas(Gtk.DrawingArea):
-    """Central ring-language HUD with activity-linked motion and luminance."""
-
-    def __init__(self):
-        super().__init__()
-        self.set_size_request(420, 330)
-        self.rotation = 0.0
-        self.activity = "idle"
-        self.connect("draw", self.on_draw)
-        GLib.timeout_add(33, self.on_animate)
-
-    def set_activity(self, activity):
-        self.activity = activity
-        self.queue_draw()
-
-    def on_animate(self):
-        speed = {
-            "idle": 0.010,
-            "listening": 0.025,
-            "thinking": 0.050,
-            "speaking": 0.035,
-            "error": 0.065,
-        }.get(self.activity, 0.010)
-        self.rotation = (self.rotation + speed) % (math.pi * 200)
-        self.queue_draw()
-        return True
-
-    @staticmethod
-    def draw_centered_text(cr, text, x, y, size, color, alpha=1.0):
-        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(size)
-        extents = cr.text_extents(text)
-        cr.move_to(x - extents.width / 2.0, y)
-        cr.set_source_rgba(*color, alpha)
-        cr.show_text(text)
-
-    def on_draw(self, widget, cr):
-        width = widget.get_allocated_width()
-        height = widget.get_allocated_height()
-        cx, cy = width / 2.0, height / 2.0 - 8
-        active = self.activity != "idle"
-        intensity = 0.88 if active else 0.62
-        ring_color = CAIRO_DANGER if self.activity == "error" else CAIRO_PRIMARY
-
-        for index, radius in enumerate((54, 88, 122)):
-            cr.save()
-            color = ring_color if index % 2 == 0 else CAIRO_SECONDARY
-            base_alpha = intensity - index * 0.07
-            base_width = 2.0 if active and index == 1 else 1.5
-            offset = self.rotation * (24.0 if index % 2 == 0 else -18.0)
-            cr.set_dash((12.0, 6.0), offset)
-            cr.arc(cx, cy, radius, 0, 2 * math.pi)
-            stroke_glow(cr, color, base_alpha, base_width / 2.0)
-            cr.restore()
-
-        cr.save()
-        for angle in range(0, 360, 15):
-            radians = math.radians(angle) + self.rotation * 0.45
-            inner = 110 if angle % 45 == 0 else 114
-            outer = 124 if angle % 45 == 0 else 121
-            cr.move_to(cx + inner * math.cos(radians), cy + inner * math.sin(radians))
-            cr.line_to(cx + outer * math.cos(radians), cy + outer * math.sin(radians))
-            if angle % 45 == 0:
-                stroke_glow(cr, ring_color, intensity * 0.90, 0.75)
-            else:
-                cr.set_source_rgba(*ring_color, 0.26)
-                cr.set_line_width(1.0)
-                cr.stroke()
-        cr.restore()
-
-        pulse = 20 + (5 if active else 3) * math.sin(self.rotation * 4.0)
-        for glow_radius, glow_alpha in ((pulse + 12, 0.18 if active else 0.10),
-                                         (pulse, 0.88 if active else 0.66)):
-            cr.arc(cx, cy, glow_radius, 0, 2 * math.pi)
-            cr.set_source_rgba(*ring_color, glow_alpha)
-            cr.fill()
-
-        self.draw_centered_text(cr, "OBSERVE", cx, cy - 138, 11, CAIRO_MUTED, 0.88)
-        self.draw_centered_text(cr, "REASON", cx - 142, cy + 4, 11, CAIRO_MUTED, 0.88)
-        self.draw_centered_text(cr, "ACT", cx + 142, cy + 4, 11, CAIRO_MUTED, 0.88)
-        self.draw_centered_text(
-            cr,
-            self.activity.upper(),
-            cx,
-            cy + 6,
-            11,
-            CAIRO_TEXT,
-            0.96,
-        )
-        return False
-
 
 class WaveformCanvas(Gtk.DrawingArea):
     def __init__(self):
@@ -825,19 +734,20 @@ class DarkOSDockWindow(Gtk.Window):
         self.orb_cycle_index = (self.orb_cycle_index + 1) % len(states)
         state = states[self.orb_cycle_index]
         self.ai_orb.set_state(state)
-        self.application.set_ai_activity(state)
+        # Activity state machine removed — ring is now a wallpaper asset
         if state == "error":
             GLib.timeout_add(900, self.finish_error_pulse)
 
     def finish_error_pulse(self):
         if self.ai_orb.state == "error":
             self.ai_orb.set_state("sleeping")
-            self.application.set_ai_activity("idle")
             self.orb_cycle_index = 0
         return False
 
 
 class DarkOSHUDOverlay(Gtk.Window):
+    """Text-only HUD — ring graphic lives in the wallpaper."""
+
     def __init__(self):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
         self.set_title("DarkOS AI Core")
@@ -855,15 +765,6 @@ class DarkOSHUDOverlay(Gtk.Window):
         stage = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
         add_class(stage, "hud-stage")
         stage.set_halign(Gtk.Align.CENTER)
-        self.radar = AIRadarCanvas()
-        stage.pack_start(self.radar, False, False, 0)
-
-        wordmark = make_label("DARK OS", "hud-wordmark", Gtk.Align.CENTER)
-        wordmark.set_xalign(0.5)
-        stage.pack_start(wordmark, False, False, 0)
-        tagline = make_label("CONTROL EVERYTHING", "section-title", Gtk.Align.CENTER)
-        tagline.set_xalign(0.5)
-        stage.pack_start(tagline, False, False, 0)
         state = make_label("AI CORE  /  PREVIEW MODE", "eyebrow", Gtk.Align.CENTER)
         state.set_xalign(0.5)
         stage.pack_start(state, False, False, 0)
@@ -1055,7 +956,6 @@ class DarkOSLeftPanels(Gtk.Window):
         self.response.get_style_context().remove_class("stub-text")
         add_class(self.response, "status-text")
         self.waveform.set_active(True)
-        self.application.set_ai_activity("thinking")
         GLib.timeout_add(800, self.finish_preview)
 
     def finish_preview(self):
@@ -1065,7 +965,6 @@ class DarkOSLeftPanels(Gtk.Window):
         self.response.get_style_context().remove_class("status-text")
         add_class(self.response, "stub-text")
         self.waveform.set_active(False)
-        self.application.set_ai_activity("idle")
         return False
 
     def show_stub(self, message):
@@ -1097,12 +996,13 @@ class DarkOSRightPanels(Gtk.Window):
             self,
             "darkos-right",
             GtkLayerShell.Layer.TOP if HAS_LAYER_SHELL else None,
-            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.RIGHT)
+            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.RIGHT, GtkLayerShell.Edge.BOTTOM)
             if HAS_LAYER_SHELL
             else (),
             {
                 GtkLayerShell.Edge.TOP: 16,
                 GtkLayerShell.Edge.RIGHT: 14,
+                GtkLayerShell.Edge.BOTTOM: 108,
             }
             if HAS_LAYER_SHELL
             else {},
@@ -1115,9 +1015,9 @@ class DarkOSRightPanels(Gtk.Window):
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroller.set_overlay_scrolling(True)
-        # With TOP+BOTTOM anchors, the window fills the available vertical space.
-        # Cap the scroller content height so panels scroll internally on tall content.
+        # Scroller gets all space above the calendar; its content caps at 640px.
         scroller.set_propagate_natural_height(True)
+        scroller.set_min_content_height(420)
         scroller.set_max_content_height(640)
 
         scroll_root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
@@ -1298,6 +1198,7 @@ class DarkOSRightPanels(Gtk.Window):
         calendar_widget = Gtk.Calendar()
         add_class(calendar_widget, "calendar")
         calendar_widget.set_hexpand(True)
+        calendar_widget.set_size_request(-1, 180)
         panel.pack_start(calendar_widget, False, False, 0)
         return panel
 
@@ -1432,7 +1333,6 @@ class DarkOSApplication(Gtk.Application):
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
         self.dock = None
-        self.hud = None
         self.rail = None
         self.left = None
         self.right = None
@@ -1476,11 +1376,10 @@ class DarkOSApplication(Gtk.Application):
             return
         apply_css()
         self.dock = DarkOSDockWindow(self)
-        self.hud = DarkOSHUDOverlay()
         self.rail = DarkOSIconRail(self)
         self.left = DarkOSLeftPanels(self)
         self.right = DarkOSRightPanels(self)
-        for window in (self.dock, self.hud, self.rail, self.left, self.right):
+        for window in (self.dock, self.rail, self.left, self.right):
             self.add_window(window)
 
     @staticmethod
@@ -1490,10 +1389,6 @@ class DarkOSApplication(Gtk.Application):
         else:
             window.show_all()
 
-    def set_ai_activity(self, state):
-        radar_state = "idle" if state == "sleeping" else state
-        if self.hud is not None:
-            self.hud.radar.set_activity(radar_state)
 
     def set_toggle(self, name, enabled):
         self.toggle_state[name] = enabled
@@ -1585,7 +1480,7 @@ class DarkOSApplication(Gtk.Application):
         )
 
     def set_installer_mode(self, enabled):
-        overlays = (self.dock, self.hud, self.rail, self.left, self.right)
+        overlays = (self.dock, self.rail, self.left, self.right)
         if enabled:
             if self.installer_visibility is None:
                 self.installer_visibility = tuple(
@@ -1605,7 +1500,6 @@ class DarkOSApplication(Gtk.Application):
 
     def do_command_line(self, command_line):
         parser = argparse.ArgumentParser(description="DarkOS Shell Controller")
-        parser.add_argument("--toggle-hud", action="store_true")
         parser.add_argument("--toggle-ai", action="store_true")
         parser.add_argument("--toggle-side-panels", action="store_true")
         parser.add_argument("--toggle-control", action="store_true")
@@ -1630,8 +1524,6 @@ class DarkOSApplication(Gtk.Application):
             self.toggle(self.left)
         if args.toggle_rail:
             self.toggle(self.rail)
-        if args.toggle_hud:
-            self.toggle(self.hud)
         if args.toggle_ai:
             if not self.left.is_visible():
                 self.left.show_all()
