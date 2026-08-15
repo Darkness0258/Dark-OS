@@ -11,6 +11,7 @@ nbd
 pv
 syslinux
 networkmanager
+modemmanager
 network-manager-applet
 bluez
 bluez-utils

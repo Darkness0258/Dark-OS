@@ -54,24 +54,25 @@
         "spacing": 8
     },
     "backlight": {
-        "format": "󰃠 {percent}%",
-        "tooltip": false
+        "format": "󰃠",
+        "tooltip-format": "{percent}%",
+        "tooltip": true
     },
     "custom/bluetooth": {
-        "exec": "timeout 2 bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && printf '󰂯 On' || printf '󰂲 Off'",
+        "exec": "timeout 2 bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo '󰂯' || echo '󰂲'",
         "interval": 5,
         "tooltip": false
     },
     "network": {
-        "format-wifi": "󰤨 {signalStrength}%",
-        "format-ethernet": "󰈀 Online",
-        "format-disconnected": "󰤭 Offline",
+        "format-wifi": "󰤨",
+        "format-ethernet": "󰈀",
+        "format-disconnected": "󰤭",
         "tooltip-format-wifi": "{essid} ({ipaddr})",
         "tooltip-format-ethernet": "{ifname} ({ipaddr})"
     },
     "pulseaudio": {
-        "format": "{volume}%",
-        "format-muted": "Muted",
+        "format": "",
+        "format-muted": "",
         "scroll-step": 5,
         "on-click": "pamixer -t"
     },
@@ -91,7 +92,7 @@
         "on-click": "python /usr/local/bin/darkos-shell.py --toggle-control"
     },
     "custom/avatar": {
-        "format": "󰀉 darkos",
+        "format": "󰀉",
         "tooltip-text": "Account controls remain part of the future Settings app"
     },
     "custom/power": {

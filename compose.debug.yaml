@@ -1,0 +1,6 @@
+services:
+  darkos:
+    image: darkos
+    build:
+      context: .
+      dockerfile: ./Dockerfile

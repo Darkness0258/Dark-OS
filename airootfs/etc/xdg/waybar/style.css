@@ -98,15 +98,20 @@ window#waybar {
 #pulseaudio {
     color: #00e5ff;
     background-image: -gtk-icontheme("audio-volume-high-symbolic");
-    background-position: left center;
+    background-position: center;
     background-repeat: no-repeat;
     background-size: 16px 16px;
-    padding-left: 24px;
+    min-width: 20px;
+    font-size: 0;
 }
 
 #pulseaudio.muted {
     background-image: -gtk-icontheme("audio-volume-muted-symbolic");
     color: #9aa4ad;
+}
+
+#pulseaudio > label {
+    font-size: 0;
 }
 
 #custom-control {
@@ -115,6 +120,11 @@ window#waybar {
     background-repeat: no-repeat;
     background-size: 16px 16px;
     min-width: 20px;
+    font-size: 0;
+}
+
+#custom-control > label {
+    font-size: 0;
 }
 
 #battery {

@@ -153,6 +153,32 @@ CSS_STYLE = f"""
     font-size: 20px;
 }}
 
+.dock-label {{
+    color: {COLOR_TEXT_MUTED};
+    font-size: 10px;
+    font-weight: 500;
+    padding: 0;
+}}
+
+.media-art {{
+    background-color: alpha({COLOR_BG}, 0.60);
+    border: 1px solid alpha({COLOR_BORDER}, 0.30);
+    border-radius: 12px;
+    color: {COLOR_TEXT_MUTED};
+}}
+
+.media-progress {{
+    background-color: alpha({COLOR_TEXT}, 0.10);
+    border-radius: 4px;
+    min-height: 4px;
+}}
+
+.media-progress-filled {{
+    background-color: {COLOR_PRIMARY};
+    border-radius: 4px;
+    min-height: 4px;
+}}
+
 .orb-button {{
     background-color: alpha({COLOR_BG}, 0.30);
     border-color: alpha({COLOR_PRIMARY}, 0.42);
@@ -741,81 +767,53 @@ class DarkOSDockWindow(Gtk.Window):
             GtkLayerShell.Layer.TOP if HAS_LAYER_SHELL else None,
             (GtkLayerShell.Edge.BOTTOM,) if HAS_LAYER_SHELL else (),
             {GtkLayerShell.Edge.BOTTOM: 14} if HAS_LAYER_SHELL else {},
-            exclusive_zone=82,
+            exclusive_zone=108,
             keyboard=True,
         )
 
-        dock = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_SM)
+        dock = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_XS)
         add_class(dock, "dock-bar")
         dock.set_halign(Gtk.Align.CENTER)
 
         left_apps = (
-            (
-                "folder-symbolic",
-                "Files",
-                ["/usr/local/bin/the-void.sh", "-e", "ranger"],
-            ),
-            (
-                "utilities-terminal-symbolic",
-                "Terminal",
-                ["/usr/local/bin/the-void.sh"],
-            ),
+            ("folder-symbolic", "Files", ["/usr/local/bin/the-void.sh", "-e", "ranger"]),
+            ("utilities-terminal-symbolic", "Terminal", ["/usr/local/bin/the-void.sh"]),
             ("web-browser-symbolic", "Browser", ["firefox"]),
         )
         right_apps = (
-            (
-                "accessories-text-editor-symbolic",
-                "Notes",
-                ["/usr/local/bin/the-void.sh", "-e", "nvim"],
-            ),
-            (
-                "system-software-install-symbolic",
-                "Store",
-                ["wofi", "--show", "drun"],
-            ),
-            (
-                "preferences-system-symbolic",
-                "Settings",
-                ["wofi", "--show", "drun"],
-            ),
+            ("accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/the-void.sh", "-e", "nvim"]),
+            ("system-software-install-symbolic", "Store", ["wofi", "--show", "drun"]),
+            ("preferences-system-symbolic", "Settings", ["wofi", "--show", "drun"]),
         )
 
-        for icon, name, command in left_apps:
-            dock.pack_start(
-                make_icon_button(
-                    icon,
-                    name,
-                    lambda _button, selected=command: launch(selected),
-                    "dock-icon-button",
-                    44,
-                ),
-                False,
-                False,
-                0,
+        def make_dock_slot(icon, name, command):
+            slot = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            slot.set_halign(Gtk.Align.CENTER)
+            btn = make_icon_button(
+                icon, name,
+                lambda _button, selected=command: launch(selected),
+                "dock-icon-button", 40,
             )
+            slot.pack_start(btn, False, False, 0)
+            label = make_label(name, "dock-label")
+            label.set_xalign(0.5)
+            slot.pack_start(label, False, False, 2)
+            return slot
+
+        for icon, name, command in left_apps:
+            dock.pack_start(make_dock_slot(icon, name, command), False, False, 2)
 
         orb_button = Gtk.Button()
         add_class(orb_button, "orb-button")
         orb_button.set_tooltip_text("Cycle DarkOS AI preview state")
         orb_button.get_accessible().set_name("DarkOS AI preview state")
-        self.ai_orb = AIOrbCanvas(size=58)
+        self.ai_orb = AIOrbCanvas(size=56)
         orb_button.add(self.ai_orb)
         orb_button.connect("clicked", self.on_orb_click)
         dock.pack_start(orb_button, False, False, SPACE_SM)
 
         for icon, name, command in right_apps:
-            dock.pack_start(
-                make_icon_button(
-                    icon,
-                    name,
-                    lambda _button, selected=command: launch(selected),
-                    "dock-icon-button",
-                    44,
-                ),
-                False,
-                False,
-                0,
-            )
+            dock.pack_start(make_dock_slot(icon, name, command), False, False, 2)
 
         self.add(dock)
         self.show_all()
@@ -1048,6 +1046,7 @@ class DarkOSLeftPanels(Gtk.Window):
             return
         self.entry.set_text("")
         self.response.set_text(f"Preview request: {request_text}")
+        self.response.get_style_context().remove_class("stub-text")
         add_class(self.response, "status-text")
         self.waveform.set_active(True)
         self.application.set_ai_activity("thinking")
@@ -1106,7 +1105,9 @@ class DarkOSRightPanels(Gtk.Window):
         scroller.set_overlay_scrolling(True)
         screen = Gdk.Screen.get_default()
         screen_height = screen.get_height() if screen is not None else 1080
-        panel_height = max(480, min(760, screen_height - 158))
+        # Reserve 254 px (calendar 240 px + 14 px bottom margin) so the
+        # right panel never bleeds into the calendar's zone.
+        panel_height = max(480, min(760, screen_height - 158 - 254))
         scroller.set_propagate_natural_height(False)
         scroller.set_min_content_height(panel_height)
         scroller.set_max_content_height(panel_height)
@@ -1116,7 +1117,6 @@ class DarkOSRightPanels(Gtk.Window):
         root.pack_start(self.build_notifications(), False, False, 0)
         root.pack_start(self.build_connectivity(), False, False, 0)
         root.pack_start(self.build_media(), False, False, 0)
-        root.pack_start(self.build_calendar(), False, False, 0)
         scroller.add(root)
         self.add(scroller)
         self.application.register_state_listener(self)
@@ -1125,6 +1125,8 @@ class DarkOSRightPanels(Gtk.Window):
         # Use a 5s interval (not 2s) so overlapping playerctl calls can't
         # stack if a slow player hangs near the 1.5s command_output timeout.
         GLib.timeout_add(5000, self.refresh_media)
+        # Refresh progress position every 2s for smooth bar updates.
+        GLib.timeout_add_seconds(2, self.refresh_media_position)
 
     def build_notifications(self):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
@@ -1214,12 +1216,43 @@ class DarkOSRightPanels(Gtk.Window):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
         add_class(panel, "glass-panel")
         panel.pack_start(make_label("NOW PLAYING", "section-title"), False, False, 0)
+
+        # Top row: album art tile + text metadata
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_SM)
+        self.media_art = Gtk.DrawingArea()
+        self.media_art.set_size_request(56, 56)
+        self.media_art.connect("draw", self.on_media_art_draw)
+        add_class(self.media_art, "media-art")
+        self.media_art.queue_draw()
+        top_row.pack_start(self.media_art, False, False, 0)
+
+        text_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_XS)
+        text_col.set_valign(Gtk.Align.CENTER)
         self.media_title = make_label("No active media", "media-title", wrap=True)
+        self.media_title.set_max_width_chars(22)
         self.media_artist = make_label(
             "Start a player to populate this widget.", "body-muted", wrap=True
         )
-        panel.pack_start(self.media_title, False, False, 0)
-        panel.pack_start(self.media_artist, False, False, 0)
+        self.media_artist.set_max_width_chars(22)
+        text_col.pack_start(self.media_title, False, False, 0)
+        text_col.pack_start(self.media_artist, False, False, 0)
+        top_row.pack_start(text_col, True, True, 0)
+        panel.pack_start(top_row, False, False, 0)
+
+        # Progress bar
+        progress_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.media_progress = Gtk.ProgressBar()
+        self.media_progress.set_show_text(False)
+        add_class(self.media_progress, "media-progress")
+        self.media_progress.set_fraction(0.0)
+        progress_row.pack_start(self.media_progress, True, True, 0)
+        self.media_time = make_label("--:-- / --:--", "body-muted")
+        self.media_time.set_size_request(70, -1)
+        self.media_time.set_xalign(1.0)
+        progress_row.pack_start(self.media_time, False, False, SPACE_XS)
+        panel.pack_start(progress_row, False, False, 0)
+
+        # Transport controls
         controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_MD)
         controls.set_halign(Gtk.Align.CENTER)
         self.media_buttons = (
@@ -1246,20 +1279,41 @@ class DarkOSRightPanels(Gtk.Window):
         return panel
 
     @staticmethod
-    def build_calendar():
-        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
-        add_class(panel, "glass-panel")
-        panel.pack_start(make_label("CALENDAR", "section-title"), False, False, 0)
-        calendar_widget = Gtk.Calendar()
-        add_class(calendar_widget, "calendar")
-        calendar_widget.set_hexpand(True)
-        panel.pack_start(calendar_widget, False, False, 0)
-        return panel
+    def on_media_art_draw(widget, cr):
+        """Draw a placeholder album-art tile: radial gradient with a music note glyph."""
+        width = widget.get_allocated_width()
+        height = widget.get_allocated_height()
+        cx, cy = width / 2.0, height / 2.0
+
+        # Gradient background
+        gradient = cairo.RadialGradient(cx, cy, 2.0, cx, cy, min(cx, cy))
+        gradient.add_color_stop_rgba(0.0, 0.0, 0.898, 1.0, 0.18)
+        gradient.add_color_stop_rgba(1.0, 0.0, 0.0, 0.0, 0.06)
+        cr.arc(cx, cy, min(cx, cy), 0, 2 * math.pi)
+        cr.set_source(gradient)
+        cr.fill()
+
+        # Outer ring
+        cr.arc(cx, cy, min(cx, cy) - 3, 0, 2 * math.pi)
+        stroke_glow(cr, CAIRO_PRIMARY, 0.35)
+
+        # Music note glyph
+        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(20)
+        note = "\U0001F3B5"  # 🎵
+        extents = cr.text_extents(note)
+        cr.move_to(cx - extents.width / 2.0, cy - extents.height / 2.0 - extents.y_bearing)
+        cr.set_source_rgba(*CAIRO_TEXT, 0.45)
+        cr.show_text(note)
+        return False
 
     def sync_from_application(self):
         self.syncing_toggles = True
+        airplane_active = bool(self.application.toggle_state.get("airplane", False))
         for name, button in self.toggle_buttons.items():
             button.set_active(bool(self.application.toggle_state.get(name, False)))
+            if name in ("wifi", "bluetooth"):
+                button.set_sensitive(not airplane_active)
         self.syncing_toggles = False
 
     def on_toggle(self, button, name):
@@ -1311,7 +1365,64 @@ class DarkOSRightPanels(Gtk.Window):
             self.media_active = active
             for button in self.media_buttons:
                 button.set_sensitive(active)
+        if active and hasattr(self, "media_progress"):
+            self.refresh_media_position()
         return True
+
+    def refresh_media_position(self):
+        """Poll play position and update the progress bar + time display."""
+        if not hasattr(self, "media_progress") or not self.media_active:
+            return
+        length_raw = command_output(["playerctl", "metadata", "mpris:length"])
+        position_raw = command_output(["playerctl", "position"])
+        total = int(length_raw) / 1_000_000 if length_raw and length_raw.isdigit() else 0
+        pos = int(position_raw) / 1_000_000 if position_raw and position_raw.replace(".", "").isdigit() else 0
+        if total > 0:
+            fraction = max(0.0, min(1.0, pos / total))
+            self.media_progress.set_fraction(fraction)
+            self.media_time.set_text(
+                f"{int(pos // 60)}:{int(pos % 60):02d} / {int(total // 60)}:{int(total % 60):02d}"
+            )
+        return True
+
+
+class DarkOSCalendarWindow(Gtk.Window):
+    """Always-visible calendar panel anchored bottom-right, independent of the right panel scroller."""
+
+    def __init__(self, application):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.application = application
+        self.set_title("DarkOS Calendar")
+        self.set_decorated(False)
+        self.set_app_paintable(True)
+        add_class(self, "darkos-window")
+        configure_layer_window(
+            self,
+            "darkos-calendar",
+            GtkLayerShell.Layer.TOP if HAS_LAYER_SHELL else None,
+            (GtkLayerShell.Edge.BOTTOM, GtkLayerShell.Edge.RIGHT)
+            if HAS_LAYER_SHELL
+            else (),
+            {
+                GtkLayerShell.Edge.BOTTOM: 14,
+                GtkLayerShell.Edge.RIGHT: 14,
+            }
+            if HAS_LAYER_SHELL
+            else {},
+            keyboard=True,
+        )
+
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
+        add_class(panel, "glass-panel")
+        panel.pack_start(make_label("CALENDAR", "section-title"), False, False, 0)
+        calendar_widget = Gtk.Calendar()
+        add_class(calendar_widget, "calendar")
+        calendar_widget.set_hexpand(True)
+        panel.pack_start(calendar_widget, False, False, 0)
+
+        self.add(panel)
+        self.set_size_request(360, 240)
+        self.show_all()
 
 
 class DarkOSApplication(Gtk.Application):
@@ -1330,6 +1441,7 @@ class DarkOSApplication(Gtk.Application):
         self.installer_visibility = None
         self.state_listeners = []
         self.current_theme = "dark"
+        self.airplane_radio_state = None
         self.toggle_state = {
             "wifi": self.query_wifi(),
             "bluetooth": self.query_bluetooth(),
@@ -1349,6 +1461,11 @@ class DarkOSApplication(Gtk.Application):
         value = command_output(["bluetoothctl", "show"])
         return bool(value and "Powered: yes" in value)
 
+    @staticmethod
+    def query_wwan():
+        value = command_output(["nmcli", "radio", "wwan"])
+        return value == "enabled" if value is not None else False
+
     def register_state_listener(self, listener):
         self.state_listeners.append(listener)
 
@@ -1365,7 +1482,8 @@ class DarkOSApplication(Gtk.Application):
         self.rail = DarkOSIconRail(self)
         self.left = DarkOSLeftPanels(self)
         self.right = DarkOSRightPanels(self)
-        for window in (self.dock, self.hud, self.rail, self.left, self.right):
+        self.calendar = DarkOSCalendarWindow(self)
+        for window in (self.dock, self.hud, self.rail, self.left, self.right, self.calendar):
             self.add_window(window)
 
     @staticmethod
@@ -1382,7 +1500,16 @@ class DarkOSApplication(Gtk.Application):
 
     def set_toggle(self, name, enabled):
         self.toggle_state[name] = enabled
-        if name == "wifi":
+        if name in ("wifi", "bluetooth") and self.toggle_state["airplane"]:
+            if self.airplane_radio_state is not None:
+                self.airplane_radio_state[name] = enabled
+            self.toggle_state[name] = False
+            display_name = "Wi-Fi" if name == "wifi" else "Bluetooth"
+            self.right.set_control_status(
+                f"{display_name} will be {'enabled' if enabled else 'disabled'} "
+                "when airplane mode is disabled."
+            )
+        elif name == "wifi":
             launch(["nmcli", "radio", "wifi", "on" if enabled else "off"])
             self.right.set_control_status(
                 f"Wi-Fi {'enabled' if enabled else 'disabled'} via NetworkManager."
@@ -1393,10 +1520,39 @@ class DarkOSApplication(Gtk.Application):
                 f"Bluetooth {'enabled' if enabled else 'disabled'}."
             )
         elif name == "airplane":
-            launch(["nmcli", "radio", "all", "off" if enabled else "on"])
-            launch(["bluetoothctl", "power", "off" if enabled else "on"])
-            self.toggle_state["wifi"] = not enabled
-            self.toggle_state["bluetooth"] = not enabled
+            if enabled:
+                if self.airplane_radio_state is None:
+                    self.airplane_radio_state = {
+                        "wifi": self.toggle_state["wifi"],
+                        "bluetooth": self.toggle_state["bluetooth"],
+                        "wwan": self.query_wwan(),
+                    }
+                launch(["nmcli", "radio", "all", "off"])
+                launch(["bluetoothctl", "power", "off"])
+                self.toggle_state["wifi"] = False
+                self.toggle_state["bluetooth"] = False
+            else:
+                radio_state = self.airplane_radio_state or {
+                    "wifi": False,
+                    "bluetooth": False,
+                    "wwan": False,
+                }
+                launch(
+                    ["nmcli", "radio", "wifi", "on" if radio_state["wifi"] else "off"]
+                )
+                launch(
+                    ["nmcli", "radio", "wwan", "on" if radio_state["wwan"] else "off"]
+                )
+                launch(
+                    [
+                        "bluetoothctl",
+                        "power",
+                        "on" if radio_state["bluetooth"] else "off",
+                    ]
+                )
+                self.toggle_state["wifi"] = radio_state["wifi"]
+                self.toggle_state["bluetooth"] = radio_state["bluetooth"]
+                self.airplane_radio_state = None
             self.right.set_control_status(
                 f"Airplane mode {'enabled' if enabled else 'disabled'}."
             )
@@ -1425,12 +1581,14 @@ class DarkOSApplication(Gtk.Application):
             launch(commands[action])
             return
         phase = {"gallery": "4", "music": "7", "gaming": "7"}.get(action, "later")
+        if not self.left.is_visible():
+            self.left.show_all()
         self.left.show_stub(
             f"Not opened: {action.title()} is a Phase {phase} surface and is not built yet."
         )
 
     def set_installer_mode(self, enabled):
-        overlays = (self.dock, self.hud, self.rail, self.left, self.right)
+        overlays = (self.dock, self.hud, self.rail, self.left, self.right, self.calendar)
         if enabled:
             if self.installer_visibility is None:
                 self.installer_visibility = tuple(

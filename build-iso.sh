@@ -242,6 +242,11 @@ printf 'Staging a fresh Archiso releng profile...\n'
 cp -a "${releng_profile}/airootfs" "${stage_profile}/"
 cp -a "${releng_profile}/efiboot" "${stage_profile}/"
 cp -a "${project_dir}/airootfs/." "${stage_profile}/airootfs/"
+# A local Python syntax check can leave ignored bytecode beside the source.
+# `cp -a` deliberately copies ignored files too, so strip those caches from
+# the staged payload rather than silently shipping host-specific bytecode.
+find "${stage_profile}/airootfs/usr/local/bin" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+find "${stage_profile}/airootfs/usr/local/bin" -depth -type d -name '__pycache__' -empty -delete
 repair_staged_symlinks "${stage_profile}/airootfs"
 
 # Reuse the canonical DarkOS logo in Plymouth without storing a second binary
