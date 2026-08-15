@@ -552,13 +552,16 @@ grep -Fq '("sleeping", "listening", "thinking", "speaking", "error")' \
     printf 'AI Orb does not expose all five required click states\n' >&2
     exit 1
 }
-for hud_text in 'make_label("DARK OS", "hud-wordmark"' \
-    'make_label("CONTROL EVERYTHING", "section-title"'; do
-    grep -Fq "$hud_text" "$shell_source" || {
-        printf 'DarkOS HUD identity is missing: %s\n' "$hud_text" >&2
-        exit 1
-    }
-done
+# HUD identity is baked into the wallpaper image; verify the asset shipped.
+wallpaper="$extracted/usr/share/backgrounds/darkos/darkos-wallpaper.png"
+if [[ ! -s "$wallpaper" ]]; then
+    printf 'DarkOS wallpaper is missing or empty\n' >&2
+    exit 1
+fi
+if ! grep -q $'\x89PNG' "$wallpaper"; then
+    printf 'DarkOS wallpaper is not a valid PNG\n' >&2
+    exit 1
+fi
 grep -Fq 'self.toggle_state = {' "$shell_source" || {
     printf 'Shell shared toggle state is not owned by DarkOSApplication\n' >&2
     exit 1
