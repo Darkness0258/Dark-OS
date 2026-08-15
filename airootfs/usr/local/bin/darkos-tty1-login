@@ -18,9 +18,9 @@ TTY="$1"
 TERM_TYPE="${2:-linux}"
 
 if [ -d /run/archiso ] && id darkos >/dev/null 2>&1; then
-    exec /sbin/agetty --autologin darkos --noclear "$TTY" "$TERM_TYPE"
+    exec agetty --autologin darkos --noclear "$TTY" "$TERM_TYPE"
 else
     while true; do
-        /sbin/agetty --noclear "$TTY" "$TERM_TYPE"
+        agetty --noclear "$TTY" "$TERM_TYPE"
     done
 fi
