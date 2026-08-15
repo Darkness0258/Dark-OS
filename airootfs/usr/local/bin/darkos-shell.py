@@ -1097,13 +1097,12 @@ class DarkOSRightPanels(Gtk.Window):
             self,
             "darkos-right",
             GtkLayerShell.Layer.TOP if HAS_LAYER_SHELL else None,
-            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.RIGHT, GtkLayerShell.Edge.BOTTOM)
+            (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.RIGHT)
             if HAS_LAYER_SHELL
             else (),
             {
                 GtkLayerShell.Edge.TOP: 16,
                 GtkLayerShell.Edge.RIGHT: 14,
-                GtkLayerShell.Edge.BOTTOM: 96,
             }
             if HAS_LAYER_SHELL
             else {},
@@ -1321,14 +1320,28 @@ class DarkOSRightPanels(Gtk.Window):
         cr.arc(cx, cy, min(cx, cy) - 3, 0, 2 * math.pi)
         stroke_glow(cr, CAIRO_PRIMARY, 0.35)
 
-        # Music note glyph
-        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(20)
-        note = "\U0001F3B5"  # 🎵
-        extents = cr.text_extents(note)
-        cr.move_to(cx - extents.width / 2.0, cy - extents.height / 2.0 - extents.y_bearing)
-        cr.set_source_rgba(*CAIRO_TEXT, 0.45)
-        cr.show_text(note)
+        # Drawn music-note glyph (emoji fonts aren't guaranteed available)
+        cr.set_line_width(2.0)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_source_rgba(*CAIRO_TEXT, 0.50)
+        # Note head (filled ellipse)
+        cr.save()
+        cr.translate(cx - 6.0, cy + 8.0)
+        cr.scale(1.0, 0.75)
+        cr.arc(0.0, 0.0, 7.0, 0.0, 2 * math.pi)
+        cr.set_source_rgba(*CAIRO_TEXT, 0.50)
+        cr.fill_preserve()
+        cr.set_source_rgba(*CAIRO_TEXT, 0.70)
+        cr.stroke()
+        cr.restore()
+        # Stem
+        cr.move_to(cx + 1.0, cy + 7.0)
+        cr.line_to(cx + 10.0, cy - 12.0)
+        cr.stroke()
+        # Flag
+        cr.move_to(cx + 10.0, cy - 12.0)
+        cr.curve_to(cx + 16.0, cy - 6.0, cx + 14.0, cy + 2.0, cx + 10.0, cy + 2.0)
+        cr.stroke()
         return False
 
     def sync_from_application(self):
