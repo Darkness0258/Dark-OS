@@ -526,14 +526,14 @@ grep -Fq '  - name: greetd' "$services_config" || {
 }
 
 shell_source="$extracted/usr/local/bin/darkos-shell.py"
-grep -Fq 'overlays = (self.dock, self.hud, self.rail, self.left, self.right)' \
+grep -Fq 'overlays = (self.dock, self.rail, self.left, self.right)' \
     "$shell_source" || {
     printf 'DarkOS shell does not hide every overlay during installation\n' >&2
     exit 1
 }
 for component in 'class DarkOSIconRail' 'class DarkOSLeftPanels' \
-    'class DarkOSRightPanels' 'class AIRadarCanvas' \
-    'class RingGauge' 'class AIOrbCanvas'; do
+    'class DarkOSRightPanels' 'class RingGauge' \
+    'class AIOrbCanvas'; do
     grep -Fq "$component" "$shell_source" || {
         printf 'DarkOS shell component is missing: %s\n' "$component" >&2
         exit 1
