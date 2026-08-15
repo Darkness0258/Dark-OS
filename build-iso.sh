@@ -58,6 +58,10 @@ readonly runtime_scripts=(
     usr/local/bin/the-void.sh
     usr/local/bin/start-hyprland
     usr/local/bin/darkos-firstboot-tools
+    usr/local/bin/Installation_guide
+    usr/local/bin/choose-mirror
+    usr/local/bin/livecd-sound
+    root/.automated_script.sh
 )
 
 readonly bash_scripts=(
@@ -70,6 +74,10 @@ readonly bash_scripts=(
     usr/local/bin/the-void.sh
     usr/local/bin/start-hyprland
     usr/local/bin/darkos-firstboot-tools
+    usr/local/bin/Installation_guide
+    usr/local/bin/choose-mirror
+    usr/local/bin/livecd-sound
+    root/.automated_script.sh
 )
 readonly python_scripts=(
     usr/local/bin/darkos-shell.py
@@ -402,7 +410,7 @@ printf 'Verifying executable modes inside the built SquashFS...\n'
 verify_root="${verify_parent}/rootfs"
 unsquashfs -quiet -dest "${verify_root}" "${rootfs_images[0]}" "${runtime_scripts[@]}"
 assert_runtime_scripts "${verify_root}" 'built SquashFS' check
-for relative in "${runtime_scripts[@]}" "usr/local/bin/Installation_guide" "usr/local/bin/choose-mirror" "usr/local/bin/livecd-sound" "root/.automated_script.sh"; do
+for relative in "${runtime_scripts[@]}"; do
     cmp -s "${project_dir}/airootfs/${relative}" "${verify_root}/${relative}" || {
         printf 'Packaged runtime executable differs from source: /%s\n' "${relative}" >&2
         exit 1
