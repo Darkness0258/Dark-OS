@@ -1015,9 +1015,11 @@ class DarkOSRightPanels(Gtk.Window):
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroller.set_overlay_scrolling(True)
-        # Scroller gets all space above the calendar; its content caps at 640px.
+        # Scroller gets all space above the calendar; its content needs at least
+        # 560px to always show notifications, both sliders (volume + brightness),
+        # and the full Now Playing card without quietly collapsing anything.
         scroller.set_propagate_natural_height(True)
-        scroller.set_min_content_height(420)
+        scroller.set_min_content_height(560)
         scroller.set_max_content_height(640)
 
         scroll_root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
