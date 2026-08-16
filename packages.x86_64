@@ -28,6 +28,7 @@ dbus
 xorg-xwayland
 xorg-xauth
 waybar
+wlogout
 greetd
 greetd-regreet
 cage
@@ -66,6 +67,7 @@ ntfs-3g
 efibootmgr
 fastfetch
 rsync
+reflector
 grub
 os-prober
 arch-install-scripts

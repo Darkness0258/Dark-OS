@@ -5,7 +5,7 @@
 **Reviewed against:** `e933f489` (Phase 1 baseline)
 **Review date:** 2026-08-13
 **Reviewer:** Claude Code (ultracode pass)
-**Status:** All code fixes applied. Awaiting VM verification (item 5).
+**Status:** All code fixes applied. ReGreet login path VM-verified on 2026-08-16 (see "Verified in VM" below); the Plymouth boot items remain open (Blocking 1).
 
 ---
 
@@ -25,10 +25,28 @@
 - .agents/AGENTS.md: already references README verification section (no change needed)
 - darkos-grub-install.sh: already writes `built_from=<sha>` to the marker (no change needed)
 
+## Verified in VM — 2026-08-16
+
+The erase-disk-install → reboot cycle that previously blocked this page was
+executed and confirmed:
+
+- **Login confirmed** — the installed system reaches ReGreet (real login UI, no
+  hang, no getty fallback) with the installer ISO disconnected.
+- **Password hash confirmed** — the installed `/etc/shadow` holds a real hash
+  created by the Calamares `users` module, and the password set during
+  installation authenticates through ReGreet/PAM.
+- **First-boot dialog confirmed** — `darkos-firstboot-tools` presents its wofi
+  "Install BlackArch tools?" prompt on the first installed Hyprland session,
+  and correctly skips on the live ISO and after its completion marker.
+
+Pointer: this supersedes the 2026-08-13 "awaiting VM verification" status. The
+same 2026-08-16 VM pass also produced the follow-up fixes in `64d4504`
+(hyprlock `##` escape) and the shell scroller-height commits `9b16243` /
+`75d2021`.
+
 ## Blocking
 
-1. **VM verification not yet performed** — fresh erase-disk install → reboot must confirm:
-   - System reaches ReGreet (not a hang, not a getty fallback)
+1. **Plymouth on the installed-system path — still unverified:**
    - Installed system's resolved mkinitcpio HOOKS line contains `plymouth`
    - Plymouth splash renders on installed-system boot
 
