@@ -2,26 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Build, Test, and Verify
+## Quick Commands
 
-The build pipeline checks every artifact at multiple stages before accepting the ISO.
-
-- `sudo bash build-iso.sh` -- full build: stages a clean archiso releng profile, pins executable modes and symlinks, builds the pinned Calamares package into a local pacman repo, runs `mkarchiso`, extracts the built SquashFS and verifies executables match source byte-for-byte, then runs `ci/verify-iso.sh`. Publishes a versioned ISO (`out/darkos-YYYY.MM.DD-x86_64.iso`) only after every check passes. A stable symlink `out/darkos.iso` is atomically updated to point at the verified image -- the VMware test machine always boots from this path. Set `DARKOS_KEEP_WORK=1` to preserve temp directories for debugging.
-- `bash ci/verify-iso.sh out/darkos-*.iso` -- standalone post-build artifact verification: extracts the ISO squashfs and initramfs, checks critical payload files, permissions, executable modes, script syntax, Waybar module set, greetd/ReGreet config, Hyprland/hypridle/hyprlock settings, Plymouth theme, pacman.conf signature checks, systemd symlinks, package list entries, and byte-identical payload scripts.
-- `bash ci/build-calamares.sh /tmp/repo` -- builds the pinned Calamares AUR package (commit `167151beb`, version 3.4.2) and publishes a local pacman repo. Accepts `DARKOS_CALAMARES_PACKAGE` + `DARKOS_CALAMARES_PACKAGE_SHA256` to reuse a verified cache.
-- `bash -n <script>` -- syntax-check shell scripts. The CI workflow checks all `airootfs/usr/local/bin/*.sh` plus `build-iso.sh`, `ci/build-calamares.sh`, `ci/verify-iso.sh`, and `profiledef.sh`.
-- `python -m py_compile <file>` -- syntax-check Python scripts.
-- Boot in QEMU (UEFI only): `qemu-system-x86_64 -m 4096 -enable-kvm -cdrom out/darkos.iso -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd -drive if=pflash,format=raw,file=/tmp/darkos-vars.fd`.
+- `sudo bash build-iso.sh` — full ISO build: stages a clean archiso releng profile, repairs permissions/symlinks, builds the pinned Calamares package into a local pacman repo, runs `mkarchiso`, extracts the built SquashFS and verifies executables match source byte-for-byte, then runs `ci/verify-iso.sh`. Publishes a versioned ISO (`out/darkos-YYYY.MM.DD-x86_64.iso`) and atomically updates the `out/darkos.iso` symlink. Set `DARKOS_KEEP_WORK=1` to preserve temp directories for debugging.
+- `bash ci/verify-iso.sh out/darkos-*.iso` — standalone post-build artifact verification: extracts the ISO squashfs and initramfs, checks critical payload files, permissions, executable modes, script syntax, Waybar module set, greetd/ReGreet config, Hyprland/hypridle/hyprlock settings, Plymouth theme, pacman.conf signature checks, systemd symlinks, package list entries, and byte-identical payload scripts.
+- `bash ci/build-calamares.sh /tmp/repo` — builds the pinned Calamares AUR package (commit `167151beb`, version 3.4.2) and publishes a local pacman repo. Accepts `DARKOS_CALAMARES_PACKAGE` + `DARKOS_CALAMARES_PACKAGE_SHA256` to reuse a verified cache.
+- `bash -n <script>` — syntax-check shell scripts. CI checks all `airootfs/usr/local/bin/*.sh` plus `build-iso.sh`, `ci/build-calamares.sh`, `ci/verify-iso.sh`, and `profiledef.sh`.
+- `python -m py_compile <file>` — syntax-check Python scripts.
+- `git ls-files -s <file>` — verify a file's git mode is `100755` (executable tracked in git).
+- `git show HEAD:<path> | od -c | head -3` — inspect committed bytes to confirm LF-only line endings.
+- Boot in QEMU (UEFI only): copy `OVMF_VARS.4m.fd` to `/tmp/darkos-vars.fd` first, then `qemu-system-x86_64 -m 4096 -enable-kvm -cdrom out/darkos.iso -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd -drive if=pflash,format=raw,file=/tmp/darkos-vars.fd`.
 
 ## Developing Without a Full Rebuild
 
-Many changes (GTK CSS, shell surface code, Waybar config, Hyprland config) can be iterated on directly inside a running VM without rebuilding the ISO:
+Many changes (GTK CSS, shell surface code, Waybar config, Hyprland config) can be iterated on directly inside a running VM:
 
-- **Shell CSS or panel layout changes:** edit `airootfs/usr/local/bin/darkos-shell.py` in the source checkout, then restart the shell inside the VM with `python /usr/local/bin/darkos-shell.py --toggle-hud` followed by `killall darkos-shell.py` and `python /usr/local/bin/darkos-shell.py &` (or log out/in). The build's byte-identical check will catch any unintended edits when you do eventually run `build-iso.sh`.
-- **Waybar config/CSS:** edit the files under `airootfs/etc/xdg/waybar/`, then `killall waybar && waybar &` inside the VM.
-- **Hyprland config:** edit `airootfs/etc/xdg/hypr/hyprland.conf`, then `hyprctl reload` inside the VM.
+- **Shell CSS or panel layout:** edit `airootfs/usr/local/bin/darkos-shell.py` in the source checkout, then restart the shell inside the VM with `python /usr/local/bin/darkos-shell.py --toggle-hud` followed by `killall darkos-shell.py` and `python /usr/local/bin/darkos-shell.py &` (or log out/in). The build's byte-identical check will catch any unintended edits when you eventually run `build-iso.sh`.
+- **Waybar config/CSS:** edit files under `airootfs/etc/xdg/waybar/`, then `killall waybar && waybar &`.
+- **Hyprland config:** edit `airootfs/etc/xdg/hypr/hyprland.conf`, then `hyprctl reload`.
 
-Run the full build only when you need to verify that packaging, permissions, symlinks, and the Calamares build all still pass.
+Run the full build only when you need to verify packaging, permissions, symlinks, and the Calamares build all still pass.
 
 ## Project Structure
 
@@ -29,19 +29,37 @@ DarkOS is an ArchISO profile for an AI-first Arch Linux respin. The live ISO pay
 
 Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in `airootfs/usr/share/applications/` (`darkos-installer`, `the-void`, `darkos-tool-groups`), Hyprland/Waybar config in `airootfs/etc/xdg/`, Calamares modules in `airootfs/etc/calamares/`, and systemd enablement in `airootfs/etc/systemd/system/`.
 
+## Stack and Boundaries
+
+- **Base:** Arch Linux respun with `archiso` — inherits pacman + AUR.
+- **Security tools:** BlackArch repository layered onto the Arch base via `pacman.conf`.
+- **Compositor/shell:** Hyprland (Wayland). Its `hyprctl` IPC socket is the assistant's control surface.
+- **Installer:** Calamares (graphical).
+- **Login / lock / boot:** greetd + ReGreet under Cage for installed login; `hyprlock` + `hypridle` for session locking; Plymouth for early-boot splash.
+- **Shell UI:** GTK3 + gtk-layer-shell Python process creating Wayland layer-shell surfaces.
+- **Windows compatibility:** Wine 11 / Bottles / Proton / QEMU/KVM — integration, not custom code.
+
+**Non-negotiable boundaries:**
+
+- System control goes through D-Bus / `hyprctl` / AT-SPI / standard CLI tools — never raw input injection. Wayland's security model blocks synthetic input.
+- The visual shell never blocks on the AI backend — if the assistant is offline, the HUD degrades gracefully.
+- BlackArch tools are opt-in tool *groups* at install/setup time, not force-installed as one 2,900-package blob.
+- Hosted apps are never modified or forked. Visual consistency comes from Hyprland's compositor-level decorations, not app-level changes.
+- "Settings" is one app with many tabs, not 20 separate apps.
+
 ## Architecture
 
 ### Shell surface (Phase 2)
 
 The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) that creates five independent layer-shell windows, each anchored separately to a compositor edge. All are owned by `DarkOSApplication` (the single-instance `Gtk.Application`), which owns shared toggle state (`wifi`, `bluetooth`, `dark_mode`, `night_light`, `focus`, `airplane`) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
 
-- `darkos-dock` -- floating bottom dock (Files, Terminal, Browser, AI Orb, Notes, Store, Settings, Logout via wlogout). Exclusive zone 82px.
-- `darkos-hud` -- top-center AI Core radar/dial overlay with activity-linked motion.
-- `darkos-rail` -- left-side vertical icon rail (10 actions: AI, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming).
-- `darkos-left` -- left-of-center panels (AI chat with waveform, weather stub, system overview with live CPU/GPU/RAM/Disk gauges). Refreshes every 2s via `SystemSampler` reading `/proc/stat`, `/proc/meminfo`, `/sys/class/drm`, and `/proc/net/dev`.
-- `darkos-right` -- right-of-center panels (notifications, connectivity toggles, media widget reading `playerctl`, calendar).
+- `darkos-dock` — floating bottom dock (Files, Terminal, Browser, AI Orb, Notes, Store, Settings, Logout via wlogout). Exclusive zone 82px.
+- `darkos-hud` — top-center AI Core radar/dial overlay with activity-linked motion.
+- `darkos-rail` — left-side vertical icon rail (10 actions: AI, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming).
+- `darkos-left` — left-of-center panels (AI chat with waveform, weather stub, system overview with live CPU/GPU/RAM/Disk gauges). Refreshes every 2s via `SystemSampler` reading `/proc/stat`, `/proc/meminfo`, `/sys/class/drm`, and `/proc/net/dev`.
+- `darkos-right` — right-of-center panels (notifications, connectivity toggles, media widget reading `playerctl`, calendar).
 
-The AI Orb cycles through five states (`sleeping`, `listening`, `thinking`, `speaking`, `error`) that also drive the HUD radar animation. All AI requests are stubbed with "Not executed: connect an AI backend" -- no backend exists yet. The visual shell never blocks on the AI backend.
+The AI Orb cycles through five states (`sleeping`, `listening`, `thinking`, `speaking`, `error`) that also drive the HUD radar animation. All AI requests are stubbed with "Not executed: connect an AI backend" — no backend exists yet. The visual shell never blocks on the AI backend.
 
 `set_installer_mode(on)` hides all five surfaces and records their visibility; `set_installer_mode(off)` restores them. This is the mechanism `darkos-installer` uses to suspend the shell while Calamares runs.
 
@@ -75,44 +93,40 @@ Hyprlock's config parser treats `#` as a comment delimiter. Any literal `#` insi
 
 ### Calamares modules
 
-Custom modules in `airootfs/etc/calamares/modules/` handle the install pipeline: `welcome.conf` (connectivity check), `partition.conf` (LUKS1, small swap), `users.conf`, `removeuser.conf` (removes live `darkos` user), `services-systemd.conf` (enables greetd in installed system), `packages.conf`, `unpackfs.conf`, `shellprocess@bootloader-install.conf` (the guarded wrapper), `shellprocess@pacman-keyring.conf` (stops GnuPG agent before keyring init), and `shellprocess@live-cleanup.conf`. The `settings.conf` `exec:` sequence runs `removeuser` before `users` so the live account is cleaned up before the real one is created; `shellprocess@live-cleanup` removes live-only sudoers and autologin; `grubcfg` writes GRUB defaults (not the actual install); the bootloader runs via `shellprocess@bootloader-install` (not the built-in `bootloader` module) to avoid exit-126 permission failures. `users` must run before `packages` and `shellprocess@pacman-keyring` -- running it last in the exec sequence caused the password hash write to `/etc/shadow` to silently fail in the degraded post-packages chroot. `disable-cancel-during-exec` and `hide-back-and-next-during-exec` are both true.
+Custom modules in `airootfs/etc/calamares/modules/` handle the install pipeline: `welcome.conf` (connectivity check), `partition.conf` (LUKS1, small swap), `users.conf`, `removeuser.conf` (removes live `darkos` user), `services-systemd.conf` (enables greetd in installed system), `packages.conf`, `unpackfs.conf`, `shellprocess@bootloader-install.conf` (the guarded wrapper), `shellprocess@pacman-keyring.conf` (stops GnuPG agent before keyring init), and `shellprocess@live-cleanup.conf`.
 
-`out/` holds ~14 live-testing helper scripts used during Phase 2 development inside a running VM: `hot-reload-shell.sh`, `collect-final-smoke.sh`, `audit-final-runtime.sh`, `repair-audio-live.sh`, `reload-waybar-live.sh`, `test-lock-dpms-live.sh`, `trigger-lock-live.sh`, `install-lock-config-live.sh`, `collect-lock-crash.sh`, `test-hyprlock-live.sh`, `probe-hyprlock.sh`, `test-darkos-lock-wrapper.sh`, `verify-final-desktop.sh`, and `verify-packaged-lock.sh`.
+The `settings.conf` `exec:` sequence runs `removeuser` before `users` so the live account is cleaned up before the real one is created; `shellprocess@live-cleanup` removes live-only sudoers and autologin; `grubcfg` writes GRUB defaults (not the actual install); the bootloader runs via `shellprocess@bootloader-install` (not the built-in `bootloader` module) to avoid exit-126 permission failures. `users` must run before `packages` and `shellprocess@pacman-keyring` — running it last in the exec sequence caused the password hash write to `/etc/shadow` to silently fail in the degraded post-packages chroot. `disable-cancel-during-exec` and `hide-back-and-next-during-exec` are both true.
 
-Three `.desktop` launchers live in `airootfs/usr/share/applications/`: `darkos-installer` (launches the session-aware wrapper), `the-void` (kitty terminal, validated by `desktop-file-validate` in CI), and `darkos-tool-groups` (BlackArch tool picker in a terminal).
+## Build Pipeline
 
-### AI control boundaries (non-negotiable)
+The build enforces correctness at **four stages**: source checkout, staged profile, built SquashFS, and final ISO payload. Every shipped script must be byte-identical across all four.
 
-OS-level actions (volume, brightness, workspaces, launching apps) go through D-Bus + `hyprctl`. Generic in-app control uses AT-SPI (Linux accessibility API), avoiding per-app integrations. Screen understanding uses periodic screenshots + vision model for custom-drawn UI. Never use raw input injection -- Wayland security model blocks it.
+The `[darkos-local]` pacman repo is built by `ci/build-calamares.sh` and injected at the top of `pacman.conf` during staging, so the pinned Calamares package always resolves before network repos.
 
-## Coding Conventions
+`build-iso.sh` derives a build SHA from the git checkout (or `DARKOS_BUILD_SHA` / `GITHUB_SHA`). The first 8 hex chars are written into `etc/darkos-build-sha` in the staged profile. Build environment issues almost always trace to a missing command or a checkout outside a git repository.
 
-Shell scripts use `set -Eeuo pipefail` for build and verification paths. Runtime scripts use `set -euo pipefail` or `set -u` + `set -o pipefail`. All scripts must be executable, shebang-led, and LF-only -- the build rejects missing execute bits and CRLF bytes. Use lowercase `darkos-*` names for project scripts and launchers. Keep installer, systemd, and package changes scoped to their existing directories.
-
-The build enforces a strict list of 11 runtime executables, their permissions (mode 755), shebangs, and CRLF-free content at four stages: source checkout, staged profile, built SquashFS, and final ISO payload. Any mismatch fails the build.
+`profiledef.sh` declares `file_permissions` as a plain associative array (not `declare -A`), because mkarchiso sources it from inside a function — `declare -A` would make the map function-local and silently reset every permission to 0644. It also derives `iso_version` from `date +%Y.%m.%d`, so each build gets a date-stamped version.
 
 ## Build Invariants
 
-`build-iso.sh` and `ci/verify-iso.sh` enforce these on every shipped script:
+Every script in the `runtime_scripts` list must be:
 
-- Mode `755` in the source checkout, staged profile, and built squashfs.
-- A `#!` shebang on the first line.
-- LF-only line endings -- CRLF causes exit code 126 at runtime.
+- Mode `755` in the source checkout, staged profile, built squashfs, **and** final ISO payload — asserted by `assert_runtime_scripts` at four stages.
+- Have a `#!` shebang on the first line.
+- Free of CRLF bytes (CRLF causes exit code 126 at runtime).
 - Byte-identical between `airootfs/` source and the packaged squashfs (`cmp -s`).
-- Shell scripts pass `bash -n`; the Python shell passes `python -m py_compile`.
+- Listed in `bash_scripts` if it's a shell script (passes `bash -n`), or `python_scripts` if it's Python (passes `python -m py_compile`).
 
-`profiledef.sh` declares `file_permissions` as a plain associative array (not `declare -A`), because mkarchiso sources it from inside a function -- `declare -A` would make the map function-local and silently reset every permission to 0644. It also derives `iso_version` from `date +%Y.%m.%d`, so each build gets a date-stamped version.
-
-`build-iso.sh` validates that ~18 required commands are present (`awk`, `bash`, `chmod`, `cmp`, `find`, `git`, `grep`, `head`, `install`, `ln`, `lsinitcpio`, `mkarchiso`, `mktemp`, `pacman`, `readlink`, `rm`, `stat`, `tee`, `unsquashfs`, `xorriso`) and derives a build SHA from the git checkout (or `DARKOS_BUILD_SHA` / `GITHUB_SHA`). The first 8 hex chars are written into `etc/darkos-build-sha` in the staged profile. Build environment issues almost always trace to a missing command or a checkout outside a git repository.
+When adding a new runtime script, you must update **all four** enforcement points: the source file itself, `profiledef.sh` `file_permissions`, `build-iso.sh` `runtime_scripts` + `bash_scripts`/`python_scripts`, and `ci/verify-iso.sh` `payload` + `scripts` arrays. The `.claude/skills/darkos-build/SKILL.md` skill documents the exact steps.
 
 ## Live ISO vs Installed System
 
 Several scripts behave differently depending on whether `/run/archiso` exists (present on the live ISO, absent on an installed system). This is the canonical discriminator used throughout the codebase:
 
-- `darkos-tty1-login` -- autologins as `darkos` only when `/run/archiso` exists.
-- `darkos-firstboot-tools` -- skips entirely on the live ISO.
-- `darkos-installer` -- refuses to run without `/run/archiso`.
-- `darkos-grub-repair.service` -- `ConditionPathExists=!/run/archiso` prevents first-boot repair on the live ISO.
+- `darkos-tty1-login` — autologins as `darkos` only when `/run/archiso` exists.
+- `darkos-firstboot-tools` — skips entirely on the live ISO.
+- `darkos-installer` — refuses to run without `/run/archiso`.
+- `darkos-grub-repair.service` — `ConditionPathExists=!/run/archiso` prevents first-boot repair on the live ISO.
 
 When changing any of these scripts, verify both paths (live and installed).
 
@@ -120,17 +134,17 @@ When changing any of these scripts, verify both paths (live and installed).
 
 The target test environment is VMware Workstation. Several components have explicit software-rendering paths for VMware's SVGA adapter:
 
-- `the-void.sh` -- forces `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe` when `systemd-detect-virt --vm` succeeds.
-- `darkos-lock` -- same detection for `hyprlock` + `LIBGL_ALWAYS_SOFTWARE`. Override with `DARKOS_HYPRLOCK_RENDERER=software|hardware` (default `auto`).
-- `start-hyprland` and greetd/ReGreet -- `GDK_DISABLE=dmabuf,vulkan` and `GSK_RENDERER=cairo` for software rendering.
-- `hyprland.conf` -- `AQ_NO_HARDWARE_CURSORS=1` to avoid cursor issues with llvmpipe.
-- `darkos-installer` -- `QT_QUICK_BACKEND=software` for Calamares inside a VM.
+- `the-void.sh` — forces `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe` when `systemd-detect-virt --vm` succeeds.
+- `darkos-lock` — same detection for `hyprlock` + `LIBGL_ALWAYS_SOFTWARE`. Override with `DARKOS_HYPRLOCK_RENDERER=software|hardware` (default `auto`).
+- `start-hyprland` and greetd/ReGreet — `GDK_DISABLE=dmabuf,vulkan` and `GSK_RENDERER=cairo` for software rendering.
+- `hyprland.conf` — `AQ_NO_HARDWARE_CURSORS=1` to avoid cursor issues with llvmpipe.
+- `darkos-installer` — `QT_QUICK_BACKEND=software` for Calamares inside a VM.
 
 Changes that work on bare metal may fail silently in VMware. Test inside the QEMU/VM path before assuming correctness.
 
 ## Shell CSS and Design Tokens
 
-`darkos-shell.py` defines color constants in two forms: hex strings for CSS injection and `(r, g, b)` tuples for Cairo rendering. Both derive from `ui-tokens.md`. When changing a token, update both the hex constant and the Cairo tuple, and the corresponding CSS `alpha()` call if the alpha changes. The glow system uses three layered strokes (sharp core, mid glow, outer haze) -- this applies to all Cairo-drawn elements (orb, radar, gauges). GTK widget glow uses CSS `box-shadow` with `alpha(color, 0.20)`.
+`darkos-shell.py` defines color constants in two forms: hex strings for CSS injection and `(r, g, b)` tuples for Cairo rendering. Both derive from `ui-tokens.md`. When changing a token, update both the hex constant and the Cairo tuple, and the corresponding CSS `alpha()` call if the alpha changes. The glow system uses three layered strokes (sharp core, mid glow, outer haze) — this applies to all Cairo-drawn elements (orb, radar, gauges). GTK widget glow uses CSS `box-shadow` with `alpha(color, 0.20)`.
 
 ## CI
 
@@ -138,11 +152,7 @@ GitHub Actions (`.github/workflows/build-iso.yml`) runs on every push to `main` 
 
 ## Security
 
-`ci/verify-iso.sh` rejects `TrustAll` in the packaged runtime `pacman.conf`. Preserve secure modes for `/etc/shadow` (0600), `/etc/gshadow` (0600), `/root/.gnupg` (0700), and sudoers files (0440/0750). BlackArch and Chaotic-AUR mirror/keyring changes are security-sensitive -- the pinned BlackArch HTTPS endpoint and the verified Chaotic-AUR keyring flow are intentional.
-
-## Project Skill
-
-The `.claude/skills/darkos-build/SKILL.md` skill provides build-specific guidance: how to add a runtime script, a package, or a config file without tripping the enforcement gates, and the Calamares sequence gotchas. Use it when the task touches `build-iso.sh`, `ci/verify-iso.sh`, `profiledef.sh`, `packages.x86_64`, or any file under `airootfs/`.
+`ci/verify-iso.sh` rejects `TrustAll` in the packaged runtime `pacman.conf`. Preserve secure modes for `/etc/shadow` (0600), `/etc/gshadow` (0600), `/root/.gnupg` (0700), and sudoers files (0440/0750). BlackArch and Chaotic-AUR mirror/keyring changes are security-sensitive — the pinned BlackArch HTTPS endpoint and the verified Chaotic-AUR keyring flow are intentional.
 
 ## Design System Reference
 
