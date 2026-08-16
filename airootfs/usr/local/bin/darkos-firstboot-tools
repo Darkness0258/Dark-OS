@@ -35,7 +35,7 @@ fi
 
 # Ask the user whether to install BlackArch tools now.
 choice=$(printf "Yes - Select tools now\nNo - Don't ask again" \
-    | wofi --dmenu --prompt "Install BlackArch tools?" 2>/dev/null || true)
+    | wofi --show dmenu --prompt "Install BlackArch tools?" 2>/dev/null || true)
 
 # Cancelling is not a decision; offer the prompt again next session.
 [ -z "$choice" ] && exit 0

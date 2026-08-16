@@ -98,7 +98,7 @@ interactive_pick() {
         fi
     elif command -v wofi >/dev/null 2>&1; then
         local chosen
-        chosen=$(printf "all\n%s" "$groups" | wofi --dmenu --prompt "Select BlackArch Tool Group:" || true)
+        chosen=$(printf "all\n%s" "$groups" | wofi --show dmenu --prompt "Select BlackArch Tool Group:" || true)
         if [ -n "$chosen" ]; then
             selection=("$chosen")
         fi

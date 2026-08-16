@@ -16,6 +16,8 @@
 3. **AI chat card placement — confirmed** — `build_chat_panel()` is in `DarkOSLeftPanels`, not the centered HUD. `AIRadarCanvas` and `DarkOSHUDOverlay` contain only the radar and tagline.
 4. **Top bar 24px blur — confirmed rendering** — Hyprland layerrule at `hyprland.conf:90` applies `blur on, blur_popups on` to the Waybar namespace. GTK3 cannot use CSS `backdrop-filter`; blur is compositor-rendered. ui-tokens.md updated to document this.
 5. **Quick toggles — confirmed wired** — Wi-Fi uses `nmcli radio wifi`, Bluetooth uses `bluetoothctl power`. Airplane mode disables both. Night Light and Focus are honest preview stubs. Volume uses `pamixer`, brightness uses `brightnessctl`.
+6. **BlackArch picker terminal launch — fixed** — routed `darkos-firstboot-tools` through `/usr/local/bin/the-void.sh` (`the-void.sh -e sudo /usr/local/bin/darkos-tool-groups`) instead of bare `kitty`. In VMs without hardware OpenGL 3.3 support, `kitty` silently aborted on context creation; `the-void.sh` applies software rendering fallback (`LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe`) ensuring the interactive terminal selector opens properly.
+7. **Now Playing card placement — fixed** — reordered `DarkOSRightPanels` scroller content so `build_media()` renders above `build_connectivity()`, guaranteeing the Now Playing card is immediately visible at top of right panels without scrolling.
 
 ## Docs Updated This Pass
 
