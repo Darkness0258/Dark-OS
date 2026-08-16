@@ -47,9 +47,12 @@ case "$choice" in
         ;;
 esac
 
-# Launch the tool-groups picker in a terminal so sudo can prompt.
+# Launch the BlackArch tool-group picker in a terminal so sudo can prompt
+# for the install password. Go through The Void (the project's terminal
+# wrapper), not bare kitty, so the selector also opens inside VMs where
+# kitty cannot create an OpenGL context.
 if command -v kitty >/dev/null 2>&1; then
-    kitty -e sudo /usr/local/bin/darkos-tool-groups || exit 1
+    /usr/local/bin/the-void.sh -e sudo /usr/local/bin/darkos-tool-groups || exit 1
 else
     # Fallback: run the wofi-based picker directly (no terminal output).
     sudo /usr/local/bin/darkos-tool-groups || exit 1
