@@ -67,6 +67,7 @@ payload=(
     etc/calamares/modules/partition.conf
     etc/calamares/modules/services-systemd.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
+    etc/calamares/modules/shellprocess@fix-greeter-groups.conf
     etc/calamares/modules/shellprocess@pacman-keyring.conf
     etc/calamares/modules/welcome.conf
     etc/group
@@ -135,6 +136,7 @@ required_files=(
     etc/calamares/modules/partition.conf
     etc/calamares/modules/services-systemd.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
+    etc/calamares/modules/shellprocess@fix-greeter-groups.conf
     etc/calamares/modules/shellprocess@pacman-keyring.conf
     etc/calamares/modules/welcome.conf
     etc/group
@@ -471,7 +473,7 @@ grep -Eq '^Server = https://[^/]+\.chaotic\.cx/\$repo/\$arch$' \
 }
 
 settings="$extracted/etc/calamares/settings.conf"
-for instance in live-cleanup bootloader-install pacman-keyring; do
+for instance in live-cleanup bootloader-install pacman-keyring fix-greeter-groups; do
     grep -Fq "id: $instance" "$settings" || {
         printf 'Calamares instance is not registered: %s\n' "$instance" >&2
         exit 1
