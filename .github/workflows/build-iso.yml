@@ -59,10 +59,18 @@ jobs:
           printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
           curl --fail --location --retry 3 --retry-all-errors --output strap.sh https://blackarch.org/strap.sh
           chmod +x strap.sh
-          ./strap.sh
-          # strap.sh can finish successfully even when its selected mirror
-          # timed out. Use the canonical HTTPS endpoint and require a usable
-          # sync database before allowing any package transaction to continue.
+          # strap.sh imports the BlackArch signing key via a keyserver, which
+          # can return "No data" on transient network errors. Retry the key
+          # import before falling back to a manual fetch.
+          for attempt in 1 2 3 4 5; do
+            ./strap.sh && break
+            echo "strap.sh attempt $attempt failed; retrying in 10s..."
+            sleep 10
+          done
+          # Even after a successful exit, strap.sh's selected mirror may have
+          # timed out during the sync. Use the canonical HTTPS endpoint and
+          # require a usable sync database before allowing any package
+          # transaction to continue.
           printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
           for attempt in 1 2 3; do
             pacman -Syy --noconfirm && test -s /var/lib/pacman/sync/blackarch.db && break
