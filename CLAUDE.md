@@ -175,7 +175,13 @@ Changes that work on bare metal may fail silently in VMware. Test inside the QEM
 
 ## CI
 
-GitHub Actions (`.github/workflows/build-iso.yml`) runs on every push to `main` and on manual dispatch. It builds inside an `archlinux` container with `--privileged`, seeds Chaotic-AUR and BlackArch keyrings/mirrorlists, validates all scripts and configs (including `desktop-file-validate` for `.desktop` files and `yaml.safe_load` for Calamares configs), builds the ISO, splits it into 1900M parts, and publishes as a GitHub Release tagged `v<run_number>`.
+GitHub Actions (`.github/workflows/build-iso.yml`) runs on every push to `main` and on manual dispatch. It builds inside an `archlinux` container with `--privileged` on `ubuntu-latest`. Steps:
+
+1. Install build deps (`archiso`, `base-devel`, `desktop-file-utils`, `python-yaml`, etc.).
+2. **Validate profile sources** — `bash -n` on all shell scripts (`build-iso.sh`, `ci/*.sh`, `profiledef.sh`, and every `airootfs/usr/local/bin/*.sh`); `compile()` on `darkos-shell.py`; `yaml.safe_load` on every Calamares `.conf` plus `airootfs/usr/share/calamares/branding/darkos/branding.desc`; `desktop-file-validate` on every `.desktop` launcher.
+3. Seed Chaotic-AUR and BlackArch keyrings/mirrorlists, verifying the BlackArch sync DB is non-empty before proceeding.
+4. Run `bash build-iso.sh` (no `sudo` — the privileged container runs as root).
+5. Split the ISO into 1900M parts and publish as a GitHub Release tagged `v<run_number>`.
 
 ## Security
 
