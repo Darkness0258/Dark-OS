@@ -23,6 +23,33 @@ Many changes (GTK CSS, shell surface code, Waybar config, Hyprland config) can b
 
 Run the full build only when you need to verify packaging, permissions, symlinks, and the Calamares build all still pass.
 
+### Live-testing helpers in `out/`
+
+The `out/` directory holds ~14 VM helper scripts for Phase 2 iteration: hot-reload (shell/Waybar/Hyprland), audit (surface inventory), lock probe (hyprlock state), waybar reload, smoke test (post-login surface check), and others. Use these inside a running VM to iterate without rebuilding.
+
+## Validation
+
+There are no unit tests. Correctness is enforced through:
+
+- `bash -n` for shell scripts, `python -m py_compile` for Python.
+- Full `sudo bash build-iso.sh` for packaging, permission, symlink, and Calamares changes.
+- `bash ci/verify-iso.sh` for post-build artifact checks.
+- QEMU boot for installer, bootloader, login, and shell-surface changes.
+
+When in doubt, run the full build and boot the ISO in QEMU.
+
+## Windows Developer Host
+
+This repo is developed on a Windows host with `core.autocrlf=true`. All shell scripts **must** maintain Unix LF (`\n`) line endings — CRLF causes `exit code 126` shebang failures at runtime. Executable scripts must have matching `100755` git mode and `eol=lf` in `.gitattributes`. The build rejects CRLF bytes and missing execute bits at four stages.
+
+## CI Releng Copy Warning
+
+At build time, mkarchiso copies releng profile defaults into `airootfs/`. Do **not** commit conflicting base files (e.g. `airootfs/etc/passwd` from releng) that would break releng seeding — keep only the project's additions and overrides in `airootfs/`.
+
+## Use the `darkos-build` Skill
+
+For any change touching `build-iso.sh`, `ci/verify-iso.sh`, `ci/build-calamares.sh`, `profiledef.sh`, `packages.x86_64`, `pacman.conf`, or any file under `airootfs/`, invoke the `darkos-build` skill. It documents the exact enforcement points for new runtime scripts and prevents tripping build-time checks.
+
 ## Project Structure
 
 DarkOS is an ArchISO profile for an AI-first Arch Linux respin. The live ISO payload lives under `airootfs/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`. Generated ISOs go to `out/`, which also holds ~14 live-testing helper scripts (hot-reload, audit, lock probes, waybar reload, smoke tests) used during Phase 2 development inside a running VM.
@@ -51,7 +78,9 @@ Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in 
 
 ### Shell surface (Phase 2)
 
-The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) that creates five independent layer-shell windows, each anchored separately to a compositor edge. All are owned by `DarkOSApplication` (the single-instance `Gtk.Application`), which owns shared toggle state (`wifi`, `bluetooth`, `dark_mode`, `night_light`, `focus`, `airplane`) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
+The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) owned by a single `Gtk.Application` instance. A fresh instance is created on the first `activate()` call; subsequent calls return immediately — this is why command-line flags like `--toggle-hud` work on an already-running process. The application owns shared toggle state (`wifi`, `bluetooth`, `dark_mode`, `night_light`, `focus`, `airplane`) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
+
+Five independent layer-shell windows are anchored separately to compositor edges:
 
 - `darkos-dock` — floating bottom dock (Files, Terminal, Browser, AI Orb, Notes, Store, Settings, Logout via wlogout). Exclusive zone 82px.
 - `darkos-hud` — top-center AI Core radar/dial overlay with activity-linked motion.
@@ -62,8 +91,6 @@ The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) 
 The AI Orb cycles through five states (`sleeping`, `listening`, `thinking`, `speaking`, `error`) that also drive the HUD radar animation. All AI requests are stubbed with "Not executed: connect an AI backend" — no backend exists yet. The visual shell never blocks on the AI backend.
 
 `set_installer_mode(on)` hides all five surfaces and records their visibility; `set_installer_mode(off)` restores them. This is the mechanism `darkos-installer` uses to suspend the shell while Calamares runs.
-
-The shell accepts command-line flags on an existing instance: `--toggle-hud`, `--toggle-ai`, `--toggle-side-panels`, `--toggle-control`, `--toggle-left`, `--toggle-rail`, `--lock`, `--installer-mode on|off`. Hyprland keybinds in `hyprland.conf` call these to show/hide surfaces at runtime. A fresh instance is created on the first `activate()` call; subsequent calls return immediately.
 
 ### Installer flow
 
