@@ -2,5 +2,5 @@
 vt = 1
 
 [default_session]
-command = "env GTK_USE_PORTAL=0 GDK_DEBUG=no-portals GDK_DISABLE=dmabuf,vulkan GSK_RENDERER=cairo dbus-run-session cage -s -mlast -d -- regreet --style /etc/greetd/regreet.css"
+command = "env WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 LIBGL_ALWAYS_SOFTWARE=1 WLR_RENDERER_ALLOW_SOFTWARE=1 GTK_USE_PORTAL=0 GDK_DEBUG=no-portals GDK_DISABLE=dmabuf,vulkan GSK_RENDERER=cairo dbus-run-session cage -s -mlast -d -- regreet --style /etc/greetd/regreet.css"
 user = "greeter"

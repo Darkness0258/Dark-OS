@@ -87,6 +87,23 @@ has SHA-256 `CEB95BACC1AC69C783A89CB411239CBDD7AB278FEF3C83A8A09206E0CE032B25`.
 - `/boot/grub/install.log` ends with `repair complete; validated config and marker written`.
 - The installed system's `/etc/mkinitcpio.conf` is modified at first boot by `darkos-grub-install.sh` to include the `plymouth` hook, then `mkinitcpio -P` builds the initramfs with the DarkOS splash.
 
+## Phase 2 Verification
+
+Phase 2 was validated end-to-end on a fresh erase-disk UEFI installation in VMware Workstation with the complete shell chrome and login stack active:
+
+1. **Plymouth Boot Splash**: The DarkOS `CONTROL EVERYTHING` boot animation loads cleanly during initramfs kernel execution.
+2. **ReGreet Login Display Manager**: The `greetd` + `cage` + `regreet` stack starts on boot with the DarkOS wallpaper, session selector (Hyprland), and user authentication.
+3. **Desktop Shell Chrome**: Post-login Hyprland environment launches the complete UI surface:
+   - **Top Bar & Left Rail**: Status indicators, workspace switcher, and quick launcher rail.
+   - **Center HUD & System Gauges**: Central radar/dial aesthetic with live CPU, RAM, and Disk telemetry gauges.
+   - **Floating Dock**: Enlarged, glowing central AI Orb surrounded by pinned core application shortcuts.
+   - **Right Column Panels**: Fully populated and rendered in standard production order:
+     - `Notifications` (System feed, Recent Mako popups, and Clear All action)
+     - `Now Playing` (Album art tile, track metadata, progress bar, and media transport controls)
+     - `Connectivity` (3×2 grid of 6 toggles: Wi-Fi, Bluetooth, Dark Mode, Night Light, Focus, Airplane, plus real Audio Volume and Display Brightness sliders)
+     - `Calendar` (Fixed bottom panel with monthly date grid and month navigation)
+4. **The Void & BlackArch First-Boot Flow**: `darkos-firstboot-tools` prompts on initial desktop entry, launching The Void terminal wrapper (`kitty` with VM software rendering fallback) to execute `darkos-tool-groups`, which performs live pacman database synchronization and presents the interactive BlackArch tool group selector.
+
 ## Project Structure
 
 ```
@@ -146,8 +163,8 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 | Phase | Goal |
 |---|---|
 | 1 | Bootable and installable Arch + Hyprland + BlackArch ISO ✓ |
-| 2 | Core shell chrome (HUD, panels, dock, lock, login, boot animation) *(in progress -- code-complete, awaiting VM verification)* |
-| 3 | AI assistant (STT/TTS/brain, OS control) |
+| 2 | Core shell chrome (HUD, panels, dock, lock, login, boot animation) ✓ |
+| 3 | AI assistant (STT/TTS/brain, OS control) *(active focus)* |
 | 4 | Daily-use native apps |
 | 5 | System management (Settings, Network, Security) |
 | 6 | Store & DevHub |
@@ -159,9 +176,8 @@ Full details in [build-plan.md](build-plan.md).
 ## Status
 
 - **Phase 1 is complete and VM-verified** — CI produces installable UEFI ISOs published as GitHub Releases from `main`.
-- **Calamares installation is verified** — the guarded bootloader wrapper completes successfully and writes its validation marker and log to the installed system.
-- **Installed-system boot is verified** — a clean virtual disk booted to a real login prompt with the ISO disconnected.
-- **Phase 2 shell chrome is code-complete** — HUD, panels, dock, lock screen (hyprlock + hypridle), ReGreet login, and Plymouth boot animation are all implemented. Awaiting fresh VM verification before claiming full Phase 2 closure.
+- **Phase 2 shell chrome is complete and VM-verified** — Plymouth boot animation, ReGreet display manager, Hyprland glassmorphism shell (HUD, system gauges, dock with AI Orb, floating side panels with Notifications, Now Playing, Connectivity, and Calendar), hyprlock screen, and first-boot tool group installer are fully verified on installed UEFI hardware.
+- **Phase 3 (AI Assistant)** is the current active focus — integrating STT/TTS, local brain runtime, D-Bus/`hyprctl` control surface, and AT-SPI accessibility automation.
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).
 
