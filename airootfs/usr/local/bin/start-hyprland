@@ -37,4 +37,8 @@ elif [[ -f /sys/class/dmi/id/sys_vendor ]] && grep -qiE 'vmware|virtualbox|qemu|
     export AQ_NO_MODIFIERS=1
 fi
 
+if [[ -x /usr/bin/start-hyprland ]]; then
+    exec /usr/bin/start-hyprland "$@"
+fi
+
 exec /usr/bin/Hyprland "$@"
