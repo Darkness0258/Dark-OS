@@ -92,8 +92,6 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/tokens.py
 )
 
-# Files that must be byte-identical between source and squashfs but are not
-# runtime executables (no mode-755 / shebang enforcement — they're library modules).
 # Library modules (not mode-755 executables) that must be byte-identical
 # between source and squashfs. These are also in python_scripts for py_compile.
 readonly cmp_scripts=(
@@ -439,7 +437,7 @@ fi
 
 printf 'Verifying executable modes inside the built SquashFS...\n'
 verify_root="${verify_parent}/rootfs"
-unsquashfs -quiet -dest "${verify_root}" "${rootfs_images[0]}" "${runtime_scripts[@]}"
+unsquashfs -quiet -dest "${verify_root}" "${rootfs_images[0]}" "${runtime_scripts[@]}" "${cmp_scripts[@]}"
 assert_runtime_scripts "${verify_root}" 'built SquashFS' check
 for relative in "${runtime_scripts[@]}"; do
     cmp -s "${project_dir}/airootfs/${relative}" "${verify_root}/${relative}" || {
