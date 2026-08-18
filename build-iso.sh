@@ -81,6 +81,29 @@ readonly bash_scripts=(
 )
 readonly python_scripts=(
     usr/local/bin/darkos-shell.py
+    usr/local/bin/darkos_shell/__init__.py
+    usr/local/bin/darkos_shell/ai_brain.py
+    usr/local/bin/darkos_shell/activity_detector.py
+    usr/local/bin/darkos_shell/assistant_trigger.py
+    usr/local/bin/darkos_shell/canvases.py
+    usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/system_sampler.py
+    usr/local/bin/darkos_shell/surfaces.py
+    usr/local/bin/darkos_shell/tokens.py
+)
+
+# Files that must be byte-identical between source and squashfs but are not
+# runtime executables (no mode-755 / shebang enforcement — they're library modules).
+readonly cmp_scripts=(
+    usr/local/bin/darkos_shell/__init__.py
+    usr/local/bin/darkos_shell/ai_brain.py
+    usr/local/bin/darkos_shell/activity_detector.py
+    usr/local/bin/darkos_shell/assistant_trigger.py
+    usr/local/bin/darkos_shell/canvases.py
+    usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/system_sampler.py
+    usr/local/bin/darkos_shell/surfaces.py
+    usr/local/bin/darkos_shell/tokens.py
 )
 
 readonly archiso_hook_packages=(
@@ -236,6 +259,12 @@ done
 for relative in "${python_scripts[@]}"; do
     python -m py_compile "${project_dir}/airootfs/${relative}"
 done
+for relative in "${cmp_scripts[@]}"; do
+    cmp -s "${project_dir}/airootfs/${relative}" "${stage_profile}/airootfs/${relative}" || {
+        printf 'Packaged library module differs from source: /%s\n' "${relative}" >&2
+        return 1
+    }
+done
 
 stage_profile="$(mktemp -d /tmp/darkos-archiso-profile.XXXXXX)"
 work_dir="$(mktemp -d /tmp/darkos-archiso-work.XXXXXX)"
@@ -356,6 +385,12 @@ done
 for relative in "${python_scripts[@]}"; do
     python -m py_compile "${stage_profile}/airootfs/${relative}"
 done
+for relative in "${cmp_scripts[@]}"; do
+    cmp -s "${project_dir}/airootfs/${relative}" "${stage_profile}/airootfs/${relative}" || {
+        printf 'Packaged library module differs from source at staged profile: /%s\n' "${relative}" >&2
+        return 1
+    }
+done
 
 printf 'Building the pinned Calamares package and local pacman repository...\n'
 bash "${project_dir}/ci/build-calamares.sh" "${repo_dir}"
@@ -421,6 +456,12 @@ for relative in "${bash_scripts[@]}"; do
 done
 for relative in "${python_scripts[@]}"; do
     python -m py_compile "${verify_root}/${relative}"
+done
+for relative in "${cmp_scripts[@]}"; do
+    cmp -s "${project_dir}/airootfs/${relative}" "${verify_root}/${relative}" || {
+        printf 'Packaged library module differs from source in built SquashFS: /%s\n' "${relative}" >&2
+        exit 1
+    }
 done
 
 printf 'Verifying the payload embedded in the final ISO...\n'

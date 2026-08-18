@@ -63,3 +63,29 @@ same 2026-08-16 VM pass also produced the follow-up fixes in `64d4504`
 - Build registration complete for all changed files
 - No input injection anywhere in the codebase
 - Structural decisions (separate windows, shared state on DarkOSApplication) correct
+
+## Session — 2026-08-17: Plan update (security, AV, cross-platform, look)
+
+Requested: antivirus system, expanded security, a more professional look, broader app/device compatibility, more advanced animations, a more advanced AI, and a client/server split for sold copies.
+
+Actioned this session:
+- Antivirus design added — architecture.md § Security & antivirus, build-plan.md Phase 5 (ClamAV + fanotify on-access + rkhunter/AIDE + quarantine)
+- Android app compatibility added — architecture.md Stack, build-plan.md Phase 7 (Waydroid)
+- ui-rules.md Motion section extended with 4 concrete additions (panel stagger, dock magnetism, transition style, load-reactive background)
+
+Open, not designed yet — needs Hamza's input before any doc goes further:
+- **"Professional look."** Correction to the note below from earlier this session: Phase 2 (shell chrome) is actually already built and VM-verified, not unbuilt — see the doc-sync entry just below. So "not built yet" wasn't the real explanation. Still needs Hamza to say what specifically looks off, now that the shell is real and running rather than assumed unbuilt.
+- **macOS app support.** Re-asked this session; the 2026-07-22 decision is unchanged (no legal/mature compat layer exists for generic PC hardware) — noting here so it isn't silently relitigated later.
+- **"All devices."** If this means DarkOS itself running on phones/tablets, that's already backlogged as the separate Phone Companion project. If it means app compatibility on the current desktop/laptop target, Windows + Linux + Android are now covered and macOS stays out of scope.
+
+**Resolved same session:** client/server ask — Hamza clarified "control" means the server provides different services per tier and centrally stores account/opt-in data, not remote control of the device. Designed as DarkOS Cloud (architecture.md § DarkOS Cloud, build-plan.md Phase 9): accounts, license tiers, cloud AI tier, opt-in sync, signed updates, and opt-in per-session remote support (user-generated code, visible indicator). Client-initiated throughout — the existing no-remote-control boundary holds.
+
+## Session — 2026-08-18: Phase 3 refactor reported complete
+
+Reported: `darkos-shell.py` (1,549 lines) split into a `darkos_shell/` package — `tokens.py`, `canvases.py`, `system_sampler.py`, `css.py`, `surfaces.py`, `ai_brain.py`, `activity_detector.py`, `assistant_trigger.py`, `__init__.py` (24-line entry point). Build system updated to match: `build-iso.sh`, `profiledef.sh`, `ci/verify-iso.sh`.
+
+**Verified per report (build-level only):** all modules pass `py_compile`, LF-only endings, `darkos-shell.py` mode 755/100755, existing `hyprland.conf` keybindings (`--toggle-hud`, `--toggle-ai`, etc.) still route correctly.
+
+**Not yet verified (runtime):** no confirmation of an actual voice round-trip (wake word → Groq transcription → OpenRouter response → edge-tts speech), wake-word/push-to-talk firing in a live session, or activity-detection accuracy / live layout swaps.
+
+**Missing from the module list entirely:** snapshot-before-act (Btrfs/ZFS undo — flagged non-negotiable), "explain this" (AT-SPI error explain+fix), AI-driven D-Bus/hyprctl OS control, and generic AT-SPI in-app control proven on 2+ apps. build-plan.md Phase 3 updated to reflect exactly this — flagged for Hamza to confirm which were skipped vs. just left out of the summary.

@@ -110,6 +110,15 @@ payload=(
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
     usr/local/bin/darkos-shell.py
+    usr/local/bin/darkos_shell/__init__.py
+    usr/local/bin/darkos_shell/ai_brain.py
+    usr/local/bin/darkos_shell/activity_detector.py
+    usr/local/bin/darkos_shell/assistant_trigger.py
+    usr/local/bin/darkos_shell/canvases.py
+    usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/system_sampler.py
+    usr/local/bin/darkos_shell/surfaces.py
+    usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
     usr/local/bin/start-hyprland
@@ -387,6 +396,15 @@ scripts=(
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
     usr/local/bin/darkos-shell.py
+    usr/local/bin/darkos_shell/__init__.py
+    usr/local/bin/darkos_shell/ai_brain.py
+    usr/local/bin/darkos_shell/activity_detector.py
+    usr/local/bin/darkos_shell/assistant_trigger.py
+    usr/local/bin/darkos_shell/canvases.py
+    usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/system_sampler.py
+    usr/local/bin/darkos_shell/surfaces.py
+    usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
     usr/local/bin/start-hyprland
@@ -528,29 +546,31 @@ grep -Fq '  - name: greetd' "$services_config" || {
 }
 
 shell_source="$extracted/usr/local/bin/darkos-shell.py"
+shell_pkg="$extracted/usr/local/bin/darkos_shell"
+# Overlays tuple is defined in darkos_shell/__init__.py (DarkOSApplication)
 grep -Fq 'overlays = (self.dock, self.rail, self.left, self.right)' \
-    "$shell_source" || {
+    "$shell_pkg/__init__.py" "$shell_source" || {
     printf 'DarkOS shell does not hide every overlay during installation\n' >&2
     exit 1
 }
 for component in 'class DarkOSIconRail' 'class DarkOSLeftPanels' \
     'class DarkOSRightPanels' 'class RingGauge' \
     'class AIOrbCanvas'; do
-    grep -Fq "$component" "$shell_source" || {
+    grep -Fq "$component" "$shell_pkg/"*.py "$shell_source" || {
         printf 'DarkOS shell component is missing: %s\n' "$component" >&2
         exit 1
     }
 done
-if grep -Fq 'class DarkOSSidePanels' "$shell_source"; then
+if grep -Fq 'class DarkOSSidePanels' "$shell_pkg/"*.py "$shell_source"; then
     printf 'Legacy combined DarkOSSidePanels still exists\n' >&2
     exit 1
 fi
-if grep -Fq -- '-gtk-icon-size:' "$shell_source"; then
+if grep -Fq -- '-gtk-icon-size:' "$shell_pkg/"*.py "$shell_source"; then
     printf 'DarkOS shell uses the invalid GTK3 CSS property -gtk-icon-size\n' >&2
     exit 1
 fi
 grep -Fq '("sleeping", "listening", "thinking", "speaking", "error")' \
-    "$shell_source" || {
+    "$shell_pkg/__init__.py" "$shell_source" || {
     printf 'AI Orb does not expose all five required click states\n' >&2
     exit 1
 }
@@ -564,15 +584,15 @@ if ! grep -q $'\x89PNG' "$wallpaper"; then
     printf 'DarkOS wallpaper is not a valid PNG\n' >&2
     exit 1
 fi
-grep -Fq 'self.toggle_state = {' "$shell_source" || {
+grep -Fq 'self.toggle_state = {' "$shell_pkg/__init__.py" "$shell_source" || {
     printf 'Shell shared toggle state is not owned by DarkOSApplication\n' >&2
     exit 1
 }
-grep -Fq '["playerctl", "metadata", "--format"' "$shell_source" || {
+grep -Fq '"playerctl", "metadata", "--format"' "$shell_pkg/surfaces.py" "$shell_source" || {
     printf 'Media panel does not read live playerctl metadata\n' >&2
     exit 1
 }
-grep -Fq 'Not executed: connect an AI backend' "$shell_source" || {
+grep -Fq 'Not executed: connect an AI backend' "$shell_pkg/surfaces.py" "$shell_source" || {
     printf 'AI preview does not state that requests are unexecuted\n' >&2
     exit 1
 }

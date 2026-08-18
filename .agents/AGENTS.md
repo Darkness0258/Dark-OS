@@ -55,7 +55,7 @@ Welcome to **DarkOS** — an original, AI-first Linux OS (Arch respin + BlackArc
 
 ---
 
-## 5. Roadmap Status (Phase 1 -> Phase 2 Transition)
+## 5. Roadmap Status (Phase 2 -> Phase 3 Transition)
 
 - **Phase 1 (Bootable Foundation)**: Completed base archiso, Hyprland desktop config, Waybar, TTY autologin, and Calamares installer config (darkos-grub-install.sh). Fixed critical bug: start-hyprland wrapper script was missing (both .bash_profile files called a non-existent command). Wired darkos-tool-groups into first-boot flow via darkos-firstboot-tools (wofi dialog on first Hyprland start, skips on live ISO and after first run). Verification evidence: see [README.md#phase-1-verification](../README.md#phase-1-verification).
-- **Phase 2 (Core Shell Chrome)**: Active / Next focus — building the UI shell widgets (Top Bar, Central AI HUD, Dock, Glass side panels).
+- **Phase 2 (Core Shell Chrome)**: Reviewed 2026-08-13 (Claude Code ultracode pass), VM-verified 2026-08-16 — top bar, AI Core HUD, icon rail, left/right panels, dock, lock screen, and login are done (see ui-registry.md for the full component list). **Open discrepancy:** README.md/CLAUDE.md say the Plymouth boot animation is fully verified on installed hardware; progress-tracker.md's own Blocking section says that specific path is still unverified. Confirm which is accurate before treating Phase 2 as 100% closed. Next real focus is Phase 3 (the assistant) — see build-plan.md.

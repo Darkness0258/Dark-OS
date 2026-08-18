@@ -17,6 +17,10 @@
 - Physics-based movement for window open/close/resize/drag — spring/elastic easing, never linear
 - Target 120 FPS on animations; degrade gracefully on lower-end GPUs (reduce particles/glow first — never drop frame pacing)
 - AI Orb has exactly 5 states, each with its own motion signature: sleeping (slow breathing glow), listening (reactive waveform), thinking (rotating/pulsing rings), speaking (waveform synced to audio output), error (brief red pulse, not a jarring shake)
+- Panel entrances stagger (40-60ms offset per panel), not all at once — reinforces the "HUD powering on" feel from the reference mockup
+- Dock icons get magnetic hover (icon + 1-2 neighbors scale slightly toward cursor), matching the "enlarge on hover" rule already set above
+- App-to-app switches use a brief scan-line/glass-refraction transition instead of a hard cut, reusing the existing glass material rather than a new effect
+- Ambient background (behind the AI Core) subtly reacts to system load — never so much it competes with the Core for attention, per the existing "nothing competes with the Core" rule
 
 ## Buttons & interactive states
 - Primary action: filled glass panel, `--color-primary` glow on hover/focus

@@ -14,6 +14,7 @@
   - TTS: TBD — edge-tts (cloud) or Piper (local, CPU-friendly, fully offline)
   - App layer: GTK3 (PyGObject) + `gtk-layer-shell`, rendered as Wayland layer-shell surfaces (HUD overlay, not a normal window)
 - **Windows compatibility (bolted on, not built):** Wine 11 / Bottles for general Windows apps, Proton for Steam games, QEMU/KVM as the fallback for anything with kernel-level anti-cheat or driver hooks. These projects already exist and are mature — this is integration work.
+- **Android app compatibility (bolted on, not built):** Waydroid — a maintained LXC container running a real Android image under Wayland, same integrate-don't-reimplement pattern as Wine/Proton. Covers the "mobile apps" part of the install-anything ask; real phone hardware (camera/cellular/sensors) stays the separate, backlogged Phone Companion project.
 - **macOS compatibility:** does not exist as a real option (see app catalog note below) — macOS influence here is original UI inspired by its UX patterns only.
 
 ## App catalog (native vs. hosted)
@@ -29,7 +30,7 @@ Your ~90-item feature list groups into roughly **27 real native applications** �
 7. **Dock / Launcher**
 8. **Widgets** — the framework powering the panel widgets seen in the reference mockup
 9. **Notifications**
-10. **Store** — Packages, Updates (one app, wraps pacman/AUR/flatpak)
+10. **Store** — Packages, Updates, Games (one app, one search bar for everything — wraps pacman/AUR/Flatpak for native, Wine/Bottles/Proton for Windows apps & Steam games, Waydroid for Android apps. User searches once; Store resolves the right backend and installs — they never need to know which subsystem an app needs. Every install routed through Shield first, no exceptions for non-native packages.)
 11. **Backup / Recovery**
 12. **Network Center** — Wi-Fi, Bluetooth, Connect, Cloud (integration UI only — actual cloud storage is a third-party backend)
 13. **Security Center** — Vault, Privacy, Shield, Permissions, Encrypt
@@ -59,10 +60,34 @@ No custom rebuild and no manual reskinning for the hosted tier — Hyprland's co
 
 **"macOS features" — the honest version:** Mission and Spaces already cover the two most recognizable ones (Mission Control, virtual desktops), built original. There's no mature, legal Wine-equivalent for running actual macOS software on generic PC hardware — Apple's license ties macOS to Apple silicon, unlike Windows where Wine/Proton/Bottles are real and legal. Original UI inspired by macOS's patterns: yes. Running macOS binaries: not realistic, not needed.
 
+## Security & antivirus
+Security Center (app #13) gets a real engine behind "Shield," not just a settings UI:
+- **Malware scanning:** ClamAV as the on-demand/scheduled engine (signature-based, open-source, actively maintained) + `freshclam` for signature updates
+- **On-access scanning:** `fanotify`-based watcher flags new/modified files for a background scan instead of polling the whole disk
+- **Rootkit / integrity checks:** rkhunter-style heuristic checks + AIDE for file-integrity baselining, surfaced as a visible "Shield" scan result
+- **Quarantine, not silent delete:** flagged files move to a quarantine folder with one-click restore — false positives are normal for heuristic AV, and silent deletion loses user trust and data
+- **Network transparency dashboard:** plain-language view of what's phoning home right now, per app — PHANTOM's monitoring core repurposed, not new groundwork
+- All of this runs local-only, initiated by and visible to the device's own user — ties into the Boundaries entry below
+
 ## AI control mechanism
 - OS-level actions (volume, brightness, workspaces, launching apps): D-Bus + `hyprctl`
 - Generic in-app control ("self-controlling OS"): AT-SPI, Linux's accessibility API — lets the assistant read and act on any app's buttons/fields/text generically, the same mechanism screen readers and UI-testing tools use. Avoids a one-off integration per app.
 - Screen understanding: periodic screenshot + vision-model call, for anything AT-SPI can't expose (custom-drawn UI, games, video)
+- **Snapshot-before-act:** any AI action beyond trivial (installs, file/system changes, settings edits) triggers a Btrfs/ZFS snapshot first — a real system-wide "undo that," not just per-file undo. Non-negotiable given the assistant can act autonomously — this is a safety requirement, not a nice-to-have
+- **Explain this, anywhere:** right-click any error, crash log, or notification → AT-SPI pulls the text, AI explains it and offers a fix inline. No mainstream OS does this at the system level
+- **Context-aware shell:** AI reads the foreground app + activity pattern (coding/gaming/writing) via the same AT-SPI signal and swaps Dock/panel layout automatically — an assistive layout change, not an autonomous system action, so it doesn't need the snapshot step above
+
+## DarkOS Cloud (services & data)
+Resolves the 2026-08-17 open question: "server controls client" = a services/data backend, not remote control of the device. The client always initiates; the server never reaches in.
+
+- **Account & license:** which tier a given install is entitled to — the real "is this a paid copy" check
+- **Cloud AI tier (paid):** hosted brain for devices too weak for a good local model — same Groq/OpenRouter-class APIs already planned in Stack above, just gated by tier instead of free-for-everyone. Directly useful given your own dev machine's local ceiling (~3B Q4)
+- **AI training data (disclosed, time-boxed):** conversations sent to the cloud AI can be used to improve the model — disclosed in the privacy policy up front, collected in defined batches/windows rather than kept forever, and scoped strictly to what the client sent the AI. Never extended to other device data (files, local activity, anything the user didn't send to the AI). A "not used for training" guarantee is a natural higher-tier perk later if you want one.
+- **Sync / backup (opt-in, paid):** settings, Notes, files — encrypted, off by default, user turns it on
+- **Update distribution:** signed release manifests the client pulls on its own schedule — same model as pacman mirrors or Windows Update, not a push channel
+- **Remote support (opt-in, per-session):** for direct help on a customer's machine, they generate a support code locally and hand it to you — time-limited, with a visible "session active" indicator the whole time. Same pattern as AnyDesk/TeamViewer/Chrome Remote Desktop. This is the one place anything resembling "control" is real, and it only exists because the user started it, in front of them
+- **Stored server-side:** account/license state, plus whatever the user opted into (sync/backup, crash reports if enabled) — not a standing log of everything the device does; nothing above needs that
+- **Stack:** Supabase covers the account + Postgres + storage shape and is already your pattern on PHANTOM and Akane. Backend framework (FastAPI vs. Rust/Axum) stays TBD, like STT/TTS above
 
 ## Folder structure
 ```
@@ -71,7 +96,7 @@ plus separate repos for the assistant, the shell, and each native app once Phase
 ```
 
 ## Boundaries (non-negotiable)
-- System control goes through D-Bus / hyprctl / AT-SPI / standard CLI tools — never raw input-injection (`pyautogui`-style). Wayland's security model blocks synthetic input by design.
+- System control goes through D-Bus / hyprctl / AT-SPI / standard CLI tools — never raw input-injection (`pyautogui`-style). Wayland's security model blocks synthetic input by design. This covers remote/networked control too: no server-side channel lets anyone but the device's own user drive that device — DarkOS Cloud (above) is client-initiated service requests plus opt-in, user-started support sessions, never a standing control channel.
 - The visual shell never blocks on the AI backend — if the assistant is down or offline, the HUD degrades gracefully instead of freezing the desktop.
 - BlackArch tools are opt-in tool *groups* at install/setup time, not force-installed as one 2,900-package blob.
 - Hosted apps are never modified or forked — they run as the upstream project ships them. Visual consistency comes from Hyprland's window decorations, not app-level changes.
@@ -91,6 +116,10 @@ graph LR
 ```
 
 ## Key decisions log
+- 2026-08-17: Added 5 differentiators no mainstream OS ships: snapshot-before-act system-wide undo, system-wide "explain this," a network transparency dashboard (reused from PHANTOM), context-aware shell modes, and a unified Store covering native + Windows + Android apps/games in one search bar
+- 2026-08-17: Added Android app compatibility via Waydroid (mobile part of the "install anything" ask); Windows/Linux already covered, macOS stays out of scope (unchanged — no legal compat layer exists, see project-overview.md)
+- 2026-08-17: Added a real engine behind Security Center's Shield tab — ClamAV + fanotify on-access scanning + rkhunter/AIDE integrity checks + quarantine (not silent delete)
+- 2026-08-17: Client/server ask resolved as DarkOS Cloud — a services/data backend (accounts, license tiers, cloud AI, opt-in sync, signed updates, opt-in per-session remote support), not remote control of the device; client always initiates — see § DarkOS Cloud
 - 2026-08-11: Phase 2 shell chrome uses independent TOP-layer rail, left-panel, right-panel, HUD, and dock windows; `DarkOSApplication` owns shared toggle/theme state so separately anchored surfaces cannot drift out of sync
 - 2026-08-11: Session locking uses upstream `hyprlock` + `hypridle` and installed login uses greetd/ReGreet under Cage; a layer-shell overlay is not accepted as a security boundary because it does not implement `ext-session-lock-v1`
 - 2026-08-11: The shell app layer is GTK3 (PyGObject) + `gtk-layer-shell`, not PyQt6; native Wayland layer-shell support matches the existing shell and avoids a parallel toolkit rewrite
