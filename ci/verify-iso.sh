@@ -396,15 +396,6 @@ scripts=(
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
     usr/local/bin/darkos-shell.py
-    usr/local/bin/darkos_shell/__init__.py
-    usr/local/bin/darkos_shell/ai_brain.py
-    usr/local/bin/darkos_shell/activity_detector.py
-    usr/local/bin/darkos_shell/assistant_trigger.py
-    usr/local/bin/darkos_shell/canvases.py
-    usr/local/bin/darkos_shell/css.py
-    usr/local/bin/darkos_shell/system_sampler.py
-    usr/local/bin/darkos_shell/surfaces.py
-    usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
     usr/local/bin/start-hyprland
