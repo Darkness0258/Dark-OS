@@ -16,6 +16,13 @@ The thin wrapper at /usr/local/bin/darkos-shell.py imports this package
 and hands off to DarkOSApplication.
 """
 
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib, Gtk
+
 from darkos_shell.surfaces import (
     DarkOSDockWindow,
     DarkOSHUDOverlay,
@@ -62,21 +69,10 @@ from darkos_shell.tokens import (
 )
 
 
-class DarkOSApplication:
+class DarkOSApplication(Gtk.Application):
     """Single-instance controller and shared shell state owner."""
 
     def __init__(self):
-        import gi
-
-        gi.require_version("Gtk", "3.0")
-        gi.require_version("Gdk", "3.0")
-        gi.require_version("Gio", "2.0")
-        from gi.repository import Gio, GLib, Gtk
-
-        self.Gtk = Gtk
-        self.GLib = GLib
-        self.Gio = Gio
-
         super().__init__(
             application_id="org.darkos.Shell",
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
