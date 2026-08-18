@@ -411,6 +411,17 @@ scripts=(
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
 )
+readonly library_modules=(
+    usr/local/bin/darkos_shell/__init__.py
+    usr/local/bin/darkos_shell/ai_brain.py
+    usr/local/bin/darkos_shell/activity_detector.py
+    usr/local/bin/darkos_shell/assistant_trigger.py
+    usr/local/bin/darkos_shell/canvases.py
+    usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/system_sampler.py
+    usr/local/bin/darkos_shell/surfaces.py
+    usr/local/bin/darkos_shell/tokens.py
+)
 for relative in "${scripts[@]}"; do
     path="$extracted/$relative"
     if [[ ! -f "$path" || ! -x "$path" ]]; then
@@ -434,6 +445,18 @@ for relative in "${scripts[@]}"; do
         *.py) python -m py_compile "$extracted/$relative" ;;
         *) bash -n "$extracted/$relative" ;;
     esac
+done
+for relative in "${library_modules[@]}"; do
+    path="$extracted/$relative"
+    if [[ ! -f "$path" ]]; then
+        printf 'ISO library module is missing: /%s\n' "$relative" >&2
+        exit 1
+    fi
+    if grep -q $'\r' "$path"; then
+        printf 'ISO library module contains CRLF data: /%s\n' "$relative" >&2
+        exit 1
+    fi
+    python -m py_compile "$path"
 done
 
 declare -A service_targets=(
