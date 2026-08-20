@@ -113,6 +113,7 @@ payload=(
     usr/local/bin/darkos_shell/__init__.py
     usr/local/bin/darkos_shell/ai_brain.py
     usr/local/bin/darkos_shell/activity_detector.py
+    usr/local/bin/darkos_shell/actions.py
     usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
