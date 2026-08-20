@@ -285,7 +285,7 @@ for i in range(desktop.get_n_children()):
         break
 else:
     print('')
-""", "--", payload],
+""", payload],
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():

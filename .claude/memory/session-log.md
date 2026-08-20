@@ -29,3 +29,24 @@
 - （必要に応じて追記）
 
 ---
+
+## セッション: 2026-08-20T05:09:33Z
+
+- session_id: `session-1787202432505310800`
+- project: `Dark OS`
+- branch: `main`
+- started_at: `2026-08-20T05:07:09Z`
+- ended_at: `2026-08-20T05:09:33Z`
+- duration_minutes: 2
+- changes: 0
+
+### 変更ファイル
+- （なし）
+
+### 重要な変更（important=true）
+- （なし）
+
+### 次回への引き継ぎ（任意）
+- （必要に応じて追記）
+
+---

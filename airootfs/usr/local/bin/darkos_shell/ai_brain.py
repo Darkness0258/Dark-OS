@@ -283,11 +283,20 @@ def _dispatch_actions(reply: str, actions) -> str:
 
 
 def _parse_args(raw: str) -> list:
-    """Minimal arg parser for simple strings and ints."""
+    """Minimal arg parser for simple strings and ints.
+    Uses csv so a quoted argument can contain a literal comma, e.g.
+    atspi_set_text("entry", "search box", "hello, world") stays 3 args,
+    not 4 — a plain str.split(",") would break on the comma in the value."""
     if not raw:
         return []
+    import csv
+    import io
+    try:
+        row = next(csv.reader(io.StringIO(raw), skipinitialspace=True))
+    except StopIteration:
+        return []
     args = []
-    for part in raw.split(","):
+    for part in row:
         part = part.strip()
         if part.startswith('"') and part.endswith('"'):
             args.append(part[1:-1])
