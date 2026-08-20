@@ -126,7 +126,9 @@ class ActionDispatcher:
             return
         try:
             desc = f"darkos-ai-{int(time.time())}"
-            dst = f"{self._snapshot_root}@/.snapshots/{desc}"
+            snap_dir = Path(self._snapshot_root) / ".snapshots"
+            snap_dir.mkdir(parents=True, exist_ok=True)
+            dst = str(snap_dir / desc)
             _command(["btrfs", "subvolume", "snapshot", self._snapshot_root, dst])
             self._latest_snapshot = desc
         except Exception:
