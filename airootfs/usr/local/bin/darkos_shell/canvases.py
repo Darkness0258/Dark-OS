@@ -37,6 +37,7 @@ class AIOrbCanvas(Gtk.DrawingArea):
         self.set_size_request(size, size)
         self.state = "sleeping"
         self.anim_phase = 0.0
+        self._frame_count = 0
         self.connect("draw", self.on_draw)
         GLib.timeout_add(33, self.on_animate)
 
@@ -49,7 +50,14 @@ class AIOrbCanvas(Gtk.DrawingArea):
             "error": 0.20,
         }.get(self.state, 0.035)
         self.anim_phase = (self.anim_phase + speed) % (math.pi * 200)
-        self.queue_draw()
+        self._frame_count += 1
+        # Sleeping is a slow breathing glow — redrawing every 3rd tick
+        # (~11fps) looks identical to every tick (~30fps) but cuts the
+        # Cairo cost for the state the orb sits in almost all the time.
+        # Phase still advances every tick so active states stay smooth
+        # and don't visually "jump" on the next redraw.
+        if self.state != "sleeping" or self._frame_count % 3 == 0:
+            self.queue_draw()
         return True
 
     def set_state(self, new_state):
@@ -132,7 +140,7 @@ class WaveformCanvas(Gtk.DrawingArea):
             x = gap * (index + 0.5)
             cr.move_to(x, midpoint - amplitude)
             cr.line_to(x, midpoint + amplitude)
-            cr.stroke()
+        cr.stroke()
         return False
 
 

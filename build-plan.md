@@ -18,7 +18,7 @@ Goal — the reference mockup's look exists and runs, AI still stubbed
 - [x] Right-of-center panels (notifications, connectivity, media widget, calendar) — `RightUtilityPanels`
 - [x] Floating dock (Files, Browser, Terminal, AI, Notes, Store, Settings) — `FloatingDockAndAIOrb`
 - [x] Lock screen, login screen — `SecureLockScreen`, `ReGreetLogin`, VM-confirmed 2026-08-16
-- [ ] Boot animation — **flagged, not confirmed either way:** README.md and CLAUDE.md say Plymouth is fully verified on installed hardware; progress-tracker.md's own Blocking section says the installed-system path is still unverified. These two accounts disagree — needs an actual check on real/VM hardware before this line is honestly closed.
+- [ ] Boot animation — **confirmed not verified (2026-08-18):** README.md/CLAUDE.md's "fully verified" claim was premature. Config side checked and is fine — `darkos-grub-install.sh` fail-closes on the HOOKS line and theme selection, and the Aug 16 install completing all 34 jobs proves both held. What's actually unknown: whether the splash visually renders during boot. Needs Hamza to report what he actually sees on a real boot before this is fixable.
 
 ## Phase 3: The assistant, for real
 Goal — AI / Voice / Vision / Memory / Command / Search / Automate actually work

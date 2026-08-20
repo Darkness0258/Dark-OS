@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """GTK layer-shell window surfaces for the shell."""
 
-from gi.repository import Gtk, GtkLayerShell
+import threading
+
+from gi.repository import GLib, Gtk, GtkLayerShell
 
 from darkos_shell.canvases import AIOrbCanvas, WaveformCanvas
 from darkos_shell.css import CSS_STYLE
@@ -498,7 +500,8 @@ class DarkOSRightPanels(Gtk.Window):
         self.application.register_state_listener(self)
         self.sync_from_application()
         self.show_all()
-        from gi.repository import GLib
+        self._media_fetch_lock = threading.Lock()
+        self._position_fetch_lock = threading.Lock()
         # 5s interval so overlapping playerctl calls can't stack
         # if a slow player hangs near the 1.5s command_output timeout.
         GLib.timeout_add(5000, self.refresh_media)
@@ -743,10 +746,25 @@ class DarkOSRightPanels(Gtk.Window):
             self.notification_status.set_text("Could not reach Mako notification control.")
 
     def refresh_media(self):
-        metadata = command_output(
-            ["playerctl", "metadata", "--format", "{{title}}\t{{artist}}"]
-        )
-        status = command_output(["playerctl", "status"])
+        """Timer tick (main thread) — kick off a background fetch, don't block."""
+        if not self._media_fetch_lock.acquire(blocking=False):
+            return True  # previous fetch still running (slow player) — skip this tick
+        threading.Thread(target=self._fetch_media, daemon=True).start()
+        return True
+
+    def _fetch_media(self):
+        """Background thread — the only place that actually blocks."""
+        try:
+            metadata = command_output(
+                ["playerctl", "metadata", "--format", "{{title}}\t{{artist}}"]
+            )
+            status = command_output(["playerctl", "status"])
+        finally:
+            self._media_fetch_lock.release()
+        GLib.idle_add(self._apply_media, metadata, status)
+
+    def _apply_media(self, metadata, status):
+        """Runs on the main thread via idle_add — safe to touch widgets here."""
         active = metadata is not None and status is not None
         if active:
             title, separator, artist = metadata.partition("\t")
@@ -761,14 +779,26 @@ class DarkOSRightPanels(Gtk.Window):
                 button.set_sensitive(active)
         if active and hasattr(self, "media_progress"):
             self.refresh_media_position()
-        return True
+        return False  # one-shot idle callback, don't repeat
 
     def refresh_media_position(self):
         """Poll play position and update the progress bar + time display."""
         if not hasattr(self, "media_progress") or not self.media_active:
-            return
-        length_raw = command_output(["playerctl", "metadata", "mpris:length"])
-        position_raw = command_output(["playerctl", "position"])
+            return True  # must return truthy — this is also a repeating GLib timer
+        if not self._position_fetch_lock.acquire(blocking=False):
+            return True
+        threading.Thread(target=self._fetch_media_position, daemon=True).start()
+        return True
+
+    def _fetch_media_position(self):
+        try:
+            length_raw = command_output(["playerctl", "metadata", "mpris:length"])
+            position_raw = command_output(["playerctl", "position"])
+        finally:
+            self._position_fetch_lock.release()
+        GLib.idle_add(self._apply_media_position, length_raw, position_raw)
+
+    def _apply_media_position(self, length_raw, position_raw):
         total = int(length_raw) / 1_000_000 if length_raw and length_raw.isdigit() else 0
         pos = int(position_raw) / 1_000_000 if position_raw and position_raw.replace(".", "").isdigit() else 0
         if total > 0:
@@ -777,4 +807,4 @@ class DarkOSRightPanels(Gtk.Window):
             self.media_time.set_text(
                 f"{int(pos // 60)}:{int(pos % 60):02d} / {int(total // 60)}:{int(total % 60):02d}"
             )
-        return True
+        return False  # one-shot idle callback, don't repeat
