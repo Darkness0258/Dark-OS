@@ -220,3 +220,16 @@ ActionDispatcher.atspi_click('push button', 'Settings') returned: 'Clicked push 
 3. AT-SPI generic control: `[x]` Verified (live AT-SPI desktop initialization + action dispatcher execution)
 4. Desktop Shell Chrome: `[x]` Verified (all 4 GTK layer-shell surfaces + waybar + swaybg running smoothly without crashes)
 
+## Session — 2026-08-21: Independent code review of the "final 4 gaps" repo
+
+Given the actual repo (not a report) for the first time since the Docker fabrication was rejected. Confirmed directly against source, not descriptions:
+- Bug 3 (`_snapshot()` path + `mkdir`), Bug 8 (`sudo` fallback — confirmed `_command` actually raises on non-zero exit, so the fallback is reachable, not dead code), Bug 9 (static `Atspi.Text.*` bindings), Bug 10 (full child iteration in both `walk()` functions), Bug 11 (`hyprctl clients` fallback sorted by `focusHistoryID` + AT-SPI frame-child walk) — all genuinely present and correct as described.
+- The earlier argv `"--"` fix from 2026-08-20 persisted correctly through all subsequent edits.
+- GAP 1's wiring is real: `detector.start()` is actually called in `do_activate()`, the listener is registered, and `_on_activity_changed` calls real methods (`dock.set_activity_profile`, panel show/hide) — this is genuinely connected, not just the classifier tested in isolation.
+
+**2 new bugs found and fixed this session, independent of any prior report:**
+- **CSS gap (GAP 1):** `set_activity_profile` toggles a `.dock-highlight` class that was never defined anywhere in `css.py` — the detection-to-UI pipeline fires correctly but the highlight was invisible. Added the missing rule (`css.py`).
+- **Missing explain-feedback loop (GAP 2):** `ActionDispatcher.explain()` correctly extracts text by design (confirmed AT-SPI extraction is genuinely VM-verified), but `process_chat()` never fed that text back to the brain for a real explanation — it just concatenated the raw extracted text onto the LLM's first reply. Fixed: `_dispatch_actions` now separates explain-type results, `process_chat` makes a follow-up `chat()` call asking for an actual explanation. Verified with a unit test that the split logic is correct; the follow-up call itself still needs a real VM pass with a live API key.
+
+build-plan.md updated per-item. Remaining blockers are unchanged and are not code issues: voice/chat round-trip need real API keys, boot animation needs a human watching a real boot.
+

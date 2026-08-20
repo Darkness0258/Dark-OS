@@ -217,25 +217,36 @@ class DarkOSApplication(Gtk.Application):
 
     def _voice_pipeline(self, audio_path):
         """Background thread: STT → LLM → TTS, results posted back to UI."""
-        GLib.idle_add(self._set_orb_state, "listening")
-        text = self.brain.process_voice(audio_path)
-        if not text:
-            GLib.idle_add(self._set_orb_state, "error")
-            GLib.idle_add(self._ai_error, "No speech detected.")
-            return
-        GLib.idle_add(self._set_orb_state, "thinking")
-        reply, action_summary = self.brain.process_chat(text)
-        if not reply:
-            GLib.idle_add(self._set_orb_state, "error")
-            GLib.idle_add(self._ai_error, "No response from AI.")
-            return
-        GLib.idle_add(self._set_orb_state, "speaking")
-        self.brain.speak(reply)
-        result = reply
-        if action_summary:
-            result += "\n\n" + action_summary
-        GLib.idle_add(self._ai_response, text, result)
-        GLib.idle_add(self._set_orb_state, "sleeping")
+        from pathlib import Path
+
+        try:
+            GLib.idle_add(self._set_orb_state, "listening")
+            text = self.brain.process_voice(audio_path)
+            if not text:
+                GLib.idle_add(self._set_orb_state, "error")
+                GLib.idle_add(self._ai_error, "No speech detected.")
+                return
+            GLib.idle_add(self._set_orb_state, "thinking")
+            reply, action_summary = self.brain.process_chat(text)
+            if not reply:
+                GLib.idle_add(self._set_orb_state, "error")
+                GLib.idle_add(self._ai_error, "No response from AI.")
+                return
+            GLib.idle_add(self._set_orb_state, "speaking")
+            spoken = self.brain.speak(reply)
+            result = reply
+            if action_summary:
+                result += "\n\n" + action_summary
+            if not spoken:
+                result += "\n\nSpeech playback is unavailable."
+            GLib.idle_add(self._ai_response, text, result)
+            GLib.idle_add(self._set_orb_state, "sleeping" if spoken else "error")
+        finally:
+            # Recordings can contain sensitive speech and must not accumulate.
+            try:
+                Path(audio_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def _set_orb_state(self, state):
         self._orb_state = state
@@ -261,6 +272,8 @@ class DarkOSApplication(Gtk.Application):
         parser.add_argument("--toggle-control", action="store_true")
         parser.add_argument("--toggle-left", action="store_true")
         parser.add_argument("--toggle-rail", action="store_true")
+        parser.add_argument("--ptt-start", action="store_true")
+        parser.add_argument("--ptt-stop", action="store_true")
         parser.add_argument("--lock", action="store_true")
         parser.add_argument("--installer-mode", choices=("on", "off"))
         try:
@@ -284,6 +297,16 @@ class DarkOSApplication(Gtk.Application):
             if not self.left.is_visible():
                 self.left.show_all()
             self.left.entry.grab_focus()
+        if args.ptt_start:
+            if self.trigger.on_push_to_talk_start():
+                self._set_orb_state("listening")
+            else:
+                self._set_orb_state("error")
+                self._ai_error("No working microphone recorder was found.")
+        if args.ptt_stop:
+            if not self.trigger.on_push_to_talk_stop():
+                self._set_orb_state("error")
+                self._ai_error("No speech was captured.")
         if args.lock:
             launch(["loginctl", "lock-session"])
         return 0

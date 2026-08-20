@@ -64,6 +64,7 @@ done
 payload=(
     etc/calamares/settings.conf
     etc/darkos-build-sha
+    etc/calamares/modules/mount.conf
     etc/calamares/modules/partition.conf
     etc/calamares/modules/services-systemd.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
@@ -80,6 +81,7 @@ payload=(
     etc/pacman.d/chaotic-mirrorlist
     etc/passwd
     etc/shadow
+    etc/sudoers.d/darkos-ai-snapshot
     etc/plymouth/plymouthd.conf
     etc/xdg/hypr/hypridle.conf
     etc/xdg/hypr/hyprland.conf
@@ -91,6 +93,7 @@ payload=(
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
     etc/systemd/system/multi-user.target.wants/pacman-init.service
     etc/systemd/system/multi-user.target.wants/seatd.service
+    etc/systemd/system/multi-user.target.wants/vmtoolsd.service
     etc/systemd/system/pacman-init.service
     root/.automated_script.sh
     root/.gnupg
@@ -102,8 +105,16 @@ payload=(
     usr/bin/plymouth-set-default-theme
     usr/bin/regreet
     usr/bin/unsquashfs
+    usr/bin/arecord
+    usr/bin/brightnessctl
+    usr/bin/btrfs
+    usr/bin/espeak-ng
+    usr/bin/pamixer
+    usr/bin/playerctl
+    usr/bin/vmtoolsd
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
+    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-firstboot-tools
     usr/local/bin/darkos-grub-install.sh
@@ -143,6 +154,7 @@ unsquashfs -no-progress -d "$extracted" "$squashfs" "${payload[@]}" >/dev/null
 required_files=(
     etc/calamares/settings.conf
     etc/darkos-build-sha
+    etc/calamares/modules/mount.conf
     etc/calamares/modules/partition.conf
     etc/calamares/modules/services-systemd.conf
     etc/calamares/modules/shellprocess@bootloader-install.conf
@@ -159,6 +171,7 @@ required_files=(
     etc/pacman.d/chaotic-mirrorlist
     etc/passwd
     etc/shadow
+    etc/sudoers.d/darkos-ai-snapshot
     etc/plymouth/plymouthd.conf
     etc/xdg/hypr/hypridle.conf
     etc/xdg/hypr/hyprland.conf
@@ -174,6 +187,14 @@ required_files=(
     usr/bin/plymouth-set-default-theme
     usr/bin/regreet
     usr/bin/unsquashfs
+    usr/bin/arecord
+    usr/bin/brightnessctl
+    usr/bin/btrfs
+    usr/bin/espeak-ng
+    usr/bin/pamixer
+    usr/bin/playerctl
+    usr/bin/vmtoolsd
+    usr/local/bin/darkos-ai-snapshot
     usr/share/applications/darkos-installer.desktop
     usr/share/backgrounds/darkos/darkos-wallpaper.png
     usr/share/icons/darkos/darkos.png
@@ -223,9 +244,11 @@ for build_identity_wiring in \
     }
 done
 
-for relative in usr/bin/calamares usr/bin/cage usr/bin/ckbcomp usr/bin/hypridle \
-    usr/bin/hyprlock usr/bin/plymouth-set-default-theme usr/bin/regreet \
-    usr/bin/unsquashfs; do
+for relative in usr/bin/arecord usr/bin/brightnessctl usr/bin/btrfs \
+    usr/bin/calamares usr/bin/cage usr/bin/ckbcomp usr/bin/espeak-ng \
+    usr/bin/hypridle usr/bin/hyprlock usr/bin/pamixer usr/bin/playerctl \
+    usr/bin/plymouth-set-default-theme usr/bin/regreet usr/bin/unsquashfs \
+    usr/bin/vmtoolsd; do
     if [[ ! -x "$extracted/$relative" ]]; then
         printf 'Required ISO executable is not executable: /%s\n' "$relative" >&2
         exit 1
@@ -284,6 +307,8 @@ hyprland_config="$extracted/etc/xdg/hypr/hyprland.conf"
 # shellcheck disable=SC2016 # $mainMod is literal Hyprland configuration.
 for setting in 'exec-once = hypridle' 'exec-once = nm-applet --indicator' \
     'exec-once = blueman-applet' 'bind = $mainMod, L, exec, loginctl lock-session' \
+    'bind = $mainMod, SPACE, exec, python /usr/local/bin/darkos-shell.py --ptt-start' \
+    'bindr = $mainMod, SPACE, exec, python /usr/local/bin/darkos-shell.py --ptt-stop' \
     'match:namespace ^(waybar|darkos-(dock|hud|rail|left|right))$' \
     'blur on' 'ignore_alpha 0.08'; do
     grep -Fq "$setting" "$hyprland_config" || {
@@ -345,6 +370,16 @@ grep -Fq 'exec /usr/bin/start-hyprland "$@"' \
     printf 'Live /etc/gshadow does not have mode 0600\n' >&2
     exit 1
 }
+snapshot_sudoers="$extracted/etc/sudoers.d/darkos-ai-snapshot"
+[[ "$(stat -c '%a' "$snapshot_sudoers")" == 440 ]] || {
+    printf 'AI snapshot sudoers policy does not have mode 0440\n' >&2
+    exit 1
+}
+grep -Fxq '%wheel ALL=(root) NOPASSWD: /usr/local/bin/darkos-ai-snapshot ""' \
+    "$snapshot_sudoers" || {
+    printf 'AI snapshot sudoers policy is broader than the no-argument helper\n' >&2
+    exit 1
+}
 
 # The live account databases are layered into the image before package
 # installation. Verify package-created system identities were merged and that
@@ -391,6 +426,7 @@ scripts=(
     root/.automated_script.sh
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
+    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-firstboot-tools
     usr/local/bin/darkos-grub-install.sh
@@ -458,6 +494,7 @@ declare -A service_targets=(
     [darkos-grub-repair]="../darkos-grub-repair.service"
     [pacman-init]="../pacman-init.service"
     [seatd]="/usr/lib/systemd/system/seatd.service"
+    [vmtoolsd]="/usr/lib/systemd/system/vmtoolsd.service"
 )
 for service in "${!service_targets[@]}"; do
     link="$extracted/etc/systemd/system/multi-user.target.wants/${service}.service"
@@ -541,12 +578,94 @@ grep -Fq '/usr/bin/gpgconf --homedir /etc/pacman.d/gnupg --kill all' \
 }
 
 partition_config="$extracted/etc/calamares/modules/partition.conf"
-for setting in 'luksGeneration: luks1' 'initialSwapChoice: small'; do
+for setting in 'defaultFileSystemType: btrfs' 'luksGeneration: luks1' \
+    'initialSwapChoice: small'; do
     grep -Fq "$setting" "$partition_config" || {
         printf 'Calamares partition configuration is missing: %s\n' "$setting" >&2
         exit 1
     }
 done
+
+mount_config="$extracted/etc/calamares/modules/mount.conf"
+python - "$mount_config" <<'PY'
+from pathlib import Path
+import sys
+
+import yaml
+
+path = Path(sys.argv[1])
+try:
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+except (OSError, UnicodeError, yaml.YAMLError) as exc:
+    raise SystemExit(f"Invalid Calamares mount configuration: {exc}") from exc
+
+if not isinstance(config, dict):
+    raise SystemExit("Calamares mount configuration must be a YAML mapping")
+
+expected_subvolumes = {
+    "/": "/@",
+    "/home": "/@home",
+    "/var/cache": "/@cache",
+    "/var/log": "/@log",
+}
+subvolumes = config.get("btrfsSubvolumes")
+if not isinstance(subvolumes, list):
+    raise SystemExit("Calamares mount configuration has no Btrfs subvolume list")
+actual_subvolumes = {}
+for entry in subvolumes:
+    if not isinstance(entry, dict) or set(entry) != {"mountPoint", "subvolume"}:
+        raise SystemExit(f"Invalid Calamares Btrfs subvolume entry: {entry!r}")
+    mount_point = entry["mountPoint"]
+    if mount_point in actual_subvolumes:
+        raise SystemExit(f"Duplicate Calamares Btrfs mount point: {mount_point}")
+    actual_subvolumes[mount_point] = entry["subvolume"]
+if actual_subvolumes != expected_subvolumes:
+    raise SystemExit(
+        "Calamares Btrfs layout does not mount the installed root from /@: "
+        f"{actual_subvolumes!r}"
+    )
+if config.get("btrfsSwapSubvol") != "/@swap":
+    raise SystemExit("Calamares Btrfs swap subvolume is not /@swap")
+
+extra_mounts = config.get("extraMounts")
+if not isinstance(extra_mounts, list):
+    raise SystemExit("Calamares mount configuration has no extra chroot mounts")
+extra_by_mountpoint = {
+    entry.get("mountPoint"): entry
+    for entry in extra_mounts
+    if isinstance(entry, dict) and isinstance(entry.get("mountPoint"), str)
+}
+expected_extra_mounts = {
+    "/proc": ("proc", "proc"),
+    "/sys": ("sys", "sysfs"),
+    "/dev": ("/dev", None),
+    "/run": ("tmpfs", "tmpfs"),
+    "/run/udev": ("/run/udev", None),
+    "/sys/firmware/efi/efivars": ("efivarfs", "efivarfs"),
+}
+for mount_point, (device, filesystem) in expected_extra_mounts.items():
+    entry = extra_by_mountpoint.get(mount_point)
+    if not entry or entry.get("device") != device or entry.get("fs") != filesystem:
+        raise SystemExit(f"Calamares essential mount is invalid: {mount_point}")
+for mount_point in ("/dev", "/run/udev"):
+    if extra_by_mountpoint[mount_point].get("options") != ["bind"]:
+        raise SystemExit(f"Calamares essential bind mount is invalid: {mount_point}")
+if extra_by_mountpoint["/sys/firmware/efi/efivars"].get("efi") is not True:
+    raise SystemExit("Calamares EFI variables mount is not EFI-gated")
+
+mount_options = config.get("mountOptions")
+if not isinstance(mount_options, list):
+    raise SystemExit("Calamares mount configuration has no filesystem options")
+options_by_filesystem = {
+    entry.get("filesystem"): entry.get("options")
+    for entry in mount_options
+    if isinstance(entry, dict)
+}
+if options_by_filesystem.get("btrfs") != ["defaults", "compress=zstd:1"]:
+    raise SystemExit("Calamares Btrfs mount options are missing compression")
+if options_by_filesystem.get("efi") != ["defaults", "umask=0077"]:
+    raise SystemExit("Calamares EFI mount options do not protect firmware files")
+PY
 
 welcome_config="$extracted/etc/calamares/modules/welcome.conf"
 grep -Fq 'internetCheckUrl: https://ping.archlinux.org/nm-check.txt' \
@@ -620,6 +739,14 @@ grep -Fq 'ActionDispatcher' "$shell_pkg/__init__.py" "$shell_source" || {
     printf 'Action dispatcher not wired in\n' >&2
     exit 1
 }
+grep -Fq '"openrouter/free"' "$shell_pkg/ai_brain.py" || {
+    printf 'AI brain does not use the supported OpenRouter free router by default\n' >&2
+    exit 1
+}
+grep -Fq '_ALLOWED_ACTIONS = frozenset' "$shell_pkg/ai_brain.py" || {
+    printf 'AI action dispatch has no explicit allowlist\n' >&2
+    exit 1
+}
 
 grep -Fq 'plymouth-set-default-theme darkos' \
     "$extracted/usr/local/bin/darkos-grub-install.sh" || {
@@ -632,11 +759,13 @@ grep -Fq "set_grub_option GRUB_CMDLINE_LINUX_DEFAULT" \
     exit 1
 }
 
-for package in adwaita-icon-theme blackarch-keyring blackarch-mirrorlist calamares ckbcomp \
-    cage chaotic-keyring chaotic-mirrorlist firefox greetd greetd-regreet \
-    hypridle hyprlock inter-font lvm2 mkinitcpio-nfs-utils nbd neovim \
-    pipewire pipewire-pulse plymouth pv python-cairo ranger rtkit \
-    squashfs-tools syslinux wireplumber blueman accountsservice; do
+for package in adwaita-icon-theme alsa-utils blackarch-keyring blackarch-mirrorlist \
+    btrfs-progs brightnessctl calamares cage ckbcomp chaotic-keyring \
+    chaotic-mirrorlist espeak-ng firefox greetd greetd-regreet gtk3 \
+    gtk-layer-shell hypridle hyprlock inter-font lvm2 mkinitcpio-nfs-utils \
+    nbd neovim open-vm-tools pamixer pipewire pipewire-pulse playerctl \
+    plymouth pv python-cairo python-gobject ranger rtkit squashfs-tools \
+    syslinux wireplumber blueman accountsservice; do
     grep -Eq "^${package}[[:space:]]" "$pkglist" || {
         printf 'Required package is absent from the ISO package list: %s\n' "$package" >&2
         exit 1

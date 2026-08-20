@@ -36,13 +36,34 @@ DarkOS is a real startup product — not a demo, not a theme pack, not a Windows
 
 ### Build the ISO
 
-Requires `archiso` and `mkinitcpio` on an Arch Linux system or privileged container.
+The native build requires `archiso` and `mkinitcpio` on Arch Linux:
 
 ```bash
 git clone https://github.com/Darkness0258/Dark-OS.git
 cd Dark-OS
 sudo bash build-iso.sh
 ```
+
+On Windows, run Docker Desktop in Linux-container mode. From PowerShell in the
+repository root, build and run the privileged Arch builder with:
+
+```powershell
+Set-Location 'D:\Projects\Dark OS'
+docker compose run --rm --build darkos
+```
+
+Compose bind-mounts the repository at `/workspace` and runs
+`ci/docker-build-iso.sh`, which installs the ArchISO dependencies, builds the
+image, and runs the artifact verifier. To retain the builder's temporary work
+directories for troubleshooting, add the debug override:
+
+```powershell
+docker compose -f compose.yaml -f compose.debug.yaml run --rm --build darkos
+```
+
+The debug override stores `/tmp` in a named Docker volume and sets
+`DARKOS_KEEP_WORK=1`, so the reported staging, work, repository, and verification
+directories remain available to a later debug container.
 
 Output is written to `out/darkos-*.iso`.
 

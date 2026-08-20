@@ -26,7 +26,9 @@ ACTIVITY_PROFILES = {
     },
     "gaming": {
         "description": "Game or launcher in focus",
-        "dock_highlight": "gaming",
+        # The Phase 3 dock has no dedicated Gaming app yet (Phase 7). Highlight
+        # Store, the existing entry point for acquiring/launching software.
+        "dock_highlight": "store",
         "show_chat": False,
         "show_system": False,
         "panel_opacity": 0.30,
@@ -42,7 +44,8 @@ ACTIVITY_PROFILES = {
     },
     "media": {
         "description": "Media player or browser in focus",
-        "dock_highlight": "music",
+        # Browser is the shipped media entry point until the Phase 7 player.
+        "dock_highlight": "browser",
         "show_chat": False,
         "show_system": False,
         "panel_opacity": 0.70,

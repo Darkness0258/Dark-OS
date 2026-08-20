@@ -8,12 +8,20 @@ readonly releng_profile="/usr/share/archiso/configs/releng"
 readonly out_dir="${project_dir}/out"
 readonly vmware_iso="${out_dir}/darkos.iso"
 
+# Freeze the artifact version once so a long build crossing midnight cannot
+# make our expected path disagree with mkarchiso's later profile load.
+export DARKOS_ISO_VERSION="${DARKOS_ISO_VERSION:-$(date -u +%Y.%m.%d)}"
+if [[ ! "${DARKOS_ISO_VERSION}" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$ ]]; then
+    printf 'DARKOS_ISO_VERSION must use YYYY.MM.DD format.\n' >&2
+    exit 1
+fi
+
 if (( EUID != 0 )); then
     printf 'DarkOS ISO builds must run as root. Use: sudo bash build-iso.sh\n' >&2
     exit 1
 fi
 
-for command in awk bash chmod cmp cp find git grep head install ln lsinitcpio mkarchiso mktemp pacman readlink rm stat tee unsquashfs xorriso; do
+for command in awk bash chmod cmp cp date find git grep head install ln lsinitcpio mkarchiso mktemp pacman readlink rm stat tee unsquashfs xorriso; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         printf 'Required build command not found: %s\n' "${command}" >&2
         printf 'Run this build on Arch Linux with archiso, base-devel, and mkinitcpio installed.\n' >&2
@@ -51,6 +59,7 @@ readonly runtime_scripts=(
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-tty1-login
     usr/local/bin/darkos-tool-groups
+    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
@@ -68,6 +77,7 @@ readonly bash_scripts=(
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-tty1-login
     usr/local/bin/darkos-tool-groups
+    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
@@ -120,6 +130,7 @@ readonly runtime_symlinks=(
     etc/systemd/system/multi-user.target.wants/bluetooth.service
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
     etc/systemd/system/multi-user.target.wants/seatd.service
+    etc/systemd/system/multi-user.target.wants/vmtoolsd.service
 )
 
 declare -Ar runtime_symlink_targets=(
@@ -127,6 +138,7 @@ declare -Ar runtime_symlink_targets=(
     [etc/systemd/system/multi-user.target.wants/bluetooth.service]="/usr/lib/systemd/system/bluetooth.service"
     [etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service]="../darkos-grub-repair.service"
     [etc/systemd/system/multi-user.target.wants/seatd.service]="/usr/lib/systemd/system/seatd.service"
+    [etc/systemd/system/multi-user.target.wants/vmtoolsd.service]="/usr/lib/systemd/system/vmtoolsd.service"
 )
 
 assert_source_symlinks() {
@@ -185,6 +197,7 @@ assert_profile_permissions() (
         ["/etc/gshadow"]="0:0:600"
         ["/etc/shadow"]="0:0:600"
         ["/etc/sudoers.d"]="0:0:750"
+        ["/etc/sudoers.d/darkos-ai-snapshot"]="0:0:440"
         ["/etc/sudoers.d/darkos"]="0:0:440"
         ["/root"]="0:0:750"
         ["/root/.automated_script.sh"]="0:0:755"
@@ -261,6 +274,8 @@ done
 for relative in "${python_scripts[@]}"; do
     python -m py_compile "${project_dir}/airootfs/${relative}"
 done
+printf 'Running Phase 3 assistant regression suite...\n'
+python "${project_dir}/ci/test-phase3-linux.py"
 
 stage_profile="$(mktemp -d /tmp/darkos-archiso-profile.XXXXXX)"
 work_dir="$(mktemp -d /tmp/darkos-archiso-work.XXXXXX)"
@@ -384,7 +399,7 @@ done
 for relative in "${cmp_scripts[@]}"; do
     cmp -s "${project_dir}/airootfs/${relative}" "${stage_profile}/airootfs/${relative}" || {
         printf 'Packaged library module differs from source at staged profile: /%s\n' "${relative}" >&2
-        return 1
+        exit 1
     }
 done
 
@@ -467,7 +482,12 @@ bash "${project_dir}/ci/verify-iso.sh" "${expected_iso}"
 # that stable name only after the versioned image has passed every payload
 # check, so a local VM can never silently keep booting an older installer.
 printf 'Publishing verified VMware ISO at %s...\n' "${vmware_iso}"
-ln -f "${expected_iso}" "${vmware_iso}"
+if ! ln -f "${expected_iso}" "${vmware_iso}"; then
+    # Docker Desktop bind mounts do not expose hard-link support on every
+    # Windows filesystem/backend combination. A byte-for-byte copy is a safe
+    # publication fallback; the cmp below remains the release gate.
+    cp -f -- "${expected_iso}" "${vmware_iso}"
+fi
 cmp -s "${expected_iso}" "${vmware_iso}" || {
     printf 'Verified VMware ISO does not match the versioned build artifact.\n' >&2
     exit 1

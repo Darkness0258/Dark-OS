@@ -113,6 +113,12 @@ CSS_STYLE = f"""
     font-size: 20px;
 }}
 
+.dock-highlight {{
+    background-color: alpha({COLOR_ACCENT}, 0.16);
+    border: 1px solid alpha({COLOR_ACCENT}, 0.55);
+    box-shadow: 0 0 12px 1px alpha({COLOR_ACCENT}, 0.35);
+}}
+
 .dock-label {{
     color: {COLOR_TEXT_MUTED};
     font-size: 10px;

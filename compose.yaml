@@ -1,6 +1,10 @@
 services:
   darkos:
-    image: darkos
+    image: darkos-iso-builder
     build:
       context: .
       dockerfile: ./Dockerfile
+    privileged: true
+    working_dir: /workspace
+    volumes:
+      - .:/workspace

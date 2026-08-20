@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+readonly BLACKARCH_STRAP_SHA256="58ce783cf584d9000d42f78b51780e0b58fb2d1671abf9bca1f2a486d5368dd4"
+
 cd /workspace
 
 printf '==> Initializing pacman keys...\n'
@@ -10,7 +12,7 @@ pacman-key --init
 pacman-key --populate archlinux
 
 printf '==> Installing ISO and AUR build dependencies...\n'
-pacman -Sy --noconfirm archlinux-keyring || true
+pacman -Sy --noconfirm archlinux-keyring
 pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git mkinitcpio pacman-contrib python python-yaml squashfs-tools dosfstools efibootmgr grub libisoburn mtools pv rsync
 
 printf '==> Seeding Chaotic-AUR and BlackArch mirrorlists and keyrings...\n'
@@ -38,6 +40,8 @@ pacman -U --needed --noconfirm "/tmp/chaotic-mirrorlist.pkg.tar.zst"
 
 printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
 curl --fail --location --retry 3 --retry-all-errors --output /tmp/strap.sh https://blackarch.org/strap.sh
+printf '%s  %s\n' "$BLACKARCH_STRAP_SHA256" /tmp/strap.sh \
+  | sha256sum --check --strict -
 chmod +x /tmp/strap.sh
 (cd /tmp && ./strap.sh)
 

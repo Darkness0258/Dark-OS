@@ -1,4 +1,8 @@
-FROM alpine:latest
-LABEL Name=darkos Version=0.0.1
-RUN apk add --no-cache fortune
-ENTRYPOINT ["sh", "-c", "fortune -a | cat"]
+FROM archlinux:latest
+
+LABEL org.opencontainers.image.title="DarkOS ISO Builder"
+LABEL org.opencontainers.image.description="Privileged ArchISO build environment for DarkOS"
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/bin/bash", "/workspace/ci/docker-build-iso.sh"]

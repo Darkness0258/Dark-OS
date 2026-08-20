@@ -19,6 +19,7 @@ blueman
 pipewire
 pipewire-alsa
 pipewire-pulse
+alsa-utils
 rtkit
 wireplumber
 hyprland
@@ -60,6 +61,7 @@ nvidia-utils
 nvidia-open-dkms
 open-vm-tools
 parted
+btrfs-progs
 lvm2
 gptfdisk
 dosfstools
@@ -75,6 +77,7 @@ squashfs-tools
 python
 python-gobject
 python-cairo
+espeak-ng
 gtk3
 adwaita-icon-theme
 gtk-layer-shell

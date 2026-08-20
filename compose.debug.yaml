@@ -1,6 +1,9 @@
 services:
   darkos:
-    image: darkos
-    build:
-      context: .
-      dockerfile: ./Dockerfile
+    environment:
+      DARKOS_KEEP_WORK: "1"
+    volumes:
+      - darkos-build-debug:/tmp
+
+volumes:
+  darkos-build-debug:

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Narrow privileged helper used by the desktop assistant. It accepts no
+# caller-controlled path or name, so the sudoers grant cannot be repurposed to
+# snapshot arbitrary filesystems.
+
+set -Eeuo pipefail
+
+if (( EUID != 0 )); then
+    printf '%s\n' 'darkos-ai-snapshot must run as root' >&2
+    exit 1
+fi
+if (($# != 0)); then
+    printf '%s\n' 'darkos-ai-snapshot accepts no arguments' >&2
+    exit 2
+fi
+if [[ "$(findmnt --noheadings --output FSTYPE --target /)" != btrfs ]]; then
+    printf '%s\n' 'DarkOS root filesystem is not Btrfs' >&2
+    exit 3
+fi
+
+readonly snapshot_dir=/.snapshots
+readonly snapshot_name="darkos-ai-$(date +%s%N)"
+readonly snapshot_path="${snapshot_dir}/${snapshot_name}"
+
+install -d -o root -g root -m 0700 "${snapshot_dir}"
+btrfs subvolume snapshot -r / "${snapshot_path}" >/dev/null
+printf '%s\n' "${snapshot_name}"

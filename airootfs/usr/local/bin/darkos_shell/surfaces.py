@@ -6,9 +6,8 @@ import gi
 
 gi.require_version("GtkLayerShell", "0.1")
 gi.require_version("Gtk", "3.0")
-gi.require_version("Gdk", "3.0")
 
-from gi.repository import GLib, Gdk, Gtk, GtkLayerShell
+from gi.repository import GLib, Gtk, GtkLayerShell
 
 from darkos_shell.canvases import AIOrbCanvas, WaveformCanvas
 from darkos_shell.css import CSS_STYLE
@@ -199,39 +198,8 @@ class DarkOSDockWindow(Gtk.Window):
         for key, icon, name, command in right_apps:
             dock.pack_start(make_dock_slot(key, icon, name, command), False, False, 2)
 
-        # Push-to-talk: SUPER+SPACE press/release
-        self._ptt_key_pressed = False
-        self.set_events(
-            self.get_events()
-            | Gdk.EventMask.KEY_PRESS_MASK
-            | Gdk.EventMask.KEY_RELEASE_MASK
-        )
-        self.connect("key-press-event", self._on_key_press)
-        self.connect("key-release-event", self._on_key_release)
-
         self.add(dock)
         self.show_all()
-
-    def _on_key_press(self, _widget, event):
-        if self._ptt_key_pressed:
-            return False
-        keyval = event.get_keyval()[1] if hasattr(event, "get_keyval") else event.keyval
-        if keyval == Gdk.KEY_space and event.get_state() & Gdk.ModifierType.SUPER_MASK:
-            self._ptt_key_pressed = True
-            self.application.trigger.on_push_to_talk_start()
-            GLib.idle_add(self.application._set_orb_state, "listening")
-            return True
-        return False
-
-    def _on_key_release(self, _widget, event):
-        if not self._ptt_key_pressed:
-            return False
-        keyval = event.get_keyval()[1] if hasattr(event, "get_keyval") else event.keyval
-        if keyval == Gdk.KEY_space:
-            self._ptt_key_pressed = False
-            self.application.trigger.on_push_to_talk_stop()
-            return True
-        return False
 
     def on_orb_click(self, _button):
         states = ("sleeping", "listening", "thinking", "speaking", "error")
@@ -479,12 +447,17 @@ class DarkOSLeftPanels(Gtk.Window):
             GLib.idle_add(self._show_chat_error, "No response from AI.")
             return
         GLib.idle_add(self.application._set_orb_state, "speaking")
-        self.application.brain.speak(reply)
+        spoken = self.application.brain.speak(reply)
         result = reply
         if action_summary:
             result += "\n\n" + action_summary
+        if not spoken:
+            result += "\n\nSpeech playback is unavailable."
         GLib.idle_add(self.show_ai_response, text, result)
-        GLib.idle_add(self.application._set_orb_state, "sleeping")
+        GLib.idle_add(
+            self.application._set_orb_state,
+            "sleeping" if spoken else "error",
+        )
 
     def _show_chat_error(self, message):
         self.response.set_text(message)

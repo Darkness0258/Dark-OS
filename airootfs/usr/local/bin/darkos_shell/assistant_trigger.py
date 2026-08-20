@@ -11,11 +11,12 @@ The trigger emits a callback with audio bytes (from a temp file) on activation.
 """
 
 import os
+import json
 import shutil
 import subprocess
 import sys
 import tempfile
-import time
+import threading
 from pathlib import Path
 
 from darkos_shell.ai_brain import AIBrain
@@ -33,8 +34,14 @@ class AssistantTrigger:
         self._active = False
         self._listeners = []
         self._wake_word_process = None
+        self._wake_word_thread = None
         self._recording_process = None
         self._recording_path = None
+        self._recording_sink = None
+
+    @property
+    def is_recording(self) -> bool:
+        return self._active and self._recording_process is not None
 
     def start(self):
         """Begin listening for activation."""
@@ -44,6 +51,7 @@ class AssistantTrigger:
 
     def stop(self):
         """Stop all listening."""
+        self._active = False
         self._stop_wake_word()
         self._stop_recording()
 
@@ -54,18 +62,21 @@ class AssistantTrigger:
     def on_push_to_talk_start(self):
         """Begin recording (called from keybinding press)."""
         if self._active:
-            return
-        self._active = True
-        self._start_recording()
+            return True
+        path = self._start_recording()
+        self._active = path is not None
+        return self._active
 
     def on_push_to_talk_stop(self):
         """Stop recording and dispatch (called from keybinding release)."""
         if not self._active:
-            return
+            return False
         self._active = False
         audio_path = self._stop_recording()
         if audio_path:
             self._dispatch(audio_path)
+            return True
+        return False
 
     def on_wake_word_detected(self):
         """Called by the wake-word engine when the keyword is heard."""
@@ -77,35 +88,54 @@ class AssistantTrigger:
         recorder = _find_binary(["parec", "arecord", "ffmpeg"])
         if not recorder:
             return None
-        fd, path = tempfile.mkstemp(suffix=".webm" if recorder == "ffmpeg" else ".wav")
+        recorder_name = Path(recorder).name
+        suffix = ".webm" if recorder_name == "ffmpeg" else ".wav"
+        fd, path = tempfile.mkstemp(suffix=suffix)
         os.close(fd)
         self._recording_path = path
-        if recorder == "parec":
-            cmd = [
-                "parec", "--format=s16le", "--rate=16000", "--channels=1",
-                "--latency-msec=100",
-            ]
-            sink = open(path, "wb")
-            self._recording_process = subprocess.Popen(
-                cmd, stdout=sink, stderr=subprocess.DEVNULL
-            )
-        elif recorder == "arecord":
-            cmd = ["arecord", "-f", "S16_LE", "-r", "16000", "-c", "1", "-d", "30", path]
-            self._recording_process = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-        elif recorder == "ffmpeg":
-            cmd = [
-                "ffmpeg", "-f", "pulse", "-i", "default", "-ar", "16000", "-ac", "1",
-                "-y", path,
-            ]
-            self._recording_process = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-        return path
+        try:
+            if recorder_name == "parec":
+                # parec otherwise emits headerless raw PCM. Groq accepts WAV,
+                # so explicitly request a WAV container matching the suffix.
+                cmd = [
+                    recorder, "--file-format=wav", "--format=s16le",
+                    "--rate=16000", "--channels=1", "--latency-msec=100",
+                ]
+                self._recording_sink = open(path, "wb")
+                self._recording_process = subprocess.Popen(
+                    cmd, stdout=self._recording_sink, stderr=subprocess.DEVNULL
+                )
+            elif recorder_name == "arecord":
+                cmd = [
+                    recorder, "-q", "-f", "S16_LE", "-r", "16000",
+                    "-c", "1", "-d", "30", path,
+                ]
+                self._recording_process = subprocess.Popen(
+                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            else:
+                cmd = [
+                    recorder, "-f", "pulse", "-i", "default", "-ar", "16000",
+                    "-ac", "1", "-c:a", "libopus", "-y", path,
+                ]
+                self._recording_process = subprocess.Popen(
+                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            return path
+        except (OSError, ValueError):
+            if self._recording_sink is not None:
+                self._recording_sink.close()
+                self._recording_sink = None
+            Path(path).unlink(missing_ok=True)
+            self._recording_path = None
+            self._recording_process = None
+            return None
 
     def _stop_recording(self):
         if self._recording_process is None:
+            if self._recording_sink is not None:
+                self._recording_sink.close()
+                self._recording_sink = None
             return None
         try:
             self._recording_process.terminate()
@@ -119,9 +149,13 @@ class AssistantTrigger:
         self._recording_process = None
         path = self._recording_path
         self._recording_path = None
-        # parec writes to a file sink we opened; others write directly to path.
-        if hasattr(proc, "stdout") and proc.stdout and not proc.stdout.closed:
-            return path  # parec: return the file path we opened for stdout
+        if self._recording_sink is not None:
+            self._recording_sink.close()
+            self._recording_sink = None
+        if not path or not Path(path).is_file() or Path(path).stat().st_size <= 44:
+            if path:
+                Path(path).unlink(missing_ok=True)
+            return None
         return path
 
     # ── Wake-word engine ───────────────────────────────────────────────
@@ -144,8 +178,36 @@ class AssistantTrigger:
                 text=True,
                 bufsize=1,
             )
+            self._wake_word_thread = threading.Thread(
+                target=self._monitor_wake_word,
+                daemon=True,
+            )
+            self._wake_word_thread.start()
         except (OSError, ValueError):
             pass
+
+    def _monitor_wake_word(self):
+        """Consume detector output and dispatch on a positive detection."""
+        process = self._wake_word_process
+        if process is None or process.stdout is None:
+            return
+        for line in process.stdout:
+            normalized = line.strip().lower()
+            if not normalized:
+                continue
+            detected = False
+            try:
+                event = json.loads(normalized)
+                detected = bool(event.get("detected"))
+                if not detected:
+                    score = float(event.get("score", 0.0))
+                    detected = score >= 0.5
+            except (TypeError, ValueError, json.JSONDecodeError):
+                detected = (
+                    "hey_darkos" in normalized or "hey darkos" in normalized
+                ) and any(word in normalized for word in ("detect", "trigger", "wake"))
+            if detected:
+                self.on_wake_word_detected()
 
     def _stop_wake_word(self):
         if self._wake_word_process is not None:
@@ -158,6 +220,7 @@ class AssistantTrigger:
                 except OSError:
                     pass
             self._wake_word_process = None
+            self._wake_word_thread = None
 
     # ── Dispatch ───────────────────────────────────────────────────────
 
