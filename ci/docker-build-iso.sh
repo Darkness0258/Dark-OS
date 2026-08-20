@@ -3,15 +3,17 @@ set -Eeuo pipefail
 
 cd /workspace
 
-printf '==> Installing ISO and AUR build dependencies...\n'
-pacman -Sy --noconfirm archlinux-keyring
-pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git mkinitcpio pacman-contrib python python-yaml squashfs-tools dosfstools efibootmgr grub libisoburn mtools pv rsync
-
-printf '==> Seeding Chaotic-AUR and BlackArch mirrorlists and keyrings...\n'
+printf '==> Initializing pacman keys...\n'
 export TERM=xterm
 mkdir -p /etc/pacman.d
 pacman-key --init
 pacman-key --populate archlinux
+
+printf '==> Installing ISO and AUR build dependencies...\n'
+pacman -Sy --noconfirm archlinux-keyring || true
+pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git mkinitcpio pacman-contrib python python-yaml squashfs-tools dosfstools efibootmgr grub libisoburn mtools pv rsync
+
+printf '==> Seeding Chaotic-AUR and BlackArch mirrorlists and keyrings...\n'
 for attempt in 1 2 3; do
   pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com && break
   if [ "$attempt" -eq 3 ]; then exit 1; fi

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""DarkOS Phase 3 End-to-End Runtime Verification Suite.
+"""DarkOS Phase 3 Unit & Mock Subprocess Test Suite.
 
-Runs all 7 Phase 3 features in a live Linux environment, executes actual
-commands, and captures raw outputs and assertions.
+Tests Phase 3 action argument parsing, regex dispatching, and subprocess
+call formatting using mock shell utilities in a temporary sandbox directory.
 """
 
 import json
