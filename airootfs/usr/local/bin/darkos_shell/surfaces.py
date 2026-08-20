@@ -3,7 +3,7 @@
 
 import threading
 
-from gi.repository import GLib, Gtk, GtkLayerShell
+from gi.repository import GLib, Gdk, Gtk, GtkLayerShell
 
 from darkos_shell.canvases import AIOrbCanvas, WaveformCanvas
 from darkos_shell.css import CSS_STYLE
@@ -153,17 +153,18 @@ class DarkOSDockWindow(Gtk.Window):
         dock.set_halign(Gtk.Align.CENTER)
 
         left_apps = (
-            ("folder-symbolic", "Files", ["/usr/local/bin/the-void.sh", "-e", "ranger"]),
-            ("utilities-terminal-symbolic", "Terminal", ["/usr/local/bin/the-void.sh"]),
-            ("web-browser-symbolic", "Browser", ["firefox"]),
+            ("files", "folder-symbolic", "Files", ["/usr/local/bin/the-void.sh", "-e", "ranger"]),
+            ("terminal", "utilities-terminal-symbolic", "Terminal", ["/usr/local/bin/the-void.sh"]),
+            ("browser", "web-browser-symbolic", "Browser", ["firefox"]),
         )
         right_apps = (
-            ("accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/the-void.sh", "-e", "nvim"]),
-            ("system-software-install-symbolic", "Store", ["wofi", "--show", "drun"]),
-            ("preferences-system-symbolic", "Settings", ["wofi", "--show", "drun"]),
+            ("notes", "accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/the-void.sh", "-e", "nvim"]),
+            ("store", "system-software-install-symbolic", "Store", ["wofi", "--show", "drun"]),
+            ("settings", "preferences-system-symbolic", "Settings", ["wofi", "--show", "drun"]),
         )
+        self._dock_icons = {}
 
-        def make_dock_slot(icon, name, command):
+        def make_dock_slot(key, icon, name, command):
             slot = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             slot.set_halign(Gtk.Align.CENTER)
             btn = make_icon_button(
@@ -171,14 +172,15 @@ class DarkOSDockWindow(Gtk.Window):
                 lambda _button, selected=command: launch(selected),
                 "dock-icon-button", 40,
             )
+            self._dock_icons[key] = btn
             slot.pack_start(btn, False, False, 0)
             label = make_label(name, "dock-label")
             label.set_xalign(0.5)
             slot.pack_start(label, False, False, 2)
             return slot
 
-        for icon, name, command in left_apps:
-            dock.pack_start(make_dock_slot(icon, name, command), False, False, 2)
+        for key, icon, name, command in left_apps:
+            dock.pack_start(make_dock_slot(key, icon, name, command), False, False, 2)
 
         orb_button = Gtk.Button()
         add_class(orb_button, "orb-button")
@@ -189,11 +191,42 @@ class DarkOSDockWindow(Gtk.Window):
         orb_button.connect("clicked", self.on_orb_click)
         dock.pack_start(orb_button, False, False, SPACE_SM)
 
-        for icon, name, command in right_apps:
-            dock.pack_start(make_dock_slot(icon, name, command), False, False, 2)
+        for key, icon, name, command in right_apps:
+            dock.pack_start(make_dock_slot(key, icon, name, command), False, False, 2)
 
         self.add(dock)
         self.show_all()
+
+        # Push-to-talk: SUPER+SPACE press/release
+        self._ptt_key_pressed = False
+        self.connect("key-press-event", self._on_key_press)
+        self.connect("key-release-event", self._on_key_release)
+        self.set_events(
+            self.get_events()
+            | Gdk.EventMask.KEY_PRESS_MASK
+            | Gdk.EventMask.KEY_RELEASE_MASK
+        )
+
+    def _on_key_press(self, _widget, event):
+        if self._ptt_key_pressed:
+            return False
+        keyval = event.get_keyval()[1] if hasattr(event, "get_keyval") else event.keyval
+        if keyval == Gdk.KEY_space and event.get_state() & Gdk.ModifierType.SUPER_MASK:
+            self._ptt_key_pressed = True
+            self.application.trigger.on_push_to_talk_start()
+            GLib.idle_add(self.application._set_orb_state, "listening")
+            return True
+        return False
+
+    def _on_key_release(self, _widget, event):
+        if not self._ptt_key_pressed:
+            return False
+        keyval = event.get_keyval()[1] if hasattr(event, "get_keyval") else event.keyval
+        if keyval == Gdk.KEY_space:
+            self._ptt_key_pressed = False
+            self.application.trigger.on_push_to_talk_stop()
+            return True
+        return False
 
     def on_orb_click(self, _button):
         states = ("sleeping", "listening", "thinking", "speaking", "error")
@@ -204,6 +237,14 @@ class DarkOSDockWindow(Gtk.Window):
         if state == "error":
             from gi.repository import GLib
             GLib.timeout_add(900, self.finish_error_pulse)
+
+    def set_activity_profile(self, highlight: str | None):
+        """Update dock icon highlight for the current activity profile."""
+        for icon_name, button in getattr(self, "_dock_icons", {}).items():
+            ctx = button.get_style_context()
+            ctx.remove_class("dock-highlight")
+            if highlight and icon_name == highlight:
+                ctx.add_class("dock-highlight")
 
     def finish_error_pulse(self):
         if self.ai_orb.state == "error":
@@ -417,17 +458,47 @@ class DarkOSLeftPanels(Gtk.Window):
         self.response.get_style_context().remove_class("stub-text")
         add_class(self.response, "status-text")
         self.waveform.set_active(True)
-        from gi.repository import GLib
-        GLib.timeout_add(800, self.finish_preview)
-
-    def finish_preview(self):
-        self.response.set_text(
-            "Not executed: connect an AI backend before using assistant actions."
+        # Send to brain on a background thread so the UI stays responsive.
+        import threading as _threading
+        thread = _threading.Thread(
+            target=self._run_chat, args=(request_text,), daemon=True
         )
+        thread.start()
+
+    def _run_chat(self, text):
+        """Background thread: brain call, results posted back to UI."""
+        from gi.repository import GLib
+        GLib.idle_add(self.application._set_orb_state, "thinking")
+        reply, action_summary = self.application.brain.process_chat(text)
+        if not reply:
+            GLib.idle_add(self._show_chat_error, "No response from AI.")
+            return
+        GLib.idle_add(self.application._set_orb_state, "speaking")
+        self.application.brain.speak(reply)
+        result = reply
+        if action_summary:
+            result += "\n\n" + action_summary
+        GLib.idle_add(self.show_ai_response, text, result)
+        GLib.idle_add(self.application._set_orb_state, "sleeping")
+
+    def _show_chat_error(self, message):
+        self.response.set_text(message)
         self.response.get_style_context().remove_class("status-text")
         add_class(self.response, "stub-text")
         self.waveform.set_active(False)
-        return False
+        self.application._set_orb_state("error")
+
+    def show_ai_response(self, user_text, reply):
+        self.response.set_text(reply)
+        self.response.get_style_context().remove_class("stub-text")
+        add_class(self.response, "status-text")
+        self.waveform.set_active(False)
+        # Update the intro label to show the last user query
+        for child in self.get_children():
+            if isinstance(child, Gtk.Box):
+                for sub in child.get_children():
+                    if isinstance(sub, Gtk.Label) and "explore" in (sub.get_text() or ""):
+                        sub.set_text(f"DarkOS AI — last query: {user_text[:40]}")
 
     def show_stub(self, message):
         self.response.set_text(message)

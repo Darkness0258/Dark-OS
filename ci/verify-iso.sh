@@ -406,6 +406,7 @@ readonly library_modules=(
     usr/local/bin/darkos_shell/__init__.py
     usr/local/bin/darkos_shell/ai_brain.py
     usr/local/bin/darkos_shell/activity_detector.py
+    usr/local/bin/darkos_shell/actions.py
     usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
@@ -606,8 +607,16 @@ grep -Fq '"playerctl", "metadata", "--format"' "$shell_pkg/surfaces.py" "$shell_
     printf 'Media panel does not read live playerctl metadata\n' >&2
     exit 1
 }
-grep -Fq 'Not executed: connect an AI backend' "$shell_pkg/surfaces.py" "$shell_source" || {
-    printf 'AI preview does not state that requests are unexecuted\n' >&2
+grep -Fq 'process_chat' "$shell_pkg/__init__.py" "$shell_source" || {
+    printf 'AI chat is not wired to the brain\n' >&2
+    exit 1
+}
+grep -Fq 'process_chat' "$shell_pkg/surfaces.py" "$shell_source" || {
+    printf 'Chat entry does not call process_chat\n' >&2
+    exit 1
+}
+grep -Fq 'ActionDispatcher' "$shell_pkg/__init__.py" "$shell_source" || {
+    printf 'Action dispatcher not wired in\n' >&2
     exit 1
 }
 

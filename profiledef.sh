@@ -49,6 +49,7 @@ file_permissions=(
   ["/usr/local/bin/darkos-diagnose.sh"]="0:0:755"
   ["/usr/local/bin/darkos-shell.py"]="0:0:755"
   ["/usr/local/bin/darkos_shell/__init__.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/actions.py"]="0:0:644"
   ["/usr/local/bin/darkos-installer"]="0:0:755"
   ["/usr/local/bin/darkos-lock"]="0:0:755"
   ["/usr/local/bin/start-hyprland"]="0:0:755"

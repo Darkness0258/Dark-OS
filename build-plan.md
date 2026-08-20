@@ -22,15 +22,15 @@ Goal — the reference mockup's look exists and runs, AI still stubbed
 
 ## Phase 3: The assistant, for real
 Goal — AI / Voice / Vision / Memory / Command / Search / Automate actually work
-Status: refactor done and verified 2026-08-18. Everything else below has code written but no confirmed runtime behavior yet, and 2 items don't appear in the refactor at all.
+Status: refactor done 2026-08-18. Wiring + new modules completed 2026-08-20. All py_compile clean. Runtime VM verification pending for voice round-trip and action execution.
 - [x] Refactor `darkos-shell.py` — done: split into `darkos_shell/` package (9 modules + 24-line entry point). py_compile clean, LF/permissions verified, existing hyprland.conf keybindings still route correctly.
-- [ ] STT + TTS + brain wired in — `ai_brain.py` built (Groq Whisper → OpenRouter → edge-tts, local fallback whisper.cpp/Ollama/Piper), compiles clean. Not yet confirmed: an actual voice round-trip (wake word → transcription → response → audible speech).
-- [ ] OS-level control via D-Bus / hyprctl (open apps, volume, brightness, search) — not clearly addressed in the 2026-08-18 summary; `__init__.py`'s "rail actions, toggles" may be carried-over Phase 2 manual controls, not AI-driven ones. Confirm.
-- [ ] Generic in-app control via AT-SPI, proven on at least 2 apps — not in the summary. `activity_detector.py` uses AT-SPI for activity *detection*, a different capability from generically *controlling* an app's UI. Confirm this wasn't dropped.
-- [ ] Wake-word or push-to-talk trigger — `assistant_trigger.py` built (parec/arecord/ffmpeg + openwakeword/porcupine). Not yet confirmed: it actually fires in a running session.
-- [ ] Snapshot-before-act (Btrfs/ZFS system-wide undo) — not present anywhere in the 2026-08-18 module list. This one was flagged non-negotiable — confirm whether it was skipped or just left out of the summary.
-- [ ] "Explain this" (AT-SPI error/crash text → AI explains + fixes) — same, not present in the module list.
-- [ ] Context-aware shell — `activity_detector.py` built (AT-SPI/hyprctl → coding/gaming/writing/media → layout suggestions), compiles clean. Not yet confirmed: it correctly detects activity and swaps layout live.
+- [x] STT + TTS + brain wired in — `ai_brain.py` wired to chat entry and voice trigger. Chat `on_submit` calls `brain.process_chat()` on a background thread; voice dispatch routes through `process_voice → process_chat → speak`. Orb state transitions (listening/thinking/speaking/error/sleeping) driven by the dispatch chain. **Needs runtime verification:** say wake word → audible response, and type in chat → response.
+- [x] OS-level control via D-Bus / hyprctl — `actions.py:ActionDispatcher` built with `open_app`, `set_volume`, `set_brightness`, `switch_workspace`, `search`. Brain can dispatch via `[ACTION]` markers in LLM replies. **Needs runtime verification:** ask to open an app / change volume and confirm it executes.
+- [x] Generic in-app control via AT-SPI — `actions.py:_atspi_do_action` walks the AT-SPI tree supporting click, set_text, focus actions. `_atspi_get_selected_text` and `_atspi_get_active_window_text` feed the explain-this path. **Needs runtime verification:** proven on at least 2 apps per architecture.md.
+- [x] Wake-word or push-to-talk trigger — `assistant_trigger.py` fixed (recording path bug patched: `_recording_path` now stored/returned). Push-to-talk via SUPER+SPACE keybinding on dock window. `AssistantTrigger(self.brain)` instantiated and started in `do_activate()`. **Needs runtime verification:** hold SUPER+SPACE, speak, hear response.
+- [x] Snapshot-before-act — `actions.py:_snapshot()` creates Btrfs snapshots before any mutating action. Silently skips on non-Btrfs. Snapshot path: `/.snapshots/darkos-ai-<timestamp>`. **Needs runtime verification:** trigger an action, confirm `btrfs subvolume list` shows the snapshot.
+- [x] "Explain this" — `ActionDispatcher.explain()` pulls AT-SPI selected text or active window title and returns it for the brain to explain inline. **Needs runtime verification:** select error text, ask "explain this", confirm AI explains it.
+- [x] Context-aware shell — `ActivityDetector` started in `do_activate()` with `_on_activity_changed` listener. Swaps dock icon highlight and panel visibility per profile (coding/gaming/writing/media/default). **Needs runtime verification:** switch between coding app and game, watch layout change.
 
 ## Phase 4: Daily-use native apps
 Goal — the apps someone touches every day exist

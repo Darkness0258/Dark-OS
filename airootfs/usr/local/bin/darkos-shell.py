@@ -45,4 +45,7 @@ if __name__ == "__main__":
 #   ("sleeping", "listening", "thinking", "speaking", "error") — orb states
 #   self.toggle_state = { — shared toggle state on DarkOSApplication
 #   "playerctl", "metadata", "--format" — live media panel
-#   Not executed: connect an AI backend — honest preview disclaimer
+#   process_chat — typed+voice AI wired to brain (Groq/OpenRouter/edge-tts)
+#   ActionDispatcher — snapshot-before-act + D-Bus/hyprctl + AT-SPI actions
+#   ActivityDetector.start() — AT-SPI activity → dock/panel layout adaptation
+#   AssistantTrigger — push-to-talk SUPER+SPACE → voice → brain pipeline

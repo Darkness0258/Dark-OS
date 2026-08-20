@@ -34,6 +34,7 @@ class AssistantTrigger:
         self._listeners = []
         self._wake_word_process = None
         self._recording_process = None
+        self._recording_path = None
 
     def start(self):
         """Begin listening for activation."""
@@ -78,6 +79,7 @@ class AssistantTrigger:
             return None
         fd, path = tempfile.mkstemp(suffix=".webm" if recorder == "ffmpeg" else ".wav")
         os.close(fd)
+        self._recording_path = path
         if recorder == "parec":
             cmd = [
                 "parec", "--format=s16le", "--rate=16000", "--channels=1",
@@ -115,10 +117,12 @@ class AssistantTrigger:
                 pass
         proc = self._recording_process
         self._recording_process = None
-        # Find the output file — parec writes to stdout redirection, others to path
+        path = self._recording_path
+        self._recording_path = None
+        # parec writes to a file sink we opened; others write directly to path.
         if hasattr(proc, "stdout") and proc.stdout and not proc.stdout.closed:
-            return None  # parec stream was not saved to file
-        return getattr(proc, "_output_path", None)
+            return path  # parec: return the file path we opened for stdout
+        return path
 
     # ── Wake-word engine ───────────────────────────────────────────────
 

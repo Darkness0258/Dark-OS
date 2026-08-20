@@ -22,7 +22,7 @@ from pathlib import Path
 class AIBrain:
     """Voice + text AI backend with graceful degradation."""
 
-    def __init__(self):
+    def __init__(self, actions=None):
         self._groq_key = os.environ.get("DARKOS_GROQ_API_KEY", "")
         self._openrouter_key = os.environ.get("DARKOS_OPENROUTER_API_KEY", "")
         self._model = os.environ.get("DARKOS_LLM_MODEL", "meta-llama/llama-4-maverick:free")
@@ -32,6 +32,7 @@ class AIBrain:
         self._local_llm = os.environ.get("DARKOS_LOCAL_LLM", "")
         self._offline_mode = False
         self._last_error = None
+        self._actions = actions
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -58,6 +59,16 @@ class AIBrain:
         if self._try_piper_tts(text, timeout):
             return True
         return False
+
+    def process_chat(self, text: str) -> tuple[str, str]:
+        """High-level: chat(text) → (response, actions_summary).
+        Runs the brain then dispatches any action markers in the reply."""
+        messages = [{"role": "user", "content": text}]
+        reply = self.chat(messages)
+        actions_summary = ""
+        if self._actions and reply:
+            actions_summary = _dispatch_actions(reply, self._actions)
+        return reply, actions_summary
 
     @property
     def available(self) -> bool:
@@ -239,6 +250,59 @@ class AIBrain:
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
+
+_ACTION_MARKER = "[ACTION]"
+
+
+def _dispatch_actions(reply: str, actions) -> str:
+    """Scan reply for action markers and execute them.
+    Format: [ACTION] method(args)
+    Returns a summary of what was executed."""
+    summaries = []
+    for line in reply.splitlines():
+        line = line.strip()
+        if not line.startswith(_ACTION_MARKER):
+            continue
+        call = line[len(_ACTION_MARKER):].strip()
+        try:
+            import re
+            m = re.match(r"(\w+)\((.*)\)", call)
+            if not m:
+                continue
+            method = m.group(1)
+            args_raw = m.group(2).strip()
+            args = _parse_args(args_raw)
+            fn = getattr(actions, method, None)
+            if fn is None:
+                continue
+            result = fn(*args)
+            summaries.append(str(result))
+        except Exception as exc:
+            summaries.append(f"Action error: {exc}")
+    return "\n".join(summaries)
+
+
+def _parse_args(raw: str) -> list:
+    """Minimal arg parser for simple strings and ints."""
+    if not raw:
+        return []
+    args = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.startswith('"') and part.endswith('"'):
+            args.append(part[1:-1])
+        elif part.startswith("'") and part.endswith("'"):
+            args.append(part[1:-1])
+        else:
+            try:
+                args.append(int(part))
+            except ValueError:
+                try:
+                    args.append(float(part))
+                except ValueError:
+                    args.append(part)
+    return args
+
 
 def _find_binary(names: list[str]) -> str | None:
     """Return the first binary found on PATH, or None."""

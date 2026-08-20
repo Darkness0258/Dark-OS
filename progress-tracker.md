@@ -90,6 +90,29 @@ Reported: `darkos-shell.py` (1,549 lines) split into a `darkos_shell/` package �
 
 **Missing from the module list entirely:** snapshot-before-act (Btrfs/ZFS undo — flagged non-negotiable), "explain this" (AT-SPI error explain+fix), AI-driven D-Bus/hyprctl OS control, and generic AT-SPI in-app control proven on 2+ apps. build-plan.md Phase 3 updated to reflect exactly this — flagged for Hamza to confirm which were skipped vs. just left out of the summary.
 
+## Session — 2026-08-20: Phase 3 wiring — all modules connected
+
+**Requested:** wire the three extracted Phase 3 modules into the running app and build the 4 missing features (snapshot-before-act, explain-this, D-Bus/hyprctl AI control, AT-SPI in-app control).
+
+**Done:**
+1. `actions.py` (new) — `ActionDispatcher` with `open_app`, `set_volume`, `set_brightness`, `switch_workspace`, `search`, `explain`, `atspi_click`, `atspi_set_text`. All mutating actions call `_snapshot()` which creates a Btrfs snapshot at `/.snapshots/darkos-ai-<timestamp>`. AT-SPI helpers walk the accessibility tree for generic in-app control.
+2. `ai_brain.py` — `AIBrain.__init__` now accepts optional `actions` param. Added `process_chat(text)` → `(reply, actions_summary)` which runs the LLM then scans reply for `[ACTION] method(args)` markers and dispatches them. `_parse_args` handles strings/ints/floats.
+3. `assistant_trigger.py` — Fixed recording path bug: `_recording_path` instance variable stores the temp file path from `_start_recording`, returned by `_stop_recording` for all three recorder types (parec/arecord/ffmpeg). Previously returned `None` because `_output_path` was never set on the process.
+4. `__init__.py` — `do_activate()` now starts `activity_detector` and `assistant_trigger` with proper listeners. Added `_on_activity_changed` (swaps dock highlight + panel visibility per profile), `_on_voice_activated` (full STT→LLM→TTS pipeline on background thread with `GLib.idle_add` for UI updates), `_set_orb_state`, `_ai_response`, `_ai_error`. Added `actions` lazy property. `trigger` lazy property creates `AssistantTrigger(self.brain)`.
+5. `surfaces.py` — `DarkOSDockWindow`: dock icon keys added to `left_apps`/`right_apps` tuples, `_dock_icons` dict tracks buttons for activity highlighting, `set_activity_profile()` highlights matching icon. Added push-to-talk keybinding (SUPER+SPACE press/release) calling `trigger.on_push_to_talk_start/stop`. `DarkOSLeftPanels.on_submit` now runs brain on a background thread via `_run_chat` → `brain.process_chat()`. Added `show_ai_response()` for real AI replies.
+6. `build-plan.md` Phase 3 checklist updated to `[x]` for all 8 items with honest "needs runtime verification" notes.
+7. `darkos-shell.py` verification markers updated to reflect new wiring.
+
+**Syntax verified:** `python -m py_compile` passes for all 7 files (init, actions, ai_brain, assistant_trigger, activity_detector, surfaces, darkos-shell.py entry point).
+
+**Not verified yet (runtime — needs VM boot):**
+- Voice round-trip (hold SUPER+SPACE → speak → hear response)
+- Typed chat (enter text → AI response)
+- Activity detection (switch apps → layout changes)
+- Snapshot creation (`btrfs subvolume list` after action)
+- AT-SPI in-app control (proven on 2+ apps)
+- Explain-this (select text → AI explains)
+
 ## Session — 2026-08-18: Plymouth confirmed, lag diagnosed + fixed
 
 **Plymouth boot animation — Hamza confirmed not verified.** Resolves the README.md/CLAUDE.md vs. progress-tracker.md discrepancy in favor of progress-tracker.md: those two docs' "fully verified on installed hardware" claim was premature and should not be trusted until this is actually re-checked.

@@ -40,6 +40,7 @@ from darkos_shell.surfaces import (
 from darkos_shell.canvases import AIOrbCanvas, RingGauge, WaveformCanvas
 from darkos_shell.system_sampler import SystemSampler
 from darkos_shell.css import apply_css
+from darkos_shell.actions import ActionDispatcher
 from darkos_shell.tokens import (
     CAIRO_ACCENT,
     CAIRO_DANGER,
@@ -97,6 +98,8 @@ class DarkOSApplication(Gtk.Application):
         self._trigger = None
         self._activity_detector = None
         self._orb_state = "sleeping"
+        self._actions = None
+        self._ai_response_label = None
 
     # ── Static queries ─────────────────────────────────────────────────
 
@@ -135,10 +138,16 @@ class DarkOSApplication(Gtk.Application):
         return self._orb_state
 
     @property
+    def actions(self):
+        if self._actions is None:
+            self._actions = ActionDispatcher()
+        return self._actions
+
+    @property
     def brain(self):
         if self._brain is None:
             from darkos_shell.ai_brain import AIBrain
-            self._brain = AIBrain()
+            self._brain = AIBrain(actions=self.actions)
         return self._brain
 
     @property
@@ -147,6 +156,13 @@ class DarkOSApplication(Gtk.Application):
             from darkos_shell.activity_detector import ActivityDetector
             self._activity_detector = ActivityDetector()
         return self._activity_detector
+
+    @property
+    def trigger(self):
+        if self._trigger is None:
+            from darkos_shell.assistant_trigger import AssistantTrigger
+            self._trigger = AssistantTrigger(self.brain)
+        return self._trigger
 
     # ── Activation ─────────────────────────────────────────────────────
 
@@ -160,6 +176,80 @@ class DarkOSApplication(Gtk.Application):
         self.right = DarkOSRightPanels(self)
         for window in (self.dock, self.rail, self.left, self.right):
             self.add_window(window)
+
+        # Start activity detection → layout adaptation
+        detector = self.activity_detector
+        detector.add_listener(self._on_activity_changed)
+        detector.start()
+
+        # Start voice trigger (push-to-talk by default)
+        trigger = self.trigger
+        trigger.add_listener(self._on_voice_activated)
+        trigger.start()
+
+    # ── Activity detection → layout ─────────────────────────────────────
+
+    def _on_activity_changed(self, profile_name, profile_data):
+        """Swap dock highlight and panel visibility per activity profile."""
+        if self.dock is None:
+            return
+        self.dock.set_activity_profile(profile_data.get("dock_highlight"))
+        if self.left is not None:
+            visible = profile_data.get("show_chat", True)
+            if visible and not self.left.is_visible():
+                self.left.show_all()
+            elif not visible and self.left.is_visible():
+                self.left.hide()
+        if self.right is not None:
+            visible = profile_data.get("show_system", True)
+            if visible and not self.right.is_visible():
+                self.right.show_all()
+            elif not visible and self.right.is_visible():
+                self.right.hide()
+
+    # ── Voice activation → brain pipeline ───────────────────────────────
+
+    def _on_voice_activated(self, audio_path):
+        """Dispatch the full voice pipeline on a background thread."""
+        import threading
+        threading.Thread(
+            target=self._voice_pipeline, args=(audio_path,), daemon=True
+        ).start()
+
+    def _voice_pipeline(self, audio_path):
+        """Background thread: STT → LLM → TTS, results posted back to UI."""
+        GLib.idle_add(self._set_orb_state, "listening")
+        text = self.brain.process_voice(audio_path)
+        if not text:
+            GLib.idle_add(self._set_orb_state, "error")
+            GLib.idle_add(self._ai_error, "No speech detected.")
+            return
+        GLib.idle_add(self._set_orb_state, "thinking")
+        reply, action_summary = self.brain.process_chat(text)
+        if not reply:
+            GLib.idle_add(self._set_orb_state, "error")
+            GLib.idle_add(self._ai_error, "No response from AI.")
+            return
+        GLib.idle_add(self._set_orb_state, "speaking")
+        self.brain.speak(reply)
+        result = reply
+        if action_summary:
+            result += "\n\n" + action_summary
+        GLib.idle_add(self._ai_response, text, result)
+        GLib.idle_add(self._set_orb_state, "sleeping")
+
+    def _set_orb_state(self, state):
+        self._orb_state = state
+        if self.dock is not None and hasattr(self.dock, "ai_orb"):
+            self.dock.ai_orb.set_state(state)
+
+    def _ai_response(self, user_text, reply):
+        if self.left is not None:
+            self.left.show_ai_response(user_text, reply)
+
+    def _ai_error(self, message):
+        if self.left is not None:
+            self.left.show_stub(message)
 
     # ── Command-line dispatch ──────────────────────────────────────────
 

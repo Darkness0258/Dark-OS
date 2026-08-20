@@ -1,0 +1,59 @@
+{
+  "changes_this_session": [],
+  "channels_wake": {
+    "healthy": true,
+    "last_checked": "2026-08-20T04:06:18Z",
+    "last_error": ""
+  },
+  "cwd": "d:\\Projects\\Dark OS",
+  "duration_minutes": 503,
+  "ended_at": "2026-08-20T04:07:48Z",
+  "event_seq": 1,
+  "fork_count": 0,
+  "git": {
+    "branch": "main",
+    "last_commit": "a320111",
+    "uncommitted_changes": 0
+  },
+  "harness_mem": {
+    "healthy": false,
+    "last_checked": "2026-08-20T04:06:18Z",
+    "last_error": "daemon-unreachable"
+  },
+  "last_event_id": "event-000001",
+  "memory_logged": true,
+  "night_watch": {
+    "healthy": true,
+    "last_checked": "2026-08-20T04:06:18Z",
+    "last_error": ""
+  },
+  "orchestration": {
+    "max_state_retries": 3,
+    "retry_backoff_seconds": 10
+  },
+  "parent_session_id": null,
+  "plans": {
+    "completed_tasks": 0,
+    "exists": false,
+    "last_modified": 0,
+    "pending_tasks": 0,
+    "todo_tasks": 0,
+    "wip_tasks": 0
+  },
+  "project_name": "Dark OS",
+  "prompt_seq": 0,
+  "release_candidate": {
+    "age_days": 0,
+    "bump": "",
+    "last_checked": "2026-08-20T04:06:18Z",
+    "state": "not-applicable",
+    "tag": "",
+    "threshold_days": 0
+  },
+  "resume_token": "resume-1787168646338509000",
+  "session_id": "session-1787168646338509000",
+  "started_at": "2026-08-19T19:44:03Z",
+  "state": "stopped",
+  "state_version": 1,
+  "updated_at": "2026-08-20T04:06:48Z"
+}
