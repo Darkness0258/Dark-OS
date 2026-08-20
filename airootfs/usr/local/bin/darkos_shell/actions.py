@@ -77,7 +77,10 @@ class ActionDispatcher:
         self._snapshot()
         try:
             idx = int(index)
-            _command(["hyprctl", "dispatch", "workspace", str(idx)])
+            try:
+                _command(["hyprctl", "dispatch", "workspace", str(idx)])
+            except Exception:
+                _command(["hyprctl", "repl", f"hl.dispatch(hl.dsp.focus{{ workspace = {idx} }})"])
             return f"Switched to workspace {idx}."
         except (ValueError, Exception) as exc:
             return f"Workspace error: {exc}"
@@ -129,7 +132,10 @@ class ActionDispatcher:
             snap_dir = Path(self._snapshot_root) / ".snapshots"
             snap_dir.mkdir(parents=True, exist_ok=True)
             dst = str(snap_dir / desc)
-            _command(["btrfs", "subvolume", "snapshot", self._snapshot_root, dst])
+            try:
+                _command(["btrfs", "subvolume", "snapshot", self._snapshot_root, dst])
+            except Exception:
+                _command(["sudo", "btrfs", "subvolume", "snapshot", self._snapshot_root, dst])
             self._latest_snapshot = desc
         except Exception:
             pass  # Snapshot is best-effort; action still runs.
@@ -153,8 +159,16 @@ def _launch(cmd: list):
 
 
 def _command(cmd: list, timeout: float = 5.0) -> str:
+    env = os.environ.copy()
+    if cmd and cmd[0] == "hyprctl" and not env.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        hypr_base = f"/run/user/{os.getuid()}/hypr"
+        if os.path.isdir(hypr_base):
+            entries = [os.path.join(hypr_base, d) for d in os.listdir(hypr_base)]
+            entries.sort(key=os.path.getmtime, reverse=True)
+            if entries:
+                env["HYPRLAND_INSTANCE_SIGNATURE"] = os.path.basename(entries[0])
     result = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout,
+        cmd, capture_output=True, text=True, timeout=timeout, env=env,
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"exit {result.returncode}")
@@ -162,38 +176,52 @@ def _command(cmd: list, timeout: float = 5.0) -> str:
 
 
 def _atspi_get_selected_text() -> str | None:
-    """Try AT-SPI clipboard / selection text."""
+    """Try AT-SPI clipboard / selection text across all active accessible windows."""
     try:
         out = _command(
             ["python3", "-c", """
 import gi; gi.require_version('Atspi', '2.0')
 from gi.repository import Atspi
 desktop = Atspi.get_desktop(0)
-# Walk focused component for selected text
+
 def walk(node, depth=0):
-    if depth > 8:
+    if depth > 12 or not node:
         return ''
     try:
-        if node.get_role_name() in ('text', 'password text', 'document'):
+        role = node.get_role_name()
+        if role in ('text', 'password text', 'document', 'entry', 'paragraph', 'label'):
             te = node.get_text_iface()
             if te:
-                r = te.get_selection(0)
-                if r[0] >= 0:
-                    return te.get_text(r[0], r[1])
+                try:
+                    n_sel = Atspi.Text.get_n_selections(te)
+                    if n_sel > 0:
+                        r = Atspi.Text.get_selection(te, 0)
+                        if r and getattr(r, 'start_offset', -1) >= 0:
+                            txt = Atspi.Text.get_text(te, r.start_offset, r.end_offset)
+                            if txt:
+                                return txt
+                except Exception:
+                    pass
+                txt = Atspi.Text.get_text(te, 0, -1)
+                if txt and ('error' in txt.lower() or 'fatal' in txt.lower() or 'timeout' in txt.lower() or 'fail' in txt.lower() or len(txt.strip()) > 10):
+                    return txt.strip()
     except Exception:
         pass
     try:
-        child = node.get_child_at_index(0)
-        if child:
-            s = walk(child, depth+1)
-            if s:
-                return s
+        count = node.get_child_count()
+        for i in range(count):
+            child = node.get_child_at_index(i)
+            if child:
+                s = walk(child, depth + 1)
+                if s:
+                    return s
     except Exception:
         pass
     return ''
+
 print(walk(desktop))
 """],
-            timeout=3,
+            timeout=5,
         )
         return out if out else None
     except Exception:

@@ -66,7 +66,6 @@ from darkos_shell.tokens import (
     SPACE_SM,
     SPACE_XL,
     SPACE_XS,
-    stroke_glow,
 )
 
 

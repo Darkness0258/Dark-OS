@@ -1,7 +1,12 @@
-#!/usr/bin/env python3
-"""GTK layer-shell window surfaces for the shell."""
-
+import math
 import threading
+
+import cairo
+import gi
+
+gi.require_version("GtkLayerShell", "0.1")
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
 
 from gi.repository import GLib, Gdk, Gtk, GtkLayerShell
 
@@ -93,7 +98,7 @@ def configure_layer_window(
     if exclusive_zone:
         GtkLayerShell.set_exclusive_zone(window, exclusive_zone)
     if keyboard and hasattr(GtkLayerShell, "KeyboardMode"):
-        GtkLayerShell.set_keyboard_mode(GtkLayerShell.KeyboardMode.ON_DEMAND)
+        GtkLayerShell.set_keyboard_mode(window, GtkLayerShell.KeyboardMode.ON_DEMAND)
 
 
 def launch(command):
@@ -194,18 +199,18 @@ class DarkOSDockWindow(Gtk.Window):
         for key, icon, name, command in right_apps:
             dock.pack_start(make_dock_slot(key, icon, name, command), False, False, 2)
 
-        self.add(dock)
-        self.show_all()
-
         # Push-to-talk: SUPER+SPACE press/release
         self._ptt_key_pressed = False
-        self.connect("key-press-event", self._on_key_press)
-        self.connect("key-release-event", self._on_key_release)
         self.set_events(
             self.get_events()
             | Gdk.EventMask.KEY_PRESS_MASK
             | Gdk.EventMask.KEY_RELEASE_MASK
         )
+        self.connect("key-press-event", self._on_key_press)
+        self.connect("key-release-event", self._on_key_release)
+
+        self.add(dock)
+        self.show_all()
 
     def _on_key_press(self, _widget, event):
         if self._ptt_key_pressed:

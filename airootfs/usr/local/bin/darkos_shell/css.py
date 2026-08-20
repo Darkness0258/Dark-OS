@@ -263,3 +263,17 @@ separator {{
     min-height: 1px;
 }}
 """
+
+
+def apply_css() -> None:
+    """Load DarkOS GTK CSS into the default screen's style provider."""
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk, Gdk
+    provider = Gtk.CssProvider()
+    provider.load_from_data(CSS_STYLE.encode())
+    Gtk.StyleContext.add_provider_for_screen(
+        Gdk.Screen.get_default(),
+        provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )

@@ -122,22 +122,65 @@ class ActivityDetector:
         return "default"
 
     @staticmethod
+    def _hypr_env() -> dict:
+        """Return os.environ with HYPRLAND_INSTANCE_SIGNATURE auto-discovered."""
+        env = os.environ.copy()
+        if "HYPRLAND_INSTANCE_SIGNATURE" not in env:
+            hypr_base = f"/run/user/{os.getuid()}/hypr"
+            if os.path.isdir(hypr_base):
+                entries = [os.path.join(hypr_base, d) for d in os.listdir(hypr_base)]
+                entries.sort(key=os.path.getmtime, reverse=True)
+                if entries:
+                    env["HYPRLAND_INSTANCE_SIGNATURE"] = os.path.basename(entries[0])
+        return env
+
+    @staticmethod
     def _get_active_window_title() -> str:
         """Best-effort active window title from Hyprland or AT-SPI."""
-        # Primary: hyprctl (fast, no AT-SPI dependency)
+        env = ActivityDetector._hypr_env()
+
+        # Primary: hyprctl activewindow (fast, direct)
         try:
             result = subprocess.run(
                 ["hyprctl", "activewindow", "-j"],
                 capture_output=True,
                 text=True,
                 timeout=2.0,
+                env=env,
             )
             if result.returncode == 0:
                 data = json.loads(result.stdout)
-                return data.get("title", "") or data.get("class", "") or ""
+                title = data.get("title", "") or data.get("class", "") or ""
+                if title:
+                    return title
         except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
             pass
-        # Fallback: AT-SPI via atk-bridge
+
+        # Fallback 1: hyprctl clients — pick the most-recently-focused window
+        try:
+            result = subprocess.run(
+                ["hyprctl", "clients", "-j"],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+                env=env,
+            )
+            if result.returncode == 0:
+                clients = json.loads(result.stdout)
+                # Filter to visible, mapped, non-pinned windows
+                visible = [
+                    c for c in clients
+                    if c.get("mapped") and not c.get("hidden") and c.get("visible")
+                ]
+                if visible:
+                    # focusHistoryID 0 = most recently focused
+                    visible.sort(key=lambda c: c.get("focusHistoryID", 999))
+                    best = visible[0]
+                    return best.get("title", "") or best.get("class", "") or ""
+        except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
+            pass
+
+        # Fallback 2: AT-SPI — walk into frame children for the window title
         try:
             result = subprocess.run(
                 ["python3", "-c", """
@@ -145,8 +188,22 @@ import gi
 gi.require_version('Atspi', '2.0')
 from gi.repository import Atspi
 desktop = Atspi.get_desktop(0)
-app = desktop.get_child_at_index(0)
-print(app.get_name() if app else '')
+for i in range(desktop.get_child_count()):
+    app = desktop.get_child_at_index(i)
+    if not app:
+        continue
+    for j in range(app.get_child_count()):
+        frame = app.get_child_at_index(j)
+        if frame and frame.get_role_name() == 'frame':
+            name = frame.get_name()
+            if name:
+                print(name)
+                raise SystemExit(0)
+    name = app.get_name()
+    if name:
+        print(name)
+        raise SystemExit(0)
+print('')
 """],
                 capture_output=True,
                 text=True,
