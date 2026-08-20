@@ -29,3 +29,4 @@
 {"data":{"file_path":"d:\\Projects\\Dark OS\\ci\\verify-iso.sh"},"id":"event-000029","state":"stopped","ts":"2026-08-20T04:50:00Z","type":"tool.edit"}
 {"data":{"file_path":"d:\\Projects\\Dark OS\\build-iso.sh"},"id":"event-000030","state":"stopped","ts":"2026-08-20T04:51:15Z","type":"tool.edit"}
 {"data":{"file_path":"d:\\Projects\\Dark OS\\airootfs\\usr\\local\\bin\\darkos_shell\\__init__.py"},"id":"event-000031","state":"stopped","ts":"2026-08-20T04:52:40Z","type":"tool.edit"}
+{"data":{"file_path":"d:\\Projects\\Dark OS\\build-plan.md"},"id":"event-000032","state":"stopped","ts":"2026-08-20T04:58:46Z","type":"tool.edit"}
