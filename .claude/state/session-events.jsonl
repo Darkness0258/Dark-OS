@@ -30,3 +30,5 @@
 {"data":{"file_path":"d:\\Projects\\Dark OS\\build-iso.sh"},"id":"event-000030","state":"stopped","ts":"2026-08-20T04:51:15Z","type":"tool.edit"}
 {"data":{"file_path":"d:\\Projects\\Dark OS\\airootfs\\usr\\local\\bin\\darkos_shell\\__init__.py"},"id":"event-000031","state":"stopped","ts":"2026-08-20T04:52:40Z","type":"tool.edit"}
 {"data":{"file_path":"d:\\Projects\\Dark OS\\build-plan.md"},"id":"event-000032","state":"stopped","ts":"2026-08-20T04:58:46Z","type":"tool.edit"}
+{"data":{"file_path":"d:\\Projects\\Dark OS\\build-iso.sh"},"id":"event-000033","state":"stopped","ts":"2026-08-20T05:04:25Z","type":"tool.edit"}
+{"data":{"command":"cd d:/Projects/Dark\\ OS \u0026\u0026 bash -n build-iso.sh \u0026\u0026 echo \"OK: build-iso.sh syntax\""},"id":"event-000034","state":"stopped","ts":"2026-08-20T05:05:05Z","type":"tool.bash"}

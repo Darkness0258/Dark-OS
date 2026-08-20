@@ -63,7 +63,6 @@ readonly runtime_scripts=(
     usr/local/bin/livecd-sound
     root/.automated_script.sh
 )
-)
 
 readonly bash_scripts=(
     usr/local/bin/darkos-grub-install.sh
