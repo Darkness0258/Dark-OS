@@ -106,6 +106,7 @@ payload=(
     usr/bin/regreet
     usr/bin/unsquashfs
     usr/bin/arecord
+    usr/bin/aplay
     usr/bin/brightnessctl
     usr/bin/btrfs
     usr/bin/espeak-ng

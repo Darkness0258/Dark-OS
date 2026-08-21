@@ -295,7 +295,7 @@ trap cleanup EXIT
 printf 'Staging a fresh Archiso releng profile...\n'
 cp -a "${releng_profile}/airootfs" "${stage_profile}/"
 cp -a "${releng_profile}/efiboot" "${stage_profile}/"
-cp -a "${project_dir}/airootfs/." "${stage_profile}/airootfs/"
+cp -a --remove-destination "${project_dir}/airootfs/." "${stage_profile}/airootfs/"
 # A local Python syntax check can leave ignored bytecode beside the source.
 # `cp -a` deliberately copies ignored files too, so strip those caches from
 # the staged payload rather than silently shipping host-specific bytecode.

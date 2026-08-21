@@ -22,6 +22,7 @@ file_permissions=(
   ["/etc/sudoers.d"]="0:0:750"
   ["/etc/sudoers.d/darkos-ai-snapshot"]="0:0:440"
   ["/etc/sudoers.d/darkos"]="0:0:440"
+  ["/etc/pam.d/vmtoolsd"]="0:0:644"
   ["/home/darkos"]="1000:1000:750"
   ["/home/darkos/.bash_profile"]="1000:1000:644"
   ["/root"]="0:0:750"

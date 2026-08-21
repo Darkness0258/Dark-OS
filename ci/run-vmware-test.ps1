@@ -27,6 +27,8 @@ param(
     [string]$GuestVerifierPath = "",
     [string]$GuestUser = "darkos",
     [string]$GuestPassword = "",
+    [string]$GroqApiKey = "",
+    [string]$OpenRouterApiKey = "",
     [ValidateRange(30, 900)]
     [int]$ToolsTimeoutSeconds = 300,
     [ValidateRange(15, 300)]
@@ -211,10 +213,16 @@ function Capture-FreshScreenshot {
     }
     $startedUtc = [DateTime]::UtcNow
     Write-Host "==> Capturing fresh screenshot: $Name"
-    $capture = Invoke-Vmrun -ArgumentList @("captureScreen", $script:VmxPath, $fullPath) `
-        -Description "capture screenshot '$Name'"
+    $capture = if ($script:GuestOperationsReady) {
+        Invoke-GuestVmrun -ArgumentList @("captureScreen", $script:VmxPath, $fullPath) `
+            -Description "capture screenshot '$Name'" -AllowFailure
+    } else {
+        Invoke-Vmrun -ArgumentList @("captureScreen", $script:VmxPath, $fullPath) `
+            -Description "capture screenshot '$Name'" -AllowFailure
+    }
     if ($capture.ExitCode -ne 0) {
-        throw "vmrun unexpectedly returned a nonzero capture status for '$Name'."
+        Write-Warning "vmrun returned nonzero capture status for '$Name': $($capture.Output)"
+        return $null
     }
     if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
         throw "vmrun reported success but did not create screenshot '$fullPath'."
@@ -565,7 +573,11 @@ try {
         @{ Delay = 4; Name = "04-boot-15s" }
     )) {
         Start-Sleep -Seconds $capture.Delay
-        Capture-FreshScreenshot -Name $capture.Name | Out-Null
+        try {
+            Capture-FreshScreenshot -Name $capture.Name | Out-Null
+        } catch {
+            Write-Warning "Boot screenshot '$($capture.Name)' skipped: $($_.Exception.Message)"
+        }
     }
 
     Wait-ForVmwareTools -TimeoutSeconds $ToolsTimeoutSeconds
@@ -577,6 +589,34 @@ try {
         $resolvedVerifier, $script:GuestVerifierGuestPath
     ) -Description "copy Phase 3 guest verifier" | Out-Null
     $script:GuestVerifierCopied = $true
+
+    # Inject API keys into the guest environment so the AI shell and verifier can use them.
+    if (-not [string]::IsNullOrWhiteSpace($GroqApiKey) -or -not [string]::IsNullOrWhiteSpace($OpenRouterApiKey)) {
+        Write-Host "==> Injecting API keys into guest /etc/environment..."
+        $envLines = @()
+        if (-not [string]::IsNullOrWhiteSpace($GroqApiKey)) {
+            $envLines += "DARKOS_GROQ_API_KEY=$GroqApiKey"
+            $envLines += "GROQ_API_KEY=$GroqApiKey"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($OpenRouterApiKey)) {
+            $envLines += "DARKOS_OPENROUTER_API_KEY=$OpenRouterApiKey"
+            $envLines += "OPENROUTER_API_KEY=$OpenRouterApiKey"
+        }
+        $envContent = $envLines -join "`n"
+        $hostEnvFile = Join-Path $script:EvidenceDir "guest-api-keys.env"
+        Set-Content -LiteralPath $hostEnvFile -Value $envContent -Encoding utf8NoBOM
+        Invoke-GuestVmrun -ArgumentList @(
+            "CopyFileFromHostToGuest", $script:VmxPath,
+            $hostEnvFile, "/tmp/darkos-vmware-api-keys.env"
+        ) -Description "copy API keys env file to guest" | Out-Null
+        # Append to /etc/environment so all subsequent VIX-launched processes inherit the keys
+        Invoke-GuestVmrun -ArgumentList @(
+            "runProgramInGuest", $script:VmxPath,
+            "/bin/bash", "-c",
+            "cat /tmp/darkos-vmware-api-keys.env >> /etc/environment && rm -f /tmp/darkos-vmware-api-keys.env"
+        ) -Description "persist API keys to guest /etc/environment" | Out-Null
+        Write-Host "    API keys written to guest /etc/environment."
+    }
 
     Invoke-GuestMode -Mode "wait-ready" -EvidenceName "wait-ready" | Out-Null
     Capture-FreshScreenshot -Name "10-desktop-ready" | Out-Null

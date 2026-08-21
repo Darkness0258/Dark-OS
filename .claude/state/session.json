@@ -4,7 +4,7 @@
   "state": "initialized",
   "state_version": 1,
   "started_at": "2026-08-20T05:15:59Z",
-  "updated_at": "2026-08-20T21:44:12Z",
+  "updated_at": "2026-08-21T03:28:25Z",
   "resume_token": "resume-1787202961767861700",
   "event_seq": 0,
   "last_event_id": "",
@@ -19,7 +19,7 @@
   "git": {
     "branch": "main",
     "uncommitted_changes": 0,
-    "last_commit": "8c69099"
+    "last_commit": "e5eacac"
   },
   "plans": {
     "exists": false,
@@ -31,17 +31,17 @@
   },
   "harness_mem": {
     "healthy": false,
-    "last_checked": "2026-08-20T21:44:12Z",
+    "last_checked": "2026-08-21T03:28:25Z",
     "last_error": "timeout"
   },
   "channels_wake": {
     "healthy": true,
-    "last_checked": "2026-08-20T21:44:12Z",
+    "last_checked": "2026-08-21T03:28:25Z",
     "last_error": ""
   },
   "night_watch": {
     "healthy": true,
-    "last_checked": "2026-08-20T21:44:12Z",
+    "last_checked": "2026-08-21T03:28:25Z",
     "last_error": ""
   },
   "release_candidate": {
@@ -50,7 +50,7 @@
     "tag": "",
     "age_days": 0,
     "threshold_days": 0,
-    "last_checked": "2026-08-20T21:44:12Z"
+    "last_checked": "2026-08-21T03:28:25Z"
   },
   "changes_this_session": []
 }

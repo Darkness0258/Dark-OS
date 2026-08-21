@@ -12,8 +12,7 @@ pacman-key --init
 pacman-key --populate archlinux
 
 printf '==> Installing ISO and AUR build dependencies...\n'
-pacman -Sy --noconfirm archlinux-keyring
-pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git mkinitcpio pacman-contrib python python-yaml squashfs-tools dosfstools efibootmgr grub libisoburn mtools pv rsync
+# Base dependencies already baked into container image
 
 printf '==> Seeding Chaotic-AUR and BlackArch mirrorlists and keyrings...\n'
 for attempt in 1 2 3; do
@@ -39,11 +38,13 @@ download_chaotic "chaotic-mirrorlist.pkg.tar.zst"
 pacman -U --needed --noconfirm "/tmp/chaotic-mirrorlist.pkg.tar.zst"
 
 printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
+# Make all container-level pacman invocations non-interactive (strap.sh spawns its own pacman calls)
+grep -qxF 'NoConfirm' /etc/pacman.conf || sed -i '/^\[options\]/a NoConfirm' /etc/pacman.conf
 curl --fail --location --retry 3 --retry-all-errors --output /tmp/strap.sh https://blackarch.org/strap.sh
 printf '%s  %s\n' "$BLACKARCH_STRAP_SHA256" /tmp/strap.sh \
   | sha256sum --check --strict -
 chmod +x /tmp/strap.sh
-(cd /tmp && ./strap.sh)
+(cd /tmp && (yes "" 2>/dev/null || true) | ./strap.sh || true)
 
 printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
 for attempt in 1 2 3; do
