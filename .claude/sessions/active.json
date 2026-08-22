@@ -1,38 +1,8 @@
 {
-  "261153ec-98b7-40da-9499-8e25e1eb57ac": {
-    "short_id": "261153ec-98b",
-    "last_seen": 1787202990,
-    "pid": "15632",
-    "status": "active"
-  },
-  "580355df-7acb-4c06-a3da-227411ec04f0": {
-    "short_id": "580355df-7ac",
-    "last_seen": 1787202960,
-    "pid": "13800",
-    "status": "active"
-  },
-  "655febbf-31bc-4f72-b1e8-62c0b805b0ba": {
-    "short_id": "655febbf-31b",
-    "last_seen": 1787198149,
-    "pid": "12328",
-    "status": "active"
-  },
-  "91992be9-9358-4bee-8ad9-570a83a3d18d": {
-    "short_id": "91992be9-935",
-    "last_seen": 1787282707,
-    "pid": "20592",
-    "status": "active"
-  },
-  "a44fba00-f8d1-4b49-afc0-a2853a538ac2": {
-    "short_id": "a44fba00-f8d",
-    "last_seen": 1787198149,
-    "pid": "19316",
-    "status": "active"
-  },
-  "e2e0c695-fda4-47d8-9661-adc1308664e4": {
-    "short_id": "e2e0c695-fda",
-    "last_seen": 1787198779,
-    "pid": "19228",
+  "67928cbb-ba8c-4f4a-b797-a0e2ba2bd4a7": {
+    "short_id": "67928cbb-ba8",
+    "last_seen": 1787373400,
+    "pid": "13300",
     "status": "active"
   }
 }

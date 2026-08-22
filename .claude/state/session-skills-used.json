@@ -1,7 +1,9 @@
 {
   "used": [
-    "init"
+    "init",
+    "init",
+    "darkos-build"
   ],
   "session_start": "2026-08-20T04:06:48Z",
-  "last_used": "2026-08-20T04:06:48Z"
+  "last_used": "2026-08-22T04:57:56Z"
 }

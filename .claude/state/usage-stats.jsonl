@@ -1,1 +1,3 @@
 {"type":"skill","name":"init","digest":"{\"skill\":\"init\"}","timestamp":"2026-08-20T04:06:48Z"}
+{"type":"skill","name":"init","digest":"{\"skill\":\"init\",\"args\":\"Base directory for this skill: C:\\\\Users\\\\mhamz\\\\.claude\\\\skills\\\\init\\n\\n..","timestamp":"2026-08-22T04:37:13Z"}
+{"type":"skill","name":"darkos-build","digest":"{\"skill\":\"darkos-build\",\"args\":\"darkos-build\"}","timestamp":"2026-08-22T04:57:57Z"}
