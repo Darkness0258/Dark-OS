@@ -25,3 +25,12 @@
 
 ## 2026-08-20T05:04:25Z [261153ec-98b]
 📁 `d:\Projects\Dark OS\build-iso.sh` が変更されました: パターン '*.sh' にマッチ
+
+## 2026-08-22T13:18:08Z [39e639e3-c69]
+📁 `d:\Projects\Dark OS\ci\rebuild.sh` が変更されました: パターン '*.sh' にマッチ
+
+## 2026-08-22T13:38:42Z [39e639e3-c69]
+📁 `d:\Projects\Dark OS\ci\inject-ssh-key.sh` が変更されました: パターン '*.sh' にマッチ
+
+## 2026-08-22T13:51:46Z [39e639e3-c69]
+📁 `d:\Projects\Dark OS\ci\inject-ssh-key.sh` が変更されました: パターン '*.sh' にマッチ

@@ -341,7 +341,10 @@ function Invoke-GuestMode {
         "runProgramInGuest", $script:VmxPath,
         "/bin/bash", $script:GuestVerifierGuestPath,
         $Mode, $guestLog
-    ) + $ModeArguments
+    )
+    if ($ModeArguments.Count -gt 0) {
+        $arguments += $ModeArguments
+    }
 
     Write-Host "==> Running guest verification mode: $Mode $($ModeArguments -join ' ')"
     $run = Invoke-GuestVmrun -ArgumentList $arguments `

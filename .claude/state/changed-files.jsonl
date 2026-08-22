@@ -11,3 +11,12 @@
 {"file":"d:/Projects/Dark OS/ci/verify-iso.sh","action":"Edit","timestamp":"2026-08-20T04:48:55Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
 {"file":"build-plan.md","action":"Edit","timestamp":"2026-08-20T04:58:47Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
 {"file":"build-iso.sh","action":"Edit","timestamp":"2026-08-20T05:04:25Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
+{"file":"d:/Projects/Dark OS/ci/run-vmware-test-auto.ps1","action":"Write","timestamp":"2026-08-22T06:22:32Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"d:/Projects/Dark OS/ci/run-vmware-test-auto.cmd","action":"Write","timestamp":"2026-08-22T06:23:24Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"d:/Projects/Dark OS/ci/run-vmware-test-auto.bat","action":"Write","timestamp":"2026-08-22T06:24:39Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"d:/Projects/Dark OS/packages.x86_64","action":"Edit","timestamp":"2026-08-22T13:10:21Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"d:/Projects/Dark OS/ci/run-vmware-test.ps1","action":"Edit","timestamp":"2026-08-22T13:11:27Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"d:/Projects/Dark OS/ci/rebuild.sh","action":"Write","timestamp":"2026-08-22T13:18:08Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"C:/temp/darkos-vmware-key","action":"Write","timestamp":"2026-08-22T13:33:05Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"d:/Projects/Dark OS/ci/inject-ssh-key.sh","action":"Write","timestamp":"2026-08-22T13:38:41Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"ci/inject-ssh-key.sh","action":"Write","timestamp":"2026-08-22T13:51:46Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
