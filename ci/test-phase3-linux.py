@@ -34,6 +34,10 @@ sys.modules.setdefault("darkos_shell", darkos_shell_stub)
 sys.modules.setdefault("darkos_shell.ai_brain", ai_brain)
 import assistant_trigger
 
+if sys.platform != "linux":
+    print("test-phase3-linux.py is Linux-only (uses bash mock scripts). Skipping.")
+    sys.exit(0)
+
 print("=" * 60)
 print(" DARKOS PHASE 3 UNIT AND MOCK VERIFICATION SUITE")
 print("=" * 60)

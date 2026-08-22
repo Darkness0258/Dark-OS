@@ -113,3 +113,65 @@
 - （必要に応じて追記）
 
 ---
+
+## セッション: 2026-08-22T15:37:29Z
+
+- session_id: `session-1787412999535283500`
+- project: `Dark OS`
+- branch: `main`
+- started_at: `2026-08-22T15:36:36Z`
+- ended_at: `2026-08-22T15:37:29Z`
+- changes: 0
+
+### 変更ファイル
+- （なし）
+
+### 重要な変更（important=true）
+- （なし）
+
+### 次回への引き継ぎ（任意）
+- （必要に応じて追記）
+
+---
+
+## セッション: 2026-08-22T17:02:53Z
+
+- session_id: `session-1787414743460939700`
+- project: `Dark OS`
+- branch: `main`
+- started_at: `2026-08-22T16:05:38Z`
+- ended_at: `2026-08-22T17:02:53Z`
+- duration_minutes: 57
+- changes: 0
+
+### 変更ファイル
+- （なし）
+
+### 重要な変更（important=true）
+- （なし）
+
+### 次回への引き継ぎ（任意）
+- （必要に応じて追記）
+
+---
+
+## セッション: 2026-08-22T18:09:50Z
+
+- session_id: `session-1787420104316513200`
+- project: `Dark OS`
+- branch: `main`
+- started_at: `2026-08-22T17:35:02Z`
+- ended_at: `2026-08-22T18:09:50Z`
+- duration_minutes: 34
+- changes: 0
+
+### 変更ファイル
+- （なし）
+
+### 重要な変更（important=true）
+- （なし）
+
+### 次回への引き継ぎ（任意）
+- （必要に応じて追記）
+
+---

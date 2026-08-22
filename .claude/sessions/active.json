@@ -1,14 +1,32 @@
 {
+  "3d7b4346-3622-4334-bbb9-411f782a4162": {
+    "short_id": "3d7b4346-362",
+    "last_seen": 1787418009,
+    "pid": "19220",
+    "status": "active"
+  },
   "67928cbb-ba8c-4f4a-b797-a0e2ba2bd4a7": {
     "short_id": "67928cbb-ba8",
     "last_seen": 1787373400,
     "pid": "13300",
     "status": "active"
   },
+  "ba84ad19-b382-44a3-8ffc-81920b2f5854": {
+    "short_id": "ba84ad19-b38",
+    "last_seen": 1787414740,
+    "pid": "21064",
+    "status": "active"
+  },
   "bdeddb35-a00d-4483-84f1-1e917bf90797": {
     "short_id": "bdeddb35-a00",
     "last_seen": 1787406576,
     "pid": "12716",
+    "status": "active"
+  },
+  "e06b8876-4647-40a7-b382-d3382482d235": {
+    "short_id": "e06b8876-464",
+    "last_seen": 1787420102,
+    "pid": "18732",
     "status": "active"
   }
 }

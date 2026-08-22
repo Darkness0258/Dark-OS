@@ -8,7 +8,7 @@
   "cwd": "d:\\Projects\\Dark OS",
   "duration_minutes": 34,
   "ended_at": "2026-08-22T18:09:50Z",
-  "event_seq": 2,
+  "event_seq": 0,
   "fork_count": 0,
   "git": {
     "branch": "main",
@@ -21,9 +21,7 @@
     "last_error": "timeout"
   },
   "intent": "literal",
-  "last_event_id": "event-000002",
-  "last_message_hash": "53d4dc2b66a48bd4",
-  "last_message_length": 805,
+  "last_event_id": "",
   "memory_logged": true,
   "night_watch": {
     "healthy": true,
@@ -44,7 +42,7 @@
     "wip_tasks": 0
   },
   "project_name": "Dark OS",
-  "prompt_seq": 2,
+  "prompt_seq": 1,
   "release_candidate": {
     "age_days": 0,
     "bump": "",
@@ -58,5 +56,5 @@
   "started_at": "2026-08-22T17:35:02Z",
   "state": "stopped",
   "state_version": 1,
-  "updated_at": "2026-08-22T18:21:32Z"
+  "updated_at": "2026-08-22T18:08:57Z"
 }
