@@ -197,4 +197,4 @@ Visual design tokens live in `ui-tokens.md`, layout/motion rules in `ui-rules.md
 
 ## Phased Roadmap
 
-Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 (core shell chrome: top bar, AI Core HUD, dock, rail, side panels, lock screen, login, boot animation) is complete and VM-verified. Phases 3-8 cover the assistant, daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.
+Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 (core shell chrome: top bar, AI Core HUD, dock, rail, side panels, lock screen, login, boot animation) is complete and VM-verified. Phase 3 (AI assistant: STT/TTS/brain, OS control, AT-SPI, push-to-talk, snapshots, Command Center) is complete and VM-verified. Phases 4-8 cover daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.

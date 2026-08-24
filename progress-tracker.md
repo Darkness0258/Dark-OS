@@ -233,3 +233,79 @@ Given the actual repo (not a report) for the first time since the Docker fabrica
 
 build-plan.md updated per-item. Remaining blockers are unchanged and are not code issues: voice/chat round-trip need real API keys, boot animation needs a human watching a real boot.
 
+
+## Session — 2026-08-23: Command Center split, and the HUD was never actually wired in
+
+Asked (in chat) to fold in Zorin/CachyOS-inspired features and fix the always-everything-visible default layout. Drafted the ui-rules.md / architecture.md / build-plan.md text first, then applied it directly plus implemented the code once the real repo was available.
+
+**Found while implementing, not from a report:** `DarkOSHUDOverlay` was imported in `__init__.py` but never instantiated or added to the window set anywhere. Phase 2's "Central AI Core HUD: done, VM-verified 2026-08-16" checkbox covered the chrome around it, not the HUD itself — it never actually rendered. It's also still the text-only "PREVIEW MODE" stub described in its own docstring; the ring-graphic HUD ui-rules.md/ui-registry.md specify currently only exists as a static image in the wallpaper, not real UI. build-plan.md Phase 2 corrected to reflect this.
+
+**Implemented:**
+- `self.hud = DarkOSHUDOverlay()` now created in `do_activate()` and added to the window set.
+- HUD + left + right start hidden; dock + rail are the always-on base layer.
+- New `--toggle-command-center` flag opens/closes all three together, using HUD's `is_visible()` as the single open/closed source of truth (left/right alone would drift, since `activity_detector` also touches them independently).
+- Bound to `SUPER+H` in hyprland.conf. `SUPER+C` was already `killactive` — checked the full bind list before choosing H, so nothing broke.
+
+**Known unreconciled edge case:** `activity_detector` can still independently show/hide left/right by activity profile regardless of whether Command Center is open — the two systems aren't reconciled. Noted in ui-rules.md, not fixed.
+
+**Not implemented:** Connect (KDE Connect protocol integration) and Performance profile (kernel/scheduler + governor) are documented as new Phase 5 build-plan items only — no Settings/Network code exists yet to hang them on (Phase 5 has zero scaffold). The real Cairo ring-graphic HUD is also still open work, separate from the wiring fix above.
+
+**Verified:** `py_compile` clean on `__init__.py`; diff reviewed line by line; `SUPER+H` checked against the complete hyprland.conf bind list for conflicts (found and avoided the `SUPER+C` collision this way).
+
+## Session — 2026-08-24: Phase 3 runtime verification via SSH
+
+**ISO:** `out/darkos-2026.08.23-x86_64.iso` (2.95 GB, SHA256 `969d2556...`)
+**Network fix:** Added `dhcpcd` to packages + `ensure-network` script. VMware `NO-CARRIER` was caused by missing `ethernet0.startConnected = "TRUE"` in `.vmx` + missing `dhcpcd`.
+**sshd scoping:** `sshd.service` symlink added to `runtime_symlinks` (live-only), `override.conf` neutered, `live-cleanup.conf` removes symlink during install.
+
+### Live VM Verification (SSH, 192.168.79.128)
+
+**Stability (5 min, two snapshots — identical):**
+```
+root         735  0.2  0.2 112180  9968 ?        Ssl  06:09   0:02 /usr/bin/vmtoolsd
+darkos      1170  9.0  5.0 1077592 200348 tty1   Sl+  06:09   1:22 Hyprland --watchdog-fd 4
+darkos      1348  0.2  1.8 883476 74652 tty1     Sl+  06:09   0:02 waybar
+darkos      1351  3.6  2.2 757632 89088 tty1     Sl+  06:09   0:33 python /usr/local/bin/darkos-shell.py
+darkos      1352  0.0  0.1 85052  6932 tty1     Sl+  06:09   0:00 hypridle
+```
+(same PIDs, same processes, no crashes)
+
+**D-Bus/hyprctl control:**
+```
+pamixer --get-volume: 40 → set_volume(35) → 35
+hyprctl dispatch workspace 2: ok
+```
+
+**AI chat round-trip (OpenRouter default):**
+```
+REPLY: 2+2 equals 4.
+```
+
+**Explain-this (AT-SPI text extraction):**
+```
+EXPLAIN_RESULT: The Void
+```
+(AT-SPI extracted terminal window title — pipeline works)
+
+**Voice pipeline mechanics (STT via Groq):**
+```
+TYPE: <class 'str'>
+VALUE: ''
+```
+(`process_voice('/dev/null')` executed without crash; empty result expected for non-audio input)
+
+**Snapshot-before-act:** SKIP — live ISO uses overlayfs, not Btrfs. Works only on installed systems.
+
+**AT-SPI click:** PARTIAL — text extraction works, but `atspi_click` needs a real GTK app with buttons (terminal has none). Needs verification on a real app like Firefox or Settings.
+
+### Confirmed by Hamza 2026-08-24 (all human-only checks passed)
+1. **TTS audio** ✅ — heard spoken responses via espeak-ng fallback
+2. **Dock highlight** ✅ — cyan glow visible on active app icon
+3. **Boot animation** ✅ — Plymouth splash renders during boot
+4. **AI chat with API keys** ✅ — real OpenRouter responses, full round-trip working
+
+### What was fixed this session
+1. `dhcpcd` missing from `packages.x86_64` → VM had no network
+2. `ensure-network` script created for DHCP bring-up on boot
+3. `sshd.service` scoped to live-only (symlink + cleanup, not installed-system default)
+4. VMware `.vmx` missing `ethernet0.startConnected = "TRUE"` → virtual cable stayed unplugged

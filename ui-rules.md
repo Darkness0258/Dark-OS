@@ -3,13 +3,18 @@
 > Behavior and layout conventions — the things a design system enforces that tokens alone can't.
 
 ## Layout
+**Always-on base layer:**
 - Top bar: logo + wordmark (left), date/time (center), system tray — display, sound, Bluetooth, Wi-Fi, battery %, avatar (right)
 - Left icon rail: AI, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming — icon-only, always visible
+- Bottom dock: floating, transparent, rounded, centered, AI Orb enlarged at its center (idle/"sleeping" state when Command Center is closed) — icons enlarge on hover — never a solid bar spanning full width
+- App windows (Files, Terminal, etc.) float freely above this base layer — glass, rounded, glow border, closable/minimizable/resizable
+
+**Command Center (on demand — SUPER+H, or `--toggle-command-center`):**
 - Center stage: the AI Core — circular radar/dial HUD (concentric rings, segmented labeled arcs, cyan glow on black), "Dark OS" wordmark and "Control Everything" tagline beneath it — nothing else competes with it for visual weight
 - Floating glass panels, left-of-center: AI chat card (greeting + waveform + input box), weather, system overview (CPU/GPU/RAM/storage as circular gauges with specifics, network up/down)
 - Floating glass panels, right-of-center: notifications (grouped, "Clear All"), connectivity (Wi-Fi/Bluetooth status cards + Dark Mode/Airplane/Night Light/Focus toggles + brightness/volume sliders), media widget, calendar
-- App windows (Files, Terminal, etc.) float freely above this base layer — glass, rounded, glow border, closable/minimizable/resizable
-- Bottom dock: floating, transparent, rounded, centered, AI Orb enlarged at its center — icons enlarge on hover — never a solid bar spanning full width
+- Dismisses the same way it opened (HUD visibility is the source-of-truth open/closed flag — see `__init__.py:do_command_line`); reuses the panel stagger-in animation already documented below in Motion, since that entrance only makes narrative sense as a real power-on moment
+- Known open edge case: `activity_detector` can still independently show/hide left/right by activity profile while Command Center is open or closed — the two systems aren't yet reconciled, see progress-tracker.md
 - Responsive breakpoints: TBD once target display sizes are confirmed — this is desktop-first; exact HiDPI/tablet breakpoints come once Phase 2 has a real display to test on
 
 ## Motion

@@ -287,6 +287,15 @@ function Wait-ForGuestAuthentication {
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     $lastOutput = ""
     while ([DateTime]::UtcNow -lt $deadline) {
+        # Probe tools state (allow non-zero exit while tools boot).
+        $toolsProbe = Invoke-Vmrun -ArgumentList @("checkToolsState", $script:VmxPath) `
+            -Description "probe tools state before auth" -AllowFailure
+        $toolsRunning = $toolsProbe.ExitCode -eq 0 -and $toolsProbe.Output -match '(?im)^running\s*$'
+        if (-not $toolsRunning) {
+            Start-Sleep -Seconds 3
+            continue
+        }
+        # Tools are running — attempt guest auth.
         $probe = Invoke-GuestVmrun -ArgumentList @(
             "runProgramInGuest", $script:VmxPath, "/usr/bin/true"
         ) -Description "probe authenticated guest command" -AllowFailure
@@ -569,6 +578,20 @@ try {
         -Description "start fresh DarkOS test VM" -EchoOutput | Out-Null
     $script:VmStarted = $true
 
+    # Authenticate with the guest OS BEFORE any guest operation.
+    # VMware Workstation 17.6+ requires VixVM_LoginInGuest before
+    # screenshots, tools checks, or file copies.
+    Write-Host "==> Waiting for VMware Tools to bootstrap guest auth..."
+    $toolsBootDeadline = [DateTime]::UtcNow.AddSeconds(30)
+    while ([DateTime]::UtcNow -lt $toolsBootDeadline) {
+        $probe = Invoke-Vmrun -ArgumentList @("checkToolsState", $script:VmxPath) `
+            -Description "probe tools state for auth bootstrap" -AllowFailure
+        if ($probe.ExitCode -eq 0) { break }
+        Start-Sleep -Seconds 3
+    }
+    Wait-ForGuestAuthentication -TimeoutSeconds $GuestAuthTimeoutSeconds
+    $script:GuestOperationsReady = $true
+
     foreach ($capture in @(
         @{ Delay = 3; Name = "01-boot-03s" },
         @{ Delay = 4; Name = "02-boot-07s" },
@@ -584,7 +607,6 @@ try {
     }
 
     Wait-ForVmwareTools -TimeoutSeconds $ToolsTimeoutSeconds
-    Wait-ForGuestAuthentication -TimeoutSeconds $GuestAuthTimeoutSeconds
 
     Write-Host "==> Copying committed Phase 3 verifier into the live guest..."
     Invoke-GuestVmrun -ArgumentList @(

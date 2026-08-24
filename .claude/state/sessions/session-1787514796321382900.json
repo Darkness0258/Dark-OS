@@ -2,30 +2,31 @@
   "changes_this_session": [],
   "channels_wake": {
     "healthy": true,
-    "last_checked": "2026-08-22T18:08:57Z",
+    "last_checked": "2026-08-23T19:53:47Z",
     "last_error": ""
   },
   "cwd": "d:\\Projects\\Dark OS",
-  "duration_minutes": 34,
-  "ended_at": "2026-08-22T18:09:50Z",
+  "duration_minutes": 0,
+  "ended_at": "2026-08-23T19:53:57Z",
   "event_seq": 0,
   "fork_count": 0,
   "git": {
     "branch": "main",
-    "last_commit": "e877175",
+    "last_commit": "95607ed",
     "uncommitted_changes": 0
   },
   "harness_mem": {
     "healthy": false,
-    "last_checked": "2026-08-22T18:08:57Z",
+    "last_checked": "2026-08-23T19:53:47Z",
     "last_error": "timeout"
   },
-  "intent": "literal",
   "last_event_id": "",
+  "last_message_hash": "36383763a07a5eba",
+  "last_message_length": 391,
   "memory_logged": true,
   "night_watch": {
     "healthy": true,
-    "last_checked": "2026-08-22T18:08:57Z",
+    "last_checked": "2026-08-23T19:53:47Z",
     "last_error": ""
   },
   "orchestration": {
@@ -46,15 +47,15 @@
   "release_candidate": {
     "age_days": 0,
     "bump": "",
-    "last_checked": "2026-08-22T18:08:57Z",
+    "last_checked": "2026-08-23T19:53:47Z",
     "state": "not-applicable",
     "tag": "",
     "threshold_days": 0
   },
-  "resume_token": "resume-1787420104316513200",
-  "session_id": "session-1787420104316513200",
-  "started_at": "2026-08-22T17:35:02Z",
+  "resume_token": "resume-1787514796321382900",
+  "session_id": "session-1787514796321382900",
+  "started_at": "2026-08-23T19:53:13Z",
   "state": "stopped",
   "state_version": 1,
-  "updated_at": "2026-08-22T18:08:57Z"
+  "updated_at": "2026-08-23T19:53:47Z"
 }

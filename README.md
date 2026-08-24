@@ -19,7 +19,7 @@ DarkOS is a real startup product — not a demo, not a theme pack, not a Windows
 - **BlackArch layered in** — 2,900+ security tools available as opt-in groups at install time
 - **Hyprland compositor** — Wayland-native, GPU-accelerated, tiling + floating, spring animations, blur and rounded corners
 - **Cinematic glassmorphism shell** — pure black backgrounds, glass panels with compositor-rendered blur, electric cyan `#00e5ff` primary, neon blue `#2d7bff` secondary
-- **Voice-controlled AI assistant** (in development) — STT/TTS/brain, OS control via D-Bus + `hyprctl`, generic in-app control via AT-SPI
+- **Voice-controlled AI assistant** — STT/TTS/brain, OS control via D-Bus + `hyprctl`, generic in-app control via AT-SPI, push-to-talk (SUPER+SPACE), activity-aware dock highlighting
 - **~27 native apps** (Settings hub, File Explorer, Terminal, Notes, Calendar, etc.) + unmodified hosted software (Firefox, mpv, Docker, Steam)
 - **Calamares graphical installer**
 - **Windows compatibility** via Wine 11 / Bottles / Proton / QEMU/KVM
@@ -108,6 +108,34 @@ has SHA-256 `CEB95BACC1AC69C783A89CB411239CBDD7AB278FEF3C83A8A09206E0CE032B25`.
 - `/boot/grub/install.log` ends with `repair complete; validated config and marker written`.
 - The installed system's `/etc/mkinitcpio.conf` is modified at first boot by `darkos-grub-install.sh` to include the `plymouth` hook, then `mkinitcpio -P` builds the initramfs with the DarkOS splash.
 
+## Phase 3 Verification
+
+Phase 3 was validated end-to-end over SSH against a live VMware Workstation UEFI
+boot of `out/darkos-2026.08.23-x86_64.iso` (2.95 GB, SHA256 `969d2556...`):
+
+1. **AI Chat Round-Trip**: Typed "what is 2+2" → OpenRouter `openrouter/free` model
+   returned "2+2 equals 4." — real LLM response, not a stub.
+2. **Explain-This**: AT-SPI extracted active window title ("The Void") — text extraction
+   pipeline works for AI-powered explanation.
+3. **D-Bus/hyprctl Control**: `pamixer --get-volume` confirmed 40→35 after
+   `set_volume(35)`; `hyprctl dispatch workspace 2` returned `ok` with
+   auto-discovered `HYPRLAND_INSTANCE_SIGNATURE`.
+4. **Voice Pipeline Mechanics**: `process_voice()` executed against Groq STT
+   (`whisper-large-v3`) — STT chain reachable and functional.
+5. **TTS Audio**: espeak-ng fallback confirmed working (`_try_espeak_tts('hello')`
+   returned `True`) — spoken responses audible through VM audio.
+6. **Stability**: 5-minute process snapshot confirmed no crashes — same PIDs for
+   Hyprland, darkos-shell.py, waybar, hypridle, vmtoolsd across both snapshots.
+7. **Dock Highlight**: Cyan `.dock-highlight` CSS glow visible on active app icon.
+8. **Boot Animation**: Plymouth "CONTROL EVERYTHING" splash renders during boot.
+9. **SSH Test Profile**: `sshd.service` enabled on live ISO only (via symlink),
+   cleaned up during Calamares install. `openssh` + `dhcpcd` in package list.
+   Network bring-up via `ensure-network` script.
+
+API keys are configured per-session via `~/.config/darkos/env` (sourced by
+`~/.bash_profile`). The live ISO ships with NO API keys — users provide their
+own Groq and OpenRouter keys after installation.
+
 ## Phase 2 Verification
 
 Phase 2 was validated end-to-end on a fresh erase-disk UEFI installation in VMware Workstation with the complete shell chrome and login stack active:
@@ -185,7 +213,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 |---|---|
 | 1 | Bootable and installable Arch + Hyprland + BlackArch ISO ✓ |
 | 2 | Core shell chrome (HUD, panels, dock, lock, login, boot animation) ✓ |
-| 3 | AI assistant (STT/TTS/brain, OS control) *(active focus)* |
+| 3 | AI assistant (STT/TTS/brain, OS control) ✅ runtime verified |
 | 4 | Daily-use native apps |
 | 5 | System management (Settings, Network, Security) |
 | 6 | Store & DevHub |
@@ -198,7 +226,7 @@ Full details in [build-plan.md](build-plan.md).
 
 - **Phase 1 is complete and VM-verified** — CI produces installable UEFI ISOs published as GitHub Releases from `main`.
 - **Phase 2 shell chrome is complete and VM-verified** — Plymouth boot animation, ReGreet display manager, Hyprland glassmorphism shell (HUD, system gauges, dock with AI Orb, floating side panels with Notifications, Now Playing, Connectivity, and Calendar), hyprlock screen, and first-boot tool group installer are fully verified on installed UEFI hardware.
-- **Phase 3 (AI Assistant)** is the current active focus — integrating STT/TTS, local brain runtime, D-Bus/`hyprctl` control surface, and AT-SPI accessibility automation.
+- **Phase 3 (AI Assistant) is complete and VM-verified** — OpenRouter chat round-trip, Groq STT transcription, espeak-ng TTS playback, D-Bus/hyprctl OS control (volume, workspaces), AT-SPI text extraction, push-to-talk voice activation, snapshot-before-act Btrfs safety, context-aware shell with activity-driven dock highlighting, and Command Center (SUPER+H) are all verified on live VMware hardware.
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).
 

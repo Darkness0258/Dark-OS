@@ -57,4 +57,5 @@ file_permissions=(
   ["/usr/local/bin/darkos-lock"]="0:0:755"
   ["/usr/local/bin/start-hyprland"]="0:0:755"
   ["/usr/local/bin/darkos-firstboot-tools"]="0:0:755"
+  ["/usr/local/bin/ensure-network"]="0:0:755"
 )

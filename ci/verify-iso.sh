@@ -93,6 +93,7 @@ payload=(
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
     etc/systemd/system/multi-user.target.wants/pacman-init.service
     etc/systemd/system/multi-user.target.wants/seatd.service
+    etc/systemd/system/multi-user.target.wants/sshd.service
     etc/systemd/system/multi-user.target.wants/vmtoolsd.service
     etc/systemd/system/pacman-init.service
     root/.automated_script.sh
@@ -134,6 +135,7 @@ payload=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
+    usr/local/bin/ensure-network
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
@@ -436,6 +438,7 @@ scripts=(
     usr/local/bin/darkos-shell.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
+    usr/local/bin/ensure-network
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
@@ -495,6 +498,7 @@ declare -A service_targets=(
     [darkos-grub-repair]="../darkos-grub-repair.service"
     [pacman-init]="../pacman-init.service"
     [seatd]="/usr/lib/systemd/system/seatd.service"
+    [sshd]="/usr/lib/systemd/system/sshd.service"
     [vmtoolsd]="/usr/lib/systemd/system/vmtoolsd.service"
 )
 for service in "${!service_targets[@]}"; do

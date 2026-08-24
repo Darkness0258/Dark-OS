@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# DarkOS live ISO — ensure the primary network interface has an IP.
+# NetworkManager auto-connects on the live ISO, but if it misses (e.g.
+# VMware NAT after a suspend/resume), this brings the interface up and
+# requests a lease.
+
+set -euo pipefail
+
+# Find the first wired interface that isn't loopback or wireless.
+IFACE="$(ip -o link show 2>/dev/null \
+    | awk -F': ' '{print $2}' \
+    | grep -v '^lo$' \
+    | grep -v '^wlan' \
+    | grep -v '^wwan' \
+    | head -n1)" || true
+
+[[ -z "${IFACE}" ]] && exit 0
+
+# If it already has an IPv4, nothing to do.
+if ip -4 addr show dev "$IFACE" 2>/dev/null | grep -q 'inet '; then
+    exit 0
+fi
+
+ip link set "$IFACE" up 2>/dev/null || true
+# dhcpcd is installed on the live ISO; fall back to ip + route if missing.
+if command -v dhcpcd >/dev/null 2>&1; then
+    dhcpcd -B -1 -t 30 "$IFACE" 2>/dev/null || true
+elif command -v dhclient >/dev/null 2>&1; then
+    dhclient "$IFACE" 2>/dev/null || true
+fi

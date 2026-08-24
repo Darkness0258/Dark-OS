@@ -1,22 +1,18 @@
-{"file":"d:/Projects/Dark OS/airootfs/usr/local/bin/darkos_shell/actions.py","action":"Write","timestamp":"2026-08-20T04:25:26Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/airootfs/usr/local/bin/darkos_shell/assistant_trigger.py","action":"Edit","timestamp":"2026-08-20T04:26:23Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/airootfs/usr/local/bin/darkos_shell/ai_brain.py","action":"Edit","timestamp":"2026-08-20T04:28:59Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/airootfs/usr/local/bin/darkos_shell/__init__.py","action":"Edit","timestamp":"2026-08-20T04:31:14Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/airootfs/usr/local/bin/darkos_shell/surfaces.py","action":"Edit","timestamp":"2026-08-20T04:34:07Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/airootfs/usr/local/bin/darkos-shell.py","action":"Edit","timestamp":"2026-08-20T04:40:14Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/build-plan.md","action":"Edit","timestamp":"2026-08-20T04:41:11Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/progress-tracker.md","action":"Edit","timestamp":"2026-08-20T04:44:01Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/build-iso.sh","action":"Edit","timestamp":"2026-08-20T04:46:54Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/profiledef.sh","action":"Edit","timestamp":"2026-08-20T04:48:13Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/ci/verify-iso.sh","action":"Edit","timestamp":"2026-08-20T04:48:55Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"build-plan.md","action":"Edit","timestamp":"2026-08-20T04:58:47Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"build-iso.sh","action":"Edit","timestamp":"2026-08-20T05:04:25Z","important":false,"session_id":"261153ec-98b7-40da-9499-8e25e1eb57ac"}
-{"file":"d:/Projects/Dark OS/ci/run-vmware-test-auto.ps1","action":"Write","timestamp":"2026-08-22T06:22:32Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"d:/Projects/Dark OS/ci/run-vmware-test-auto.cmd","action":"Write","timestamp":"2026-08-22T06:23:24Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"d:/Projects/Dark OS/ci/run-vmware-test-auto.bat","action":"Write","timestamp":"2026-08-22T06:24:39Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"d:/Projects/Dark OS/packages.x86_64","action":"Edit","timestamp":"2026-08-22T13:10:21Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"d:/Projects/Dark OS/ci/run-vmware-test.ps1","action":"Edit","timestamp":"2026-08-22T13:11:27Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"d:/Projects/Dark OS/ci/rebuild.sh","action":"Write","timestamp":"2026-08-22T13:18:08Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"C:/temp/darkos-vmware-key","action":"Write","timestamp":"2026-08-22T13:33:05Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"d:/Projects/Dark OS/ci/inject-ssh-key.sh","action":"Write","timestamp":"2026-08-22T13:38:41Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
-{"file":"ci/inject-ssh-key.sh","action":"Write","timestamp":"2026-08-22T13:51:46Z","important":false,"session_id":"39e639e3-c697-4cf6-9422-4e55de08a0f3"}
+{"file":"d:/Projects/Dark OS/airootfs/etc/systemd/system/sshd.service.d/override.conf","action":"Edit","timestamp":"2026-08-23T20:27:31Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/airootfs/etc/calamares/modules/shellprocess@live-cleanup.conf","action":"Edit","timestamp":"2026-08-23T20:28:12Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/build-iso.sh","action":"Edit","timestamp":"2026-08-23T20:29:07Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/ci/verify-iso.sh","action":"Edit","timestamp":"2026-08-23T20:29:44Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/ci/vm-verify-phase3.py","action":"Write","timestamp":"2026-08-23T20:46:00Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/out/find-vm-ip.sh","action":"Write","timestamp":"2026-08-23T20:47:19Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/out/phase3-test-instructions.md","action":"Write","timestamp":"2026-08-23T20:48:16Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"packages.x86_64","action":"Edit","timestamp":"2026-08-23T22:18:02Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"airootfs/usr/local/bin/ensure-network","action":"Write","timestamp":"2026-08-23T22:18:33Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"profiledef.sh","action":"Edit","timestamp":"2026-08-23T22:19:24Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"build-iso.sh","action":"Edit","timestamp":"2026-08-23T22:19:55Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"ci/verify-iso.sh","action":"Edit","timestamp":"2026-08-23T22:20:33Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"out/test-chat.sh","action":"Write","timestamp":"2026-08-24T07:46:46Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"progress-tracker.md","action":"Edit","timestamp":"2026-08-24T08:15:59Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"build-plan.md","action":"Edit","timestamp":"2026-08-24T08:17:03Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"progress-tracker.md","action":"Edit","timestamp":"2026-08-24T10:22:52Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/README.md","action":"Edit","timestamp":"2026-08-24T10:48:24Z","important":false,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}
+{"file":"d:/Projects/Dark OS/CLAUDE.md","action":"Edit","timestamp":"2026-08-24T10:50:31Z","important":true,"session_id":"91dec196-6018-4943-91bb-6b72547d4a87"}

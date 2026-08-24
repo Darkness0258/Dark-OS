@@ -4,3 +4,5 @@ out/
 __pycache__/
 *.pyc
 .tmp/
+ci/darkos-vm-ssh-key
+ci/darkos-vm-ssh-key.pub

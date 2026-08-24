@@ -79,6 +79,7 @@ class DarkOSApplication(Gtk.Application):
         )
         self.dock = None
         self.rail = None
+        self.hud = None
         self.left = None
         self.right = None
         self.installer_visibility = None
@@ -171,10 +172,16 @@ class DarkOSApplication(Gtk.Application):
         apply_css()
         self.dock = DarkOSDockWindow(self)
         self.rail = DarkOSIconRail(self)
+        self.hud = DarkOSHUDOverlay()
         self.left = DarkOSLeftPanels(self)
         self.right = DarkOSRightPanels(self)
-        for window in (self.dock, self.rail, self.left, self.right):
+        for window in (self.dock, self.rail, self.hud, self.left, self.right):
             self.add_window(window)
+        # Command Center (HUD + info panels) starts closed — SUPER+H or
+        # --toggle-command-center opens it. Dock + rail are the always-on
+        # base layer. See ui-rules.md § Layout (2026-08-23 decision).
+        for window in (self.hud, self.left, self.right):
+            window.hide()
 
         # Start activity detection → layout adaptation
         detector = self.activity_detector
@@ -269,6 +276,7 @@ class DarkOSApplication(Gtk.Application):
         parser = argparse.ArgumentParser(description="DarkOS Shell Controller")
         parser.add_argument("--toggle-ai", action="store_true")
         parser.add_argument("--toggle-side-panels", action="store_true")
+        parser.add_argument("--toggle-command-center", action="store_true")
         parser.add_argument("--toggle-control", action="store_true")
         parser.add_argument("--toggle-left", action="store_true")
         parser.add_argument("--toggle-rail", action="store_true")
@@ -287,6 +295,16 @@ class DarkOSApplication(Gtk.Application):
         if args.toggle_side_panels:
             self._toggle_window(self.left)
             self._toggle_window(self.right)
+        if args.toggle_command_center:
+            # HUD visibility is the source of truth for "open" — unlike
+            # left/right, activity_detector never touches it, so it can't
+            # drift out of sync the way independently-toggled windows could.
+            opening = not self.hud.is_visible()
+            for window in (self.hud, self.left, self.right):
+                if opening:
+                    window.show_all()
+                else:
+                    window.hide()
         if args.toggle_control:
             self._toggle_window(self.right)
         if args.toggle_left:
