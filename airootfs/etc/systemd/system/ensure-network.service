@@ -1,0 +1,11 @@
+[Unit]
+Description=Ensure network interfaces have IP addresses (DHCP fallback)
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=systemd-udev-settle.service network-pre.target
+Before=network.target multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ensure-network
+RemainAfterExit=yes

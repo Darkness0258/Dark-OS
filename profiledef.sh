@@ -58,4 +58,5 @@ file_permissions=(
   ["/usr/local/bin/start-hyprland"]="0:0:755"
   ["/usr/local/bin/darkos-firstboot-tools"]="0:0:755"
   ["/usr/local/bin/ensure-network"]="0:0:755"
+  ["/usr/lib/systemd/system/ensure-network.service"]="0:0:644"
 )

@@ -496,6 +496,7 @@ declare -A service_targets=(
     [NetworkManager]="/usr/lib/systemd/system/NetworkManager.service"
     [bluetooth]="/usr/lib/systemd/system/bluetooth.service"
     [darkos-grub-repair]="../darkos-grub-repair.service"
+    [ensure-network]="../ensure-network.service"
     [pacman-init]="../pacman-init.service"
     [seatd]="/usr/lib/systemd/system/seatd.service"
     [sshd]="/usr/lib/systemd/system/sshd.service"
