@@ -8,3 +8,10 @@ services:
     working_dir: /workspace
     volumes:
       - .:/workspace
+      # Preserve only signed package downloads between disposable builders.
+      # The ArchISO work/root directories remain fresh on every run.
+      - darkos-pacman-cache:/var/cache/pacman/pkg
+
+volumes:
+  darkos-pacman-cache:
+    name: darkos-iso-pacman-cache
