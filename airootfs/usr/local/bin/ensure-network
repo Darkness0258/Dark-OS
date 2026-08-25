@@ -2,13 +2,14 @@
 # DarkOS live ISO — ensure the primary network interface has an IP.
 # NetworkManager auto-connects on the live ISO, but if it misses (e.g.
 # VMware NAT after a suspend/resume), this brings the interface up and
-# requests a lease.
+# requests an IPv4 lease without leaving a second DHCP client behind.
 
 set -euo pipefail
 
 # Find the first wired interface that isn't loopback or wireless.
 IFACE="$(ip -o link show 2>/dev/null \
     | awk -F': ' '{print $2}' \
+    | sed 's/@.*$//' \
     | grep -v '^lo$' \
     | grep -v '^wlan' \
     | grep -v '^wwan' \
@@ -16,15 +17,37 @@ IFACE="$(ip -o link show 2>/dev/null \
 
 [[ -z "${IFACE}" ]] && exit 0
 
-# If it already has an IPv4, nothing to do.
-if ip -4 addr show dev "$IFACE" 2>/dev/null | grep -q 'inet '; then
+has_ipv4() {
+    ip -4 addr show dev "$IFACE" 2>/dev/null | grep -q 'inet '
+}
+
+# When NetworkManager is active, give its internal DHCP client a bounded
+# chance to finish first. The unit is ordered after NetworkManager.service,
+# but service activation can complete just before the lease arrives.
+if has_ipv4; then
     exit 0
+fi
+if systemctl is-active --quiet NetworkManager.service; then
+    if command -v nmcli >/dev/null 2>&1; then
+        nmcli device connect "$IFACE" >/dev/null 2>&1 || true
+    fi
+    for _ in {1..10}; do
+        has_ipv4 && exit 0
+        sleep 1
+    done
 fi
 
 ip link set "$IFACE" up 2>/dev/null || true
-# dhcpcd is installed on the live ISO; fall back to ip + route if missing.
+# Force IPv4 and bound the entire client process. Without -4, dhcpcd 10 can
+# keep waiting on IPv6 after acquiring IPv4, which stalls multi-user.target.
 if command -v dhcpcd >/dev/null 2>&1; then
-    dhcpcd -B -1 -t 30 "$IFACE" 2>/dev/null || true
+    timeout --kill-after=5s 35s dhcpcd -4 -B -1 -t 30 "$IFACE" || true
 elif command -v dhclient >/dev/null 2>&1; then
-    dhclient "$IFACE" 2>/dev/null || true
+    timeout --kill-after=5s 35s dhclient -4 -1 "$IFACE" || true
 fi
+
+if ! has_ipv4; then
+    printf 'ensure-network: no IPv4 lease was obtained on %s\n' "$IFACE" >&2
+    exit 1
+fi
+printf 'ensure-network: IPv4 connectivity is configured on %s\n' "$IFACE"

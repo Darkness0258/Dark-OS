@@ -32,7 +32,7 @@ param(
     [ValidateRange(30, 900)]
     [int]$ToolsTimeoutSeconds = 300,
     [ValidateRange(15, 300)]
-    [int]$GuestAuthTimeoutSeconds = 60,
+    [int]$GuestAuthTimeoutSeconds = 180,
     [ValidateSet("gui", "nogui")]
     [string]$StartMode = "gui"
 )
@@ -548,6 +548,7 @@ try {
         'sata0:1.startConnected = "TRUE"',
         'sata0:1.autodetect = "FALSE"',
         'ethernet0.present = "TRUE"',
+        'ethernet0.startConnected = "TRUE"',
         'ethernet0.connectionType = "nat"',
         'ethernet0.virtualDev = "e1000e"',
         'ethernet0.addressType = "generated"',

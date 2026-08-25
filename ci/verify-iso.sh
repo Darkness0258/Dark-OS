@@ -96,6 +96,7 @@ payload=(
     etc/systemd/system/multi-user.target.wants/seatd.service
     etc/systemd/system/multi-user.target.wants/sshd.service
     etc/systemd/system/multi-user.target.wants/vmtoolsd.service
+    etc/systemd/system/ensure-network.service
     etc/systemd/system/pacman-init.service
     root/.automated_script.sh
     root/.gnupg
@@ -182,6 +183,7 @@ required_files=(
     etc/xdg/hypr/hyprlock.conf
     etc/xdg/waybar/config
     etc/xdg/waybar/style.css
+    etc/systemd/system/ensure-network.service
     etc/systemd/system/pacman-init.service
     usr/bin/calamares
     usr/bin/cage
@@ -513,6 +515,35 @@ for service in "${!service_targets[@]}"; do
         printf '%s live-session enablement has the wrong target\n' "$service" >&2
         exit 1
     fi
+done
+
+ensure_network_unit="$extracted/etc/systemd/system/ensure-network.service"
+[[ "$(stat -c '%a' "$ensure_network_unit")" == 644 ]] || {
+    printf 'ensure-network.service does not have mode 0644\n' >&2
+    exit 1
+}
+for setting in \
+    'After=systemd-udev-settle.service network-pre.target NetworkManager.service' \
+    'Before=network.target multi-user.target' \
+    'TimeoutStartSec=50s'; do
+    grep -Fxq "$setting" "$ensure_network_unit" || {
+        printf 'ensure-network.service is missing bounded ordering: %s\n' "$setting" >&2
+        exit 1
+    }
+done
+if grep -Fxq 'RemainAfterExit=yes' "$ensure_network_unit"; then
+    printf 'ensure-network.service cannot be manually re-triggered with systemctl start\n' >&2
+    exit 1
+fi
+ensure_network_script="$extracted/usr/local/bin/ensure-network"
+for setting in \
+    'systemctl is-active --quiet NetworkManager.service' \
+    'timeout --kill-after=5s 35s dhcpcd -4 -B -1 -t 30 "$IFACE"' \
+    "printf 'ensure-network: IPv4 connectivity is configured on %s\\n'"; do
+    grep -Fq "$setting" "$ensure_network_script" || {
+        printf 'ensure-network lacks the bounded IPv4 fallback: %s\n' "$setting" >&2
+        exit 1
+    }
 done
 
 pacman_init="$extracted/etc/systemd/system/pacman-init.service"
