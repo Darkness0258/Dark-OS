@@ -91,6 +91,7 @@ payload=(
     etc/systemd/system/multi-user.target.wants/NetworkManager.service
     etc/systemd/system/multi-user.target.wants/bluetooth.service
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
+    etc/systemd/system/multi-user.target.wants/ensure-network.service
     etc/systemd/system/multi-user.target.wants/pacman-init.service
     etc/systemd/system/multi-user.target.wants/seatd.service
     etc/systemd/system/multi-user.target.wants/sshd.service
