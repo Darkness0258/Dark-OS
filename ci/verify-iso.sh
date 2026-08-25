@@ -153,6 +153,8 @@ payload=(
     var/lib/AccountsService/users/greeter
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
+    usr/lib/calamares/modules/darkosapikeys/libcalamares_viewmodule_darkosapikeys.so
+    usr/lib/calamares/modules/darkosapikeys/module.desc
 )
 unsquashfs -no-progress -d "$extracted" "$squashfs" "${payload[@]}" >/dev/null
 
@@ -213,6 +215,8 @@ required_files=(
     var/lib/AccountsService/users/greeter
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
+    usr/lib/calamares/modules/darkosapikeys/libcalamares_viewmodule_darkosapikeys.so
+    usr/lib/calamares/modules/darkosapikeys/module.desc
 )
 for relative in "${required_files[@]}"; do
     if [[ ! -s "$extracted/$relative" ]]; then
@@ -601,6 +605,10 @@ for setting in 'disable-cancel-during-exec: true' \
 done
 grep -Fq -- '- shellprocess@bootloader-install' "$settings" || {
     printf 'Calamares does not run the permission-safe bootloader job\n' >&2
+    exit 1
+}
+grep -Fq -- '- darkosapikeys' "$settings" || {
+    printf 'Calamares does not register the darkosapikeys module\n' >&2
     exit 1
 }
 if grep -Eq '^[[:space:]]+- bootloader[[:space:]]*$' "$settings"; then

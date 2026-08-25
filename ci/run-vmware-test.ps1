@@ -26,13 +26,13 @@ param(
     [string]$VDiskManagerPath = "C:\Program Files (x86)\VMware\VMware Workstation\vmware-vdiskmanager.exe",
     [string]$GuestVerifierPath = "",
     [string]$GuestUser = "darkos",
-    [string]$GuestPassword = "",
+    [string]$GuestPassword = "darkos",
     [string]$GroqApiKey = "",
     [string]$OpenRouterApiKey = "",
     [ValidateRange(30, 900)]
     [int]$ToolsTimeoutSeconds = 300,
-    [ValidateRange(15, 300)]
-    [int]$GuestAuthTimeoutSeconds = 180,
+    [ValidateRange(15, 900)]
+    [int]$GuestAuthTimeoutSeconds = 420,
     [ValidateSet("gui", "nogui")]
     [string]$StartMode = "gui"
 )
@@ -213,13 +213,8 @@ function Capture-FreshScreenshot {
     }
     $startedUtc = [DateTime]::UtcNow
     Write-Host "==> Capturing fresh screenshot: $Name"
-    $capture = if ($script:GuestOperationsReady) {
-        Invoke-GuestVmrun -ArgumentList @("captureScreen", $script:VmxPath, $fullPath) `
-            -Description "capture screenshot '$Name'" -AllowFailure
-    } else {
-        Invoke-Vmrun -ArgumentList @("captureScreen", $script:VmxPath, $fullPath) `
-            -Description "capture screenshot '$Name'" -AllowFailure
-    }
+    $capture = Invoke-GuestVmrun -ArgumentList @("captureScreen", $script:VmxPath, $fullPath) `
+        -Description "capture screenshot '$Name'" -AllowFailure
     if ($capture.ExitCode -ne 0) {
         Write-Warning "vmrun returned nonzero capture status for '$Name': $($capture.Output)"
         return $null

@@ -646,25 +646,32 @@ def _strip_action_markers(reply: str) -> str:
 
 
 def _parse_args(raw: str) -> list:
-    """Parse only literal positional arguments from an action marker.
+    """Parse literal positional arguments from an action marker.
 
-    ``literal_eval`` accepts quoted commas and escaped quotes without ever
-    evaluating names, calls, attributes, or other model-provided code.
+    ``literal_eval`` accepts quoted strings and numbers without evaluating
+    arbitrary Python expressions. Also allows bare identifiers (e.g. explain(active)).
     """
-    if not raw:
+    trimmed = raw.strip()
+    if not trimmed:
         return []
     import ast
+    import re
 
     try:
-        values = ast.literal_eval(f"[{raw}]")
-    except (SyntaxError, ValueError) as exc:
-        raise ValueError("action arguments must be quoted strings or numbers") from exc
-    if not isinstance(values, list) or any(
-        isinstance(value, (bool, bytes, complex, type(None), list, tuple, dict, set))
-        for value in values
-    ):
-        raise ValueError("action arguments must be quoted strings or real numbers")
-    return values
+        values = ast.literal_eval(f"[{trimmed}]")
+        if isinstance(values, list) and all(
+            isinstance(value, (str, int, float)) and not isinstance(value, bool)
+            for value in values
+        ):
+            return values
+    except Exception:
+        pass
+
+    # Allow bare alphanumeric identifier arguments (e.g. explain(active))
+    if re.fullmatch(r"[A-Za-z0-9_-]+", trimmed):
+        return [trimmed]
+
+    raise ValueError("action arguments must be quoted strings or numbers")
 
 
 def _find_binary(names: list[str]) -> str | None:

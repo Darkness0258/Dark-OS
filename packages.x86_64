@@ -44,6 +44,7 @@ polkit-kde-agent
 qt5-wayland
 qt6-wayland
 calamares
+darkos-calamares-apikeys
 ckbcomp
 chaotic-keyring
 chaotic-mirrorlist

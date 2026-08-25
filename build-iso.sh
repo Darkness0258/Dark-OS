@@ -416,6 +416,13 @@ bash "${project_dir}/ci/build-calamares.sh" "${repo_dir}"
     exit 1
 }
 
+printf 'Building the first-party DarkOS Calamares API-key module...\n'
+bash "${project_dir}/ci/build-darkos-calamares-module.sh" "${repo_dir}" "${project_dir}"
+[[ -s "${repo_dir}/darkos-local.db.tar.gz" ]] || {
+    printf 'DarkOS Calamares module build did not update the local pacman repository database.\n' >&2
+    exit 1
+}
+
 # Put the verified local repository first, ahead of all network repositories,
 # so packages.x86_64 always resolves the pinned Calamares build.
 awk -v repo_url="file://${repo_dir}" '
