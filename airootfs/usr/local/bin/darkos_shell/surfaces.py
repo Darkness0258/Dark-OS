@@ -9,7 +9,12 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import GLib, Gtk, GtkLayerShell
 
-from darkos_shell.canvases import AIOrbCanvas, WaveformCanvas
+from darkos_shell.canvases import (
+    AIOrbCanvas,
+    GLOW_STROKES_OUTSIDE_IN,
+    WaveformCanvas,
+    stroke_glow,
+)
 from darkos_shell.css import CSS_STYLE
 from darkos_shell.tokens import (
     CAIRO_ACCENT,
@@ -226,8 +231,152 @@ class DarkOSDockWindow(Gtk.Window):
         return False
 
 
+class _HUDCanvas(Gtk.DrawingArea):
+    """Cairo-drawn radar/dial for the AI Core HUD."""
+
+    _STATE_STYLE = {
+        "sleeping": (CAIRO_PRIMARY, 0.50, 0.035, 1.5),
+        "listening": (CAIRO_PRIMARY, 0.82, 0.10, 3.0),
+        "thinking": (CAIRO_SECONDARY, 0.88, 0.16, 5.0),
+        "speaking": (CAIRO_ACCENT, 0.88, 0.13, 4.0),
+        "error": (CAIRO_DANGER, 0.94, 0.20, 6.0),
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.set_size_request(280, 260)
+        self._state = "sleeping"
+        self._phase = 0.0
+        self._frame = 0
+        self.connect("draw", self._on_draw)
+        GLib.timeout_add(33, self._on_tick)
+
+    def set_state(self, state):
+        self._state = state
+        self.queue_draw()
+
+    def _on_tick(self):
+        style = self._STATE_STYLE.get(self._state, self._STATE_STYLE["sleeping"])
+        speed = style[2]
+        self._phase = (self._phase + speed) % (math.pi * 200)
+        self._frame += 1
+        if self._state != "sleeping" or self._frame % 3 == 0:
+            self.queue_draw()
+        return True
+
+    def _stroke_ring(self, cr, cx, cy, radius, width, color, alpha):
+        cr.set_line_width(width)
+        cr.set_source_rgba(*color, alpha)
+        cr.arc(cx, cy, radius, 0, 2 * math.pi)
+        cr.stroke()
+
+    def _draw_dashed_ring(self, cr, cx, cy, radius, color, alpha):
+        segments = 20
+        for index in range(segments):
+            start = index / segments * 2 * math.pi
+            end = start + (1.0 / segments) * 2 * math.pi * 0.65
+            cr.arc(cx, cy, radius, start, end)
+            stroke_glow(cr, color, alpha)
+
+    def _draw_ticks(self, cr, cx, cy, radius, step_deg, color, alpha):
+        for angle_deg in range(0, 360, step_deg):
+            a = math.radians(angle_deg)
+            tick_inner = radius - 4
+            tick_outer = radius - (2 if angle_deg % 90 == 0 else 0)
+            cr.move_to(cx + tick_inner * math.cos(a), cy + tick_inner * math.sin(a))
+            cr.line_to(cx + tick_outer * math.cos(a), cy + tick_outer * math.sin(a))
+            cr.set_source_rgba(*color, alpha)
+            cr.set_line_width(1.0)
+            cr.stroke()
+
+    def _on_draw(self, widget, cr):
+        w = widget.get_allocated_width()
+        h = widget.get_allocated_height()
+        cx, cy = w / 2.0, h / 2.0 - 10
+
+        color, alpha = self._STATE_STYLE.get(
+            self._state, self._STATE_STYLE["sleeping"]
+        )[:2]
+
+        # Three concentric dashed rings with tick marks
+        for r, tick_step in ((54, 18), (88, 18), (122, 18)):
+            self._draw_dashed_ring(cr, cx, cy, r, color, alpha * 0.70)
+            self._draw_ticks(cr, cx, cy, r, tick_step, color, alpha * 0.50)
+
+        # Inner solid double-line ring with gap accents
+        for r, a in ((70, alpha * 0.35), (68, alpha * 0.55)):
+            self._stroke_ring(cr, cx, cy, r, 1.0, color, a)
+        for angle_deg in (90, 270):
+            a = math.radians(angle_deg)
+            x1 = cx + (69 - 3) * math.cos(a - 0.18)
+            y1 = cy + (69 - 3) * math.sin(a - 0.18)
+            x2 = cx + (69 + 3) * math.cos(a + 0.18)
+            y2 = cy + (69 + 3) * math.sin(a + 0.18)
+            cr.move_to(x1, y1)
+            cr.line_to(x2, y2)
+            cr.set_source_rgba(*CAIRO_TEXT, alpha * 0.30)
+            cr.set_line_width(2.0)
+            cr.stroke()
+
+        # Bezel ring + coarse ticks
+        bezel = 136
+        self._stroke_ring(cr, cx, cy, bezel, 1.0, CAIRO_TEXT, alpha * 0.20)
+        self._draw_ticks(cr, cx, cy, bezel, 15, CAIRO_TEXT, alpha * 0.20)
+
+        # Accent arc at top — position tracks anim_phase
+        top = -math.pi / 2.0
+        x1 = cx + 122 * math.cos(top)
+        y1 = cy + 122 * math.sin(top)
+        x2 = cx + 132 * math.cos(top)
+        y2 = cy + 132 * math.sin(top)
+        cr.move_to(x1, y1)
+        cr.line_to(x2, y2)
+        cr.set_source_rgba(*color, alpha * 0.55)
+        cr.set_line_width(1.5)
+        cr.stroke()
+        for i in range(3):
+            cr.move_to(x2 + 4, y2 - 6 + i * 4)
+            cr.line_to(x2 + 10, y2 - 6 + i * 4)
+            cr.set_source_rgba(*CAIRO_TEXT, alpha * (0.35 + i * 0.15))
+            cr.set_line_width(1.0)
+            cr.stroke()
+
+        # Radial spokes
+        for angle_deg in (0, 60, 120, 180, 240, 300):
+            a = math.radians(angle_deg)
+            cr.move_to(cx + 40 * math.cos(a), cy + 40 * math.sin(a))
+            cr.line_to(cx + bezel * math.cos(a), cy + bezel * math.sin(a))
+            cr.set_source_rgba(*CAIRO_TEXT, alpha * 0.10)
+            cr.set_line_width(1.0)
+            cr.stroke()
+
+        # Center breathing pulse
+        pulse = 4 + 3 * abs(math.sin(self._phase * 2.0))
+        cr.arc(cx, cy, pulse, 0, 2 * math.pi)
+        stroke_glow(cr, color, alpha * 0.80)
+
+        # DARK OS wordmark
+        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        cr.set_font_size(12)
+        cr.set_source_rgba(*CAIRO_TEXT, alpha * 0.90)
+        label = "DARK OS"
+        extents = cr.text_extents(label)
+        cr.move_to(cx - extents.width / 2.0, cy + 155)
+        cr.show_text(label)
+
+        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(9)
+        cr.set_source_rgba(*color, alpha * 0.80)
+        tagline = "CONTROL EVERYTHING"
+        extents = cr.text_extents(tagline)
+        cr.move_to(cx - extents.width / 2.0, cy + 172)
+        cr.show_text(tagline)
+
+        return False
+
+
 class DarkOSHUDOverlay(Gtk.Window):
-    """Text-only HUD — ring graphic lives in the wallpaper."""
+    """AI Core HUD — Cairo radar/dial overlay, state-driven via orb machine."""
 
     def __init__(self):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
@@ -243,13 +392,8 @@ class DarkOSHUDOverlay(Gtk.Window):
             {GtkLayerShell.Edge.TOP: 76},
         )
 
-        stage = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
-        add_class(stage, "hud-stage")
-        stage.set_halign(Gtk.Align.CENTER)
-        state = make_label("AI CORE  /  PREVIEW MODE", "eyebrow", Gtk.Align.CENTER)
-        state.set_xalign(0.5)
-        stage.pack_start(state, False, False, 0)
-        self.add(stage)
+        self._canvas = _HUDCanvas()
+        self.add(self._canvas)
         self.show_all()
 
 

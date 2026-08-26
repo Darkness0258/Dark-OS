@@ -212,7 +212,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 | Phase | Goal |
 |---|---|
 | 1 | Bootable and installable Arch + Hyprland + BlackArch ISO ✓ |
-| 2 | Core shell chrome (HUD, panels, dock, lock, login, boot animation) ✓ |
+| 2 | Core shell chrome (dock, panels, lock, login, boot animation done; HUD ring graphic pending) |
 | 3 | AI assistant (STT/TTS/brain, OS control) ✅ runtime verified via SSH |
 | 4 | Daily-use native apps |
 | 5 | System management (Settings, Network, Security) |
@@ -225,8 +225,8 @@ Full details in [build-plan.md](build-plan.md).
 ## Status
 
 - **Phase 1 is complete and VM-verified** — CI produces installable UEFI ISOs published as GitHub Releases from `main`.
-- **Phase 2 shell chrome is complete and VM-verified** — Plymouth boot animation, ReGreet display manager, Hyprland glassmorphism shell (HUD, system gauges, dock with AI Orb, floating side panels with Notifications, Now Playing, Connectivity, and Calendar), hyprlock screen, and first-boot tool group installer are fully verified on installed UEFI hardware.
-- **Phase 3 (AI Assistant) is core-wired and runtime-verified via SSH + VMware** — OpenRouter chat round-trip, Groq STT transcription, espeak-ng TTS playback, D-Bus/hyprctl OS control (volume, workspaces), AT-SPI text extraction, explain-this, snapshot-before-act Btrfs safety (code path verified; full creation confirmed on installed Btrfs), context-aware shell with activity-driven dock highlighting, and Command Center (SUPER+H) are all verified. Two items need real hardware testing: push-to-talk gesture (hold SUPER+SPACE, speak, hear TTS back — VMware virtual mic does not forward host audio), and actual dock highlight visual rendering on physical hardware.
+- **Phase 2 shell chrome is done and VM-verified** — Plymouth boot animation, ReGreet display manager, Hyprland glassmorphism shell (dock with AI Orb, left icon rail, floating side panels with Notifications, Now Playing, Connectivity, and Calendar), hyprlock screen, and first-boot tool group installer are fully verified on installed UEFI hardware. The AI Core HUD ring graphic is the remaining Phase 2 item.
+- **Phase 3 (AI Assistant) is core-wired and runtime-verified via SSH + VMware** — OpenRouter chat round-trip, Groq STT transcription, espeak-ng TTS playback, D-Bus/hyprctl OS control (volume, workspaces), AT-SPI text extraction, explain-this, snapshot-before-act Btrfs safety (code path verified; full creation pending real install + mutating action test), context-aware shell with activity-driven dock highlighting, and Command Center (SUPER+H) are all verified. Two items need real hardware testing: push-to-talk gesture (hold SUPER+SPACE, speak, hear TTS back — VMware virtual mic does not forward host audio), and actual dock highlight visual rendering on physical hardware.
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).
 

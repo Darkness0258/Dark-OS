@@ -17,6 +17,15 @@ from darkos_shell.tokens import (
 )
 
 
+__all__ = [
+    "AIOrbCanvas",
+    "GLOW_STROKES_OUTSIDE_IN",
+    "RingGauge",
+    "WaveformCanvas",
+    "stroke_glow",
+]
+
+
 def stroke_glow(cr, color, alpha=1.0, width_scale=1.0):
     """Stroke the current Cairo path: outer haze, mid glow, crisp core."""
     final_index = len(GLOW_STROKES_OUTSIDE_IN) - 1

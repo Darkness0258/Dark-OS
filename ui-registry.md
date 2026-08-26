@@ -11,7 +11,7 @@
 - Purpose: Central assistant radar, ring state, and "Dark OS / Control Everything" identity.
 - Variants: Idle, listening, thinking, speaking, error.
 - Tokens used: `color-primary`, `color-secondary`, `color-danger`, text colors, ring/gauge language.
-- Used in: `AIRadarCanvas` and `DarkOSHUDOverlay` in `darkos-shell.py`.
+- Used in: `DarkOSHUDOverlay` (internal radar canvas) in `darkos_shell/surfaces.py`.
 - Notes: Activity increases ring brightness and rotation speed; AI requests remain explicit previews.
 
 ## AppIconRail

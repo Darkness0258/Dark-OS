@@ -6,3 +6,6 @@ __pycache__/
 .tmp/
 ci/darkos-vm-ssh-key
 ci/darkos-vm-ssh-key.pub
+.claude/
+.claude-flow/
+.agents/
