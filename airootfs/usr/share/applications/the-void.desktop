@@ -1,10 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=The Void
-Comment=DarkOS default terminal (kitty)
+Comment=DarkOS native terminal (GTK3 + VTE)
 TryExec=/usr/local/bin/the-void.sh
 Exec=/usr/local/bin/the-void.sh
-Icon=kitty
+Icon=utilities-terminal
 Categories=System;TerminalEmulator;
 StartupNotify=true
+StartupWMClass=darkos-terminal
 Terminal=false

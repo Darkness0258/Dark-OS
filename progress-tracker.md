@@ -309,3 +309,23 @@ VALUE: ''
 2. `ensure-network` script created for DHCP bring-up on boot
 3. `sshd.service` scoped to live-only (symlink + cleanup, not installed-system default)
 4. VMware `.vmx` missing `ethernet0.startConnected = "TRUE"` → virtual cable stayed unplugged
+
+## 2026-08-27 — Phase 4 kickoff: File Explorer + Terminal, plus a real HUD bug caught
+
+**Context:** Hamza uploaded the repo asking to build all remaining phases (4-9) and test once at the end. Before starting: reviewed the repo against build-plan.md rather than trusting it at face value.
+
+**Found: commit message/diff mismatch on the two local HUD commits.** `a2ae10b` ("Audit fix: HUD ring graphic, doc corrections, git hygiene") only deletes the two zero-byte garbage files — the actual HUD/doc work described in that message lands ~8.5hrs later in `56062b2`, which reuses the identical commit message. Both are still local/unpushed. Not a functional bug, just confusing history if left as-is.
+
+**Found and fixed a real bug in the just-landed HUD code:** `_HUDCanvas` in `surfaces.py` (added in `56062b2`) references `CAIRO_DANGER` for the error-state ring color but never imports it from `darkos_shell.tokens`. This is a `NameError` at class-body evaluation time — it would crash on `import darkos_shell`, taking down the *entire shell*, not just the HUD. `py_compile` cannot catch this (it's a name-resolution error, not a syntax error); only caught it by actually importing the module. Fixed with a one-line import addition. This is exactly the "looks done, isn't" pattern already logged multiple times in this file — found within the first real runtime check of this session.
+
+**How that check happened:** installed `gir1.2-gtk-3.0`, `gir1.2-vte-2.91`, `gir1.2-gtklayershell-0.1` (matches real target deps) plus Xvfb in the review sandbox, and actually ran the shell's import chain and the two new Phase 4 apps under a virtual X11 display — not just `py_compile`. This is **not** the target Wayland/Hyprland compositor, so it's not a substitute for a real VM boot, but it catches real import/runtime errors that syntax checks can't.
+
+**Built: File Explorer (`darkos-files.py`) and Terminal (`darkos-terminal.py`)** — see build-plan.md Phase 4 for full detail on scope and what's still hardware-only-verifiable. Summary: both are normal floating GTK3 windows (not layer-shell), built entirely from stock widgets so AT-SPI can drive them like any other app, styled via new shared classes added to `darkos_shell/css.py` (`.app-window`, `.sidebar`, `.path-bar`, `.statusbar`, `notebook.terminal-tabs`, `treeview.darkos-list`) and a new `FONT_MONO` token. `the-void.sh` now execs the new terminal instead of kitty (kitty stays installed — `ci/vmware-phase3-guest.sh` still uses it directly under its own window class). Rail's "files" action now launches `darkos-files.py` instead of `the-void.sh -e ranger`.
+
+**Runtime-verified under Xvfb/X11 (screenshots taken, not just process-alive checks):**
+- File Explorer: real directory listing, folders-first sort, breadcrumb navigation (double-click into a real subfolder, confirmed via screenshot), archive-contents dialog showing the exact real contents of a test `.zip`.
+- Terminal: two live tabs (Ctrl+Shift+T), correct active-tab styling, a real spawned shell responding to typed input.
+
+**Still open (hardware/Wayland-only, can't be closed from this sandbox):** Hyprland windowrule class-matching for `darkos-terminal`/`darkos-files` (added rules assume `GLib.set_prgname()` sets the Wayland app_id — needs `hyprctl clients -j` to confirm), actual JetBrains Mono Nerd Font rendering, real keyboard/mouse timing for the double-click and keybind interactions.
+
+**Not touched this session:** Settings/Store rail actions (still `wofi --show drun` placeholders, unchanged), Notes/Calendar/Clock/Calculator and the rest of Phase 4 (not yet started), and no attempt was made to reconcile the Calamares API-key module's documentation status — that's a separate open item, not confirmed either way here.

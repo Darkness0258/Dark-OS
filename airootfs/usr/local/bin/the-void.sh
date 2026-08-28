@@ -1,16 +1,10 @@
 #!/bin/bash
-# DarkOS terminal launcher ("The Void", backed by kitty).
+# DarkOS terminal launcher ("The Void"), now backed by the native
+# darkos-terminal.py (GTK3 + VTE) instead of kitty.
 #
-# kitty needs OpenGL 3.3+. VMware's virtual GPU often only exposes an
-# older version through Mesa, so kitty aborts at context creation.
-# Force software rendering ONLY when running inside a VM; real
-# Strip -e flag if passed by standard terminal launcher callers
-if [ "${1:-}" = "-e" ]; then
-    shift
-fi
-
-if systemd-detect-virt --vm >/dev/null 2>&1; then
-    exec env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe kitty --title "The Void" "$@"
-else
-    exec kitty --title "The Void" "$@"
-fi
+# VTE renders through Cairo/Pango, not an OpenGL context, so the old
+# kitty-era VM software-rendering workaround (LIBGL_ALWAYS_SOFTWARE)
+# isn't needed here. kitty itself stays installed for
+# ci/vmware-phase3-guest.sh, which spawns it directly under its own
+# window class — unrelated to this launcher.
+exec /usr/local/bin/darkos-terminal.py "$@"

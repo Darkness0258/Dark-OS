@@ -62,3 +62,17 @@
 - Tokens used: Pure black, electric cyan, canonical DarkOS logo.
 - Used in: `/usr/share/plymouth/themes/darkos/`; selected for live and installed initramfs builds.
 - Notes: The logo is copied from the canonical Calamares branding asset during ISO staging.
+
+## FileExplorer
+- Purpose: Native daily-use file browsing, basic file ops, and archive preview/extract/compress.
+- Variants: Normal listing, filtered (search), empty folder, error dialog, archive-contents dialog.
+- Tokens used: `color-bg-alt`, `color-bg-elevated`, `color-primary`, text/muted colors, 8px control radius, monospace token (archive listing).
+- Used in: `FileExplorerWindow` in `darkos-files.py`; app rail "files" action; launched with `--cwd` from Terminal's counterpart action.
+- Notes: Normal floating GTK3 window, not layer-shell — glass/rounding comes from Hyprland's `decoration{}` + the `darkos-files` windowrule, not custom CSS alpha. Every control is a stock GTK3 widget (TreeView/ListBox/dialogs) so AT-SPI can drive it generically. Archive support previews + extracts/compresses; browsing inside an archive like a folder is a documented follow-up, not built yet.
+
+## NativeTerminal
+- Purpose: "The Void" — tabbed terminal emulator replacing the kitty-backed Phase 1 default.
+- Variants: Single tab, multiple tabs, active/inactive tab, child-exited (auto-closes tab).
+- Tokens used: `color-primary` (active tab underline + bright-cyan ANSI slot), `color-bg-alt`, a dedicated 16-slot ANSI palette derived from the token set, monospace token.
+- Used in: `TerminalWindow`/`TerminalPage` in `darkos-terminal.py`; launched via `the-void.sh` (app rail "terminal" action, and by anything that shelled out to the old kitty wrapper — `-e CMD` contract preserved).
+- Notes: Vte.Terminal owns actual emulation (PTY/ANSI/scrollback); this component is chrome only. Normal floating window like FileExplorer, same AT-SPI reasoning. `--cwd DIR` is a DarkOS-specific addition Files uses for "Open Terminal Here."

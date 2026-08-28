@@ -18,6 +18,7 @@ from darkos_shell.canvases import (
 from darkos_shell.css import CSS_STYLE
 from darkos_shell.tokens import (
     CAIRO_ACCENT,
+    CAIRO_DANGER,
     CAIRO_MUTED,
     CAIRO_PRIMARY,
     CAIRO_SECONDARY,

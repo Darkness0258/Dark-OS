@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Files
+Comment=DarkOS native file explorer with archive support
+TryExec=/usr/local/bin/darkos-files.py
+Exec=/usr/local/bin/darkos-files.py
+Icon=system-file-manager
+Categories=System;FileManager;
+StartupNotify=true
+StartupWMClass=darkos-files
+Terminal=false

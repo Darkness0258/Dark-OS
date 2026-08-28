@@ -268,6 +268,115 @@ separator {{
     background-color: alpha({COLOR_TEXT}, 0.12);
     min-height: 1px;
 }}
+
+/* ── App windows (Files, Terminal) — normal floating windows, not
+   layer-shell. Glass/blur/rounding comes from Hyprland's compositor
+   (decoration{{}} + per-class windowrule opacity), these classes only
+   handle in-content styling. ── */
+
+.app-window {{
+    background-color: {COLOR_BG_ALT};
+}}
+
+.toolbar {{
+    background-color: alpha({COLOR_BG_ELEVATED}, 0.90);
+    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.10);
+    padding: {SPACE_XS}px {SPACE_SM}px;
+}}
+
+.sidebar {{
+    background-color: alpha({COLOR_BG_ELEVATED}, 0.85);
+    border-right: 1px solid alpha({COLOR_TEXT}, 0.10);
+    padding: {SPACE_SM}px;
+}}
+
+.sidebar-row {{
+    border-radius: {RADIUS_CONTROL}px;
+    color: {COLOR_TEXT_MUTED};
+    padding: {SPACE_XS}px {SPACE_SM}px;
+}}
+
+.sidebar-row:hover {{
+    background-color: alpha({COLOR_TEXT}, 0.06);
+}}
+
+.sidebar-row.active {{
+    background-color: alpha({COLOR_PRIMARY}, 0.16);
+    color: {COLOR_PRIMARY};
+}}
+
+.path-bar {{
+    background-color: alpha({COLOR_BG}, 0.45);
+    border: 1px solid alpha({COLOR_PRIMARY}, 0.28);
+    border-radius: {RADIUS_CONTROL}px;
+    padding: 2px {SPACE_XS}px;
+}}
+
+.path-crumb {{
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    box-shadow: none;
+    color: {COLOR_TEXT_MUTED};
+    padding: {SPACE_XS}px {SPACE_SM}px;
+}}
+
+.path-crumb:hover {{
+    color: {COLOR_PRIMARY};
+}}
+
+.path-crumb-current {{
+    color: {COLOR_TEXT};
+    font-weight: 600;
+}}
+
+treeview.darkos-list {{
+    background-color: transparent;
+    color: {COLOR_TEXT};
+}}
+
+treeview.darkos-list:selected {{
+    background-color: alpha({COLOR_PRIMARY}, 0.20);
+    border-radius: {RADIUS_CONTROL}px;
+    color: {COLOR_TEXT};
+}}
+
+treeview.darkos-list header button {{
+    background-color: alpha({COLOR_BG_ELEVATED}, 0.92);
+    background-image: none;
+    border: none;
+    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.12);
+    color: {COLOR_TEXT_MUTED};
+    font-weight: 600;
+    padding: {SPACE_SM}px;
+}}
+
+notebook.terminal-tabs > header {{
+    background-color: alpha({COLOR_BG_ALT}, 0.92);
+    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.10);
+    padding: 0 {SPACE_XS}px;
+}}
+
+notebook.terminal-tabs tab {{
+    background-color: transparent;
+    border: none;
+    color: {COLOR_TEXT_MUTED};
+    padding: {SPACE_XS}px {SPACE_MD}px;
+}}
+
+notebook.terminal-tabs tab:checked {{
+    background-color: alpha({COLOR_PRIMARY}, 0.14);
+    border-bottom: 2px solid {COLOR_PRIMARY};
+    color: {COLOR_PRIMARY};
+}}
+
+.statusbar {{
+    background-color: alpha({COLOR_BG_ELEVATED}, 0.88);
+    border-top: 1px solid alpha({COLOR_TEXT}, 0.10);
+    color: {COLOR_TEXT_MUTED};
+    font-size: 11px;
+    padding: {SPACE_XS}px {SPACE_MD}px;
+}}
 """
 
 

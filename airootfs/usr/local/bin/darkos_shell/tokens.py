@@ -46,3 +46,8 @@ SPACE_XL = 48
 RADIUS_CONTROL = 8
 RADIUS_PANEL = 16
 RADIUS_DIALOG = 24
+
+# ── Typography ───────────────────────────────────────────────────────
+FONT_BODY = "Inter, \"SF Pro Display\", sans-serif"
+FONT_HEADING = "\"Space Grotesk\", sans-serif"
+FONT_MONO = "\"JetBrains Mono\", \"Fira Code\", monospace"

@@ -38,6 +38,7 @@ plymouth
 inter-font
 ttf-jetbrains-mono-nerd
 kitty
+vte3
 wofi
 xdg-desktop-portal-hyprland
 polkit-kde-agent

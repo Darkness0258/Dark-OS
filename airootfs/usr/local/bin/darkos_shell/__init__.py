@@ -361,7 +361,7 @@ class DarkOSApplication(Gtk.Application):
 
     def handle_rail_action(self, action):
         commands = {
-            "files": ["/usr/local/bin/the-void.sh", "-e", "ranger"],
+            "files": ["/usr/local/bin/darkos-files.py"],
             "terminal": ["/usr/local/bin/the-void.sh"],
             "settings": ["wofi", "--show", "drun"],
             "browser": ["firefox"],
