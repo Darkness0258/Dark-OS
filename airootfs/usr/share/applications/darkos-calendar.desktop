@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Calendar
+Comment=DarkOS calendar with per-day events
+TryExec=/usr/local/bin/darkos-calendar.py
+Exec=/usr/local/bin/darkos-calendar.py
+Icon=x-office-calendar
+Categories=Office;Calendar;
+StartupNotify=true
+StartupWMClass=darkos-calendar
+Terminal=false

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Calculator
+Comment=DarkOS calculator
+TryExec=/usr/local/bin/darkos-calculator.py
+Exec=/usr/local/bin/darkos-calculator.py
+Icon=accessories-calculator
+Categories=Utility;Calculator;
+StartupNotify=true
+StartupWMClass=darkos-calculator
+Terminal=false

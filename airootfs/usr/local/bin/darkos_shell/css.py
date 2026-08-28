@@ -370,12 +370,64 @@ notebook.terminal-tabs tab:checked {{
     color: {COLOR_PRIMARY};
 }}
 
+/* Like GtkCalendar above, GtkNotebook's page-content area (the "stack"
+   CSS node) is themed independently of its ancestors' background-color
+   and renders as stock light-theme unless targeted directly. */
+notebook, notebook stack {{
+    background-color: {COLOR_BG_ALT};
+    color: {COLOR_TEXT};
+}}
+
+/* Same story as calendar/notebook above: GtkTextView's "text" CSS node
+   (the actual editable content area) is themed independently of its
+   ancestors and renders as stock light-theme unless targeted directly. */
+textview, textview text {{
+    background-color: {COLOR_BG_ALT};
+    color: {COLOR_TEXT};
+}}
+
 .statusbar {{
     background-color: alpha({COLOR_BG_ELEVATED}, 0.88);
     border-top: 1px solid alpha({COLOR_TEXT}, 0.10);
     color: {COLOR_TEXT_MUTED};
     font-size: 11px;
     padding: {SPACE_XS}px {SPACE_MD}px;
+}}
+
+/* GtkCalendar ships its own internal theming that ignores a plain
+   background-color on its parent — needs its CSS nodes targeted directly
+   or it renders as a stock light-theme widget inside an otherwise dark app. */
+calendar {{
+    background-color: {COLOR_BG_ALT};
+    color: {COLOR_TEXT};
+    border: none;
+}}
+
+calendar.header {{
+    background-color: alpha({COLOR_BG_ELEVATED}, 0.92);
+    color: {COLOR_TEXT};
+}}
+
+calendar.button {{
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    color: {COLOR_TEXT_MUTED};
+}}
+
+calendar.button:hover {{
+    color: {COLOR_PRIMARY};
+}}
+
+calendar:selected {{
+    background-color: {COLOR_PRIMARY};
+    color: {COLOR_BG};
+    border-radius: {RADIUS_CONTROL}px;
+}}
+
+calendar.view {{
+    background-color: {COLOR_BG_ALT};
+    color: {COLOR_TEXT};
 }}
 """
 

@@ -366,7 +366,7 @@ class DarkOSApplication(Gtk.Application):
             "settings": ["wofi", "--show", "drun"],
             "browser": ["firefox"],
             "store": ["wofi", "--show", "drun"],
-            "notes": ["/usr/local/bin/the-void.sh", "-e", "nvim"],
+            "notes": ["/usr/local/bin/darkos-notes.py"],
         }
         if action == "ai":
             if not self.left.is_visible():

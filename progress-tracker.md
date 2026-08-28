@@ -329,3 +329,22 @@ VALUE: ''
 **Still open (hardware/Wayland-only, can't be closed from this sandbox):** Hyprland windowrule class-matching for `darkos-terminal`/`darkos-files` (added rules assume `GLib.set_prgname()` sets the Wayland app_id — needs `hyprctl clients -j` to confirm), actual JetBrains Mono Nerd Font rendering, real keyboard/mouse timing for the double-click and keybind interactions.
 
 **Not touched this session:** Settings/Store rail actions (still `wofi --show drun` placeholders, unchanged), Notes/Calendar/Clock/Calculator and the rest of Phase 4 (not yet started), and no attempt was made to reconcile the Calamares API-key module's documentation status — that's a separate open item, not confirmed either way here.
+
+## 2026-08-27 (cont'd) — Notes, Calendar, Clock, Calculator: three more real bugs caught by actually looking
+
+**Context:** continuing straight from the File Explorer/Terminal session above — Hamza said "done next" without picking a specific batch, so proceeded in build-plan.md's listed order: Notes (+ Editor), Calendar, Clock, Calculator.
+
+**Built:** `darkos-notes.py` (sidebar of plain `.txt` files in `~/Documents/DarkOS Notes/`, 600ms debounced autosave, doubles as a general text editor via `argv[1]`), `darkos-calendar.py` (stock `Gtk.Calendar` + JSON-backed per-day events), `darkos-clock.py` (four tabs — Clock/Alarms/Timer/Stopwatch — on one ticking timeout; world clocks via stdlib `zoneinfo`; alarms/timer-done via `Gio.Notification`), `darkos-calculator.py` (AST-walked expression evaluator, deliberately no `eval()`). Added `darkos_shell/app_kit.py` to share the boilerplate (add_class/make_icon_button/run_app) across these four rather than re-duplicating it a fourth and fifth time — Files/Terminal deliberately left with their own local copies since retrofitting already-verified code for a purely cosmetic gain isn't worth re-verifying them for.
+
+**Three more real bugs, all caught by literally looking at the screenshots, none of which `py_compile` or an import-only smoke test would catch:**
+1. `Gtk.Calendar` ignored the app's dark theme entirely — rendered as a stock white widget. GtkCalendar has its own CSS nodes (`calendar`, `.header`, `.button`, `:selected`, `.view`) that don't inherit an ancestor's background-color.
+2. Same story for `Gtk.Notebook`'s page-content area (the `stack` CSS node) — the Clock app's tab bar was dark but every tab's content was a white box with barely-visible text. This is a shared component (Terminal already uses Notebook too) — it only "worked" there because VTE's own `set_colors()` opaquely painted over the problem without me realizing there was one underneath.
+3. Same story again for `Gtk.TextView`'s `text` CSS node — Notes' editor was a white box, and (checked retroactively) File Explorer's archive-contents dialog from the previous session had the identical issue, just less obviously broken-looking in a small dialog.
+
+All three are the same root cause: GTK3's "complex" native-themed widgets (anything with its own dedicated rendering, not a plain layout container) do not inherit `background-color` from ancestors and need their CSS nodes targeted directly. Documented as a named gotcha in ui-registry.md so it isn't rediscovered from scratch on the next one (ComboBox and a few others are likely candidates whenever they show up). All three fixed in `darkos_shell/css.py` and confirmed fixed via new screenshots, not just assumed.
+
+**Runtime-verified under Xvfb/X11 (real keyboard/mouse, not just process-alive checks):** Calculator: `12+8` then continuing `×3` → 60, correct history. Calendar: double-click a real day → dialog → typed event → appears in sidebar → confirmed round-tripped through the JSON file on disk. Clock: added a world clock timezone and watched it tick; started the timer and confirmed the displayed countdown actually decremented over several real seconds; ran the stopwatch and recorded a lap. Notes: created a note, typed content, confirmed the exact text landed in the `.txt` file on disk with a correct live word count.
+
+**Known gap, not a bug:** Clock's timer/stopwatch start-pause buttons only swap their tooltip text on state change, not the icon glyph itself. Purely cosmetic, noted rather than silently left for someone else to find.
+
+**Not touched this session:** Reader, Clipboard manager, Emoji picker, Gallery, Downloads manager (rest of Phase 4) — not started. Settings/Store rail actions are still `wofi --show drun` placeholders.

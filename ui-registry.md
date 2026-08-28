@@ -76,3 +76,35 @@
 - Tokens used: `color-primary` (active tab underline + bright-cyan ANSI slot), `color-bg-alt`, a dedicated 16-slot ANSI palette derived from the token set, monospace token.
 - Used in: `TerminalWindow`/`TerminalPage` in `darkos-terminal.py`; launched via `the-void.sh` (app rail "terminal" action, and by anything that shelled out to the old kitty wrapper — `-e CMD` contract preserved).
 - Notes: Vte.Terminal owns actual emulation (PTY/ANSI/scrollback); this component is chrome only. Normal floating window like FileExplorer, same AT-SPI reasoning. `--cwd DIR` is a DarkOS-specific addition Files uses for "Open Terminal Here."
+
+## Notes
+- Purpose: Sidebar-driven notes list + plain-text editor; doubles as a general small-file text editor via `argv[1]`.
+- Variants: Notes-list mode (sidebar visible, autosave), standalone file mode (no sidebar, explicit Save button).
+- Tokens used: `color-bg-alt`, `color-bg-elevated`, sidebar/toolbar/statusbar classes shared with FileExplorer.
+- Used in: `NotesWindow` in `darkos-notes.py`; app rail "notes" action (previously launched nvim in a terminal).
+- Notes: Notes are plain `.txt` files under `~/Documents/DarkOS Notes/`, not a proprietary format — browsable from FileExplorer too.
+
+## Calendar
+- Purpose: Month view + per-day text events.
+- Variants: Day selected (no events / has events), month with marked days.
+- Tokens used: `color-bg-alt`, `color-primary` (selected day), sidebar classes for the event list.
+- Used in: `CalendarWindow` in `darkos-calendar.py`.
+- Notes: Built on stock `Gtk.Calendar`, which needed its own CSS node overrides (`calendar`, `calendar.header`, `calendar.button`, `calendar:selected`, `calendar.view`) — it does not inherit an ancestor's background-color the way plain Box/Label do. Events persist as JSON, not a recurring/reminder system.
+
+## Clock
+- Purpose: Local time + world clocks, alarms, timer, stopwatch in one tabbed window.
+- Variants: Four Notebook tabs (Clock/Alarms/Timer/Stopwatch); timer/stopwatch idle vs. running.
+- Tokens used: `color-primary` (active tab, running-state accents), shared sidebar/toolbar classes.
+- Used in: `ClockWindow` in `darkos-clock.py`.
+- Notes: Same GtkNotebook page-background issue as below — fixed once, shared by every notebook-based app.
+
+## Calculator
+- Purpose: Standard calculator with a history panel.
+- Variants: Normal entry, error state (divide-by-zero / malformed expression), history populated.
+- Tokens used: `color-bg-alt`, `action-button` styling for `=`, sidebar classes for history rows.
+- Used in: `CalculatorWindow` in `darkos-calculator.py`.
+- Notes: Expression evaluation is AST-walked, not `eval()` — only numeric literals and +-*/%** can ever execute.
+
+## GTK3 node theming gaps (cross-cutting, found 2026-08-27)
+- Purpose: Not a component — a recurring gotcha worth flagging for whoever builds the next app.
+- Notes: GtkCalendar, GtkNotebook's page/stack area, and GtkTextView's text area all render as stock light-theme by default — they don't inherit background-color from an ancestor's `.app-window` class the way plain Box/Label/Button do. Each needed its own direct CSS node targeting (`calendar`/`calendar.view`, `notebook`/`notebook stack`, `textview`/`textview text`) in `darkos_shell/css.py`. Any future app using one of these (or another complex native widget — GtkComboBox, GtkTreeView headers already handled) should check it renders dark before calling it done; a "compiles + doesn't crash" check will not catch this class of bug, only actually looking at it will.

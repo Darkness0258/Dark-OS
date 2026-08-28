@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Clock
+Comment=DarkOS clock, world clocks, alarms, timer and stopwatch
+TryExec=/usr/local/bin/darkos-clock.py
+Exec=/usr/local/bin/darkos-clock.py
+Icon=clock
+Categories=Utility;Clock;
+StartupNotify=true
+StartupWMClass=darkos-clock
+Terminal=false

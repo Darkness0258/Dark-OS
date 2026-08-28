@@ -37,6 +37,7 @@ accountsservice
 plymouth
 inter-font
 ttf-jetbrains-mono-nerd
+tzdata
 kitty
 vte3
 wofi
