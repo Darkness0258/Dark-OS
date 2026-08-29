@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Reader
+Comment=DarkOS PDF reader
+TryExec=/usr/local/bin/darkos-reader.py
+Exec=/usr/local/bin/darkos-reader.py %f
+Icon=accessories-text-editor
+Categories=Office;Viewer;
+StartupNotify=true
+StartupWMClass=darkos-reader
+MimeType=application/pdf;
+Terminal=false

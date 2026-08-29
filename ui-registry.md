@@ -108,3 +108,10 @@
 ## GTK3 node theming gaps (cross-cutting, found 2026-08-27)
 - Purpose: Not a component — a recurring gotcha worth flagging for whoever builds the next app.
 - Notes: GtkCalendar, GtkNotebook's page/stack area, and GtkTextView's text area all render as stock light-theme by default — they don't inherit background-color from an ancestor's `.app-window` class the way plain Box/Label/Button do. Each needed its own direct CSS node targeting (`calendar`/`calendar.view`, `notebook`/`notebook stack`, `textview`/`textview text`) in `darkos_shell/css.py`. Any future app using one of these (or another complex native widget — GtkComboBox, GtkTreeView headers already handled) should check it renders dark before calling it done; a "compiles + doesn't crash" check will not catch this class of bug, only actually looking at it will.
+
+## Reader / Clipboard / EmojiPicker / Gallery / Downloads
+- Purpose: The rest of Phase 4 — PDF viewing, clipboard history, emoji search, image browsing, a Downloads-focused file view.
+- Variants: Reader (no document / loaded / zoomed); Clipboard (empty / pinned+recent); EmojiPicker (full grid / search results / recent); Gallery (grid / full-size viewer); Downloads (populated / empty folder).
+- Tokens used: shared toolbar/statusbar/sidebar classes throughout; Gallery and Reader deliberately run near-opaque (0.96–0.98 in hyprland.conf) rather than the ~0.90 most app windows use, since translucent chrome behind dense text or photo color accuracy actively hurts those two.
+- Used in: `darkos-reader.py`, `darkos-clipboard.py`, `darkos-emoji.py`, `darkos-gallery.py`, `darkos-downloads.py`.
+- Notes: All five are normal floating GTK3 windows, stock widgets only, same AT-SPI reasoning as every other Phase 4 app. Clipboard's history is deliberately session-only (not written to disk) — see build-plan.md Phase 4 for the reasoning. Downloads is a specialized folder view, not a real download-progress tracker — there's no event source for that yet.

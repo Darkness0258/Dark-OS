@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Clipboard
+Comment=DarkOS clipboard history manager
+TryExec=/usr/local/bin/darkos-clipboard.py
+Exec=/usr/local/bin/darkos-clipboard.py
+Icon=edit-paste
+Categories=Utility;
+StartupNotify=true
+StartupWMClass=darkos-clipboard
+Terminal=false

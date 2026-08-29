@@ -348,3 +348,26 @@ All three are the same root cause: GTK3's "complex" native-themed widgets (anyth
 **Known gap, not a bug:** Clock's timer/stopwatch start-pause buttons only swap their tooltip text on state change, not the icon glyph itself. Purely cosmetic, noted rather than silently left for someone else to find.
 
 **Not touched this session:** Reader, Clipboard manager, Emoji picker, Gallery, Downloads manager (rest of Phase 4) — not started. Settings/Store rail actions are still `wofi --show drun` placeholders.
+
+## 2026-08-28 — Phase 4 complete: Reader, Clipboard, Emoji Picker, Gallery, Downloads
+
+**Context:** Hamza said "done next" again without picking a specific batch — proceeded with the rest of Phase 4 in the order previously listed, same as the batch before it.
+
+**Built:** `darkos-reader.py` (Poppler for PDF rendering — page nav, zoom, `%f` file-open), `darkos-clipboard.py`, `darkos-emoji.py`, `darkos-gallery.py`, `darkos-downloads.py`. Two deliberate scope calls worth remembering, not just implementation details:
+- Clipboard history is session-only (in memory), not persisted to disk. A silently-persistent plaintext log of everything ever copied is a real privacy risk (passwords, tokens) on a security-focused OS — pinning is the explicit opt-in for anything worth keeping across restarts.
+- Downloads is a focused, newest-first folder view with quick actions, not a live download-progress tracker — there's no event source in DarkOS today for actual in-progress downloads to hook into, and a fake progress UI with nothing behind it would be worse than being upfront about the scope.
+
+**New dependencies added to packages.x86_64:** `poppler-glib` (Reader), `noto-fonts-emoji` (Emoji Picker — confirmed color emoji render correctly in the sandbox once a color emoji font was present; Arch's base install doesn't include one by default the way Ubuntu's did here).
+
+**One bug caught mid-edit, not shipped:** an early draft of `darkos-downloads.py` connected `Gtk.ListBoxRow`'s own (nonexistent) `"activate"` signal instead of the ListBox's `"row-activated"` signal — would have raised `TypeError` on every row construction. Caught by re-reading the diff before running it, not by the runtime check this time — worth remembering that the Xvfb loop catches a lot but proofreading edits before running them still matters.
+
+**Runtime-verified under Xvfb/X11 with real data, not fixtures:**
+- Reader: generated a real 3-page PDF via Cairo directly, opened it, confirmed page 1 and page 2 render with correct text/graphics, confirmed zoom actually enlarges the rendered page.
+- Clipboard: simulated three external clipboard writes (a URL with a token, an IP, an SSH command) via a separate helper script — all three appeared in history in the right order; confirmed remove and click-to-recopy both work.
+- Emoji Picker: color emoji render correctly (once the font was installed); search-filtered to a single result correctly; confirmed the click-to-copy pick by checking the actual persisted `emoji-recent.json` contains the exact emoji clicked, not just eyeballing the screenshot (a plain screenshot couldn't have distinguished this case).
+- Gallery: generated 4 colored test PNGs at different aspect ratios, confirmed the grid preserves aspect ratio correctly, opened one, navigated next, confirmed the correct next file's name and index both updated.
+- Downloads: created real test files including one backdated with `touch`, confirmed newest-first sort is actually correct (not just default directory order), confirmed Move-to-Trash actually removes the file from disk.
+
+**Phase 4 is now fully code-complete** (File Explorer, Terminal, Notes, Calendar, Clock, Calculator, Reader, Clipboard, Emoji Picker, Gallery, Downloads — 11 native apps total across this and the previous session). None of these eleven have been seen running on the actual target (Wayland/Hyprland, real hardware, real input timing) — Xvfb/X11 catches real logic and rendering bugs but isn't a substitute for that, same caveat as Files/Terminal above.
+
+**Not touched:** Phase 5 (Settings/Security/Network hub) and everything after it — not started.

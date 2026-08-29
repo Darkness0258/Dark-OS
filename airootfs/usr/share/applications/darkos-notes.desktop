@@ -8,4 +8,5 @@ Icon=accessories-text-editor
 Categories=Utility;TextEditor;
 StartupNotify=true
 StartupWMClass=darkos-notes
+MimeType=text/plain;text/markdown;
 Terminal=false

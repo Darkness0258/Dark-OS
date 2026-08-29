@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gallery
+Comment=DarkOS image gallery and viewer
+TryExec=/usr/local/bin/darkos-gallery.py
+Exec=/usr/local/bin/darkos-gallery.py
+Icon=image-viewer
+Categories=Graphics;Viewer;
+StartupNotify=true
+StartupWMClass=darkos-gallery
+Terminal=false

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Downloads
+Comment=Browse recently downloaded files
+TryExec=/usr/local/bin/darkos-downloads.py
+Exec=/usr/local/bin/darkos-downloads.py
+Icon=folder-download
+Categories=System;FileManager;
+StartupNotify=true
+StartupWMClass=darkos-downloads
+Terminal=false

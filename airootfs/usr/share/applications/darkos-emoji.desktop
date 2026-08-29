@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Emoji Picker
+Comment=Search and copy emoji
+TryExec=/usr/local/bin/darkos-emoji.py
+Exec=/usr/local/bin/darkos-emoji.py
+Icon=face-smile
+Categories=Utility;
+StartupNotify=true
+StartupWMClass=darkos-emoji
+Terminal=false
