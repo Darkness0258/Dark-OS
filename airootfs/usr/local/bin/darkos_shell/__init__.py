@@ -363,7 +363,7 @@ class DarkOSApplication(Gtk.Application):
         commands = {
             "files": ["/usr/local/bin/darkos-files.py"],
             "terminal": ["/usr/local/bin/the-void.sh"],
-            "settings": ["wofi", "--show", "drun"],
+            "settings": ["/usr/local/bin/darkos-settings.py"],
             "browser": ["firefox"],
             "store": ["wofi", "--show", "drun"],
             "notes": ["/usr/local/bin/darkos-notes.py"],

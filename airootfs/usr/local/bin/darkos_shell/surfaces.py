@@ -32,6 +32,7 @@ from darkos_shell.tokens import (
     RADIUS_CONTROL,
     RADIUS_PANEL,
     RADIUS_DIALOG,
+    REDUCE_MOTION,
     SPACE_LG,
     SPACE_MD,
     SPACE_SM,
@@ -258,7 +259,7 @@ class _HUDCanvas(Gtk.DrawingArea):
 
     def _on_tick(self):
         style = self._STATE_STYLE.get(self._state, self._STATE_STYLE["sleeping"])
-        speed = style[2]
+        speed = style[2] * (0.0 if REDUCE_MOTION else 1.0)
         self._phase = (self._phase + speed) % (math.pi * 200)
         self._frame += 1
         if self._state != "sleeping" or self._frame % 3 == 0:

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Network Center
+Comment=Wi-Fi, Bluetooth, Connect, Cloud
+TryExec=/usr/local/bin/darkos-network.py
+Exec=/usr/local/bin/darkos-network.py
+Icon=network-wireless
+Categories=Settings;Network;
+StartupNotify=true
+StartupWMClass=darkos-network
+Terminal=false

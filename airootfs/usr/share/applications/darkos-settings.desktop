@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+Comment=DarkOS system settings
+TryExec=/usr/local/bin/darkos-settings.py
+Exec=/usr/local/bin/darkos-settings.py
+Icon=preferences-system
+Categories=Settings;System;
+StartupNotify=true
+StartupWMClass=darkos-settings
+Terminal=false
