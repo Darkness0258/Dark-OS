@@ -122,3 +122,10 @@
 - Tokens used: shared sidebar/toolbar/statusbar/terminal-tabs classes throughout; `Gtk.LevelBar` (Storage) and `Gtk.FontChooserWidget`/`Gtk.ColorButton`/`Gtk.Scale` (Fonts/Themes/Designer) are stock widgets, no custom styling needed beyond the usual dark-background node-targeting.
 - Used in: `darkos-settings.py`, `darkos-network.py`; rail's "settings" action now launches Settings directly instead of the `wofi --show drun` placeholder.
 - Notes: `darkos_shell/user_settings.py` is the new shared read/write layer — `tokens.py` imports it at module load, so accent color, corner radius, and reduce-motion are live values with hardcoded fallbacks, not a write-only JSON file. Confirmed by direct test (write settings.json, re-import tokens, values change) and by wiring `REDUCE_MOTION` into the HUD's own tick handler as the first real consumer. Two configparser gotchas (default key-lowercasing, and `write()`'s spacing not matching this repo's `.desktop` convention) were caught and fixed in Startup's toggle before shipping — see build-plan.md Phase 5 for detail.
+
+## SecurityCenter
+- Purpose: Vault (password/secret manager), Privacy toggles, Shield (antivirus — honest stub), Permissions, and a file Encrypt/Decrypt utility.
+- Variants: Vault locked (create vs. unlock forms) / unlocked (entry list); Encrypt idle / file chosen / success / wrong-passphrase error.
+- Tokens used: shared sidebar/toolbar/terminal-tabs classes; no new CSS needed.
+- Used in: `darkos-security.py`.
+- Notes: Vault and Encrypt are real cryptography (`cryptography` library — PBKDF2-HMAC-SHA256 key derivation, Fernet authenticated encryption), not a toy scheme, and both the success and failure paths (wrong password/passphrase correctly rejected, no corrupted output ever written) are runtime-verified, not just the happy path — see build-plan.md Phase 5 for exactly what was checked. Shield is a deliberate honest stub (disabled "Run Scan," explanation in place of fake results) — real on-access scanning needs kernel access and daemons no sandbox can respond to, so it isn't faked.

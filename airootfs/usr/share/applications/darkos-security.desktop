@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Security Center
+Comment=Vault, Privacy, Shield, Permissions, Encrypt
+TryExec=/usr/local/bin/darkos-security.py
+Exec=/usr/local/bin/darkos-security.py
+Icon=security-high
+Categories=Settings;Security;
+StartupNotify=true
+StartupWMClass=darkos-security
+Terminal=false

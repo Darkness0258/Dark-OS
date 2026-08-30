@@ -15,6 +15,7 @@ modemmanager
 network-manager-applet
 bluez
 bluez-utils
+python-cryptography
 blueman
 pipewire
 pipewire-alsa

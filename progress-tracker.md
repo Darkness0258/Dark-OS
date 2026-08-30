@@ -392,3 +392,17 @@ All three are the same root cause: GTK3's "complex" native-themed widgets (anyth
 - **Security Center, Backup/Recovery, Dashboard, Mission/Spaces**: not started. Mission/Spaces specifically needs real `hyprctl` workspace data from a running compositor to be more than a mockup — same category of gap as Shield.
 
 **Verification method, same discipline as Phase 4:** installed `network-manager`/`bluez` in the review sandbox specifically to confirm the *graceful-failure* path for real, not just the happy path — confirmed nmcli exits cleanly with a real "no NetworkManager" error and bluetoothctl actually aborts (SIGABRT, no D-Bus) in this environment, and that `darkos-network.py` catches both without the app itself crashing.
+
+## 2026-08-30 — Security Center: real crypto, honest stub for Shield
+
+**Context:** "done next" after the Phase 5 status update (Settings + Network Center done, several items explicitly deferred with reasons). Proceeded to the next listed Phase 5 item, Security Center, applying the same split already established for Connect: build the parts that are genuinely real and verifiable, stub the part that needs kernel/daemon access no sandbox can grant.
+
+**Built:** `darkos-security.py` — Vault, Privacy, Shield, Permissions, Encrypt. Vault and Encrypt use PBKDF2-HMAC-SHA256 (480,000 iterations) for key derivation and Fernet (from the `cryptography` library) for authenticated encryption — real, standard, vetted primitives, not a homemade scheme. Added `python-cryptography` to packages.x86_64.
+
+**Verification went further than "does it look right" — checked the failure paths a security tool actually has to get right:**
+- Vault: created it, added a real entry, locked it, then tested both outcomes explicitly — correct password unlocks (confirmed via screenshot), wrong password is rejected with the vault staying locked (confirmed via a separate screenshot, not just assumed from the code).
+- Encrypt: encrypted a real test file, then directly checked the ciphertext bytes for plaintext leakage (`plaintext in ciphertext_bytes` → `False`) rather than trusting that "it produced a different-looking file" meant it was actually encrypted. Decrypted with the correct passphrase and diffed the output against the original — byte-identical. Decrypted with a wrong passphrase and confirmed both that it's rejected with a clear error *and* that no corrupted/garbage output file gets written in that case (checked the file genuinely doesn't exist afterward).
+
+**Shield is explicitly not attempted**, same reasoning as Connect: real on-access scanning needs fanotify (CAP_SYS_ADMIN) and real ClamAV/rkhunter/AIDE daemons — nothing here can grant or verify that even in principle. The tab shows the explanation directly with a disabled "Run Scan" button.
+
+**Not touched:** Backup/Recovery, Dashboard, Mission/Spaces, and the network-transparency dashboard (still blocked on Hamza sharing PHANTOM's source, not on effort).
