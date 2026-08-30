@@ -406,3 +406,15 @@ All three are the same root cause: GTK3's "complex" native-themed widgets (anyth
 **Shield is explicitly not attempted**, same reasoning as Connect: real on-access scanning needs fanotify (CAP_SYS_ADMIN) and real ClamAV/rkhunter/AIDE daemons — nothing here can grant or verify that even in principle. The tab shows the explanation directly with a disabled "Run Scan" button.
 
 **Not touched:** Backup/Recovery, Dashboard, Mission/Spaces, and the network-transparency dashboard (still blocked on Hamza sharing PHANTOM's source, not on effort).
+
+## 2026-08-30 (cont'd) — Backup/Recovery and Dashboard, both fully verified
+
+**Context:** "done next" again after Security Center. PHANTOM's source still hasn't been shared, so the network transparency dashboard stays blocked — moved to the two remaining Phase 5 items that don't have that dependency: Backup/Recovery and Dashboard.
+
+**Built and fully runtime-verified (not just code-reviewed) — both of these only touch data every Linux system has, unlike Performance/Services/Shield elsewhere in Phase 5:**
+- `darkos-backup.py` — tar-based folder backup + restore, with a manifest tracking history. Backed up a real test folder through the actual UI, confirmed the archive's internal paths with `tar -tzf`, restored it, and diffed the restored file against the original byte-for-byte — identical. Uses the same `tarfile.extractall(..., filter="data")` path-traversal guard as File Explorer.
+- `darkos-dashboard.py` — live CPU%, memory, disk, and top-processes-by-memory, ticking every 2 seconds. CPU% is the standard two-sample `/proc/stat` delta technique. Verified with an actual load test: ran a real CPU-bound busy-loop in the background and confirmed the dashboard's reading moved from 0% to 100%, and that the busy-loop's own process showed up in the live top-processes list.
+
+**Test friction worth remembering (not an app bug):** GTK's `SELECT_FOLDER` file chooser doesn't select-and-close on Enter after typing a path into the location bar the way the `OPEN` chooser does for files — it navigates into the typed directory instead, and needs an explicit click on "Select" to confirm the currently-browsed folder. Cost a few retries to pin down; noted here so it doesn't cost them again on the next app that needs a folder-select dialog automated.
+
+Phase 5 status after this session: Settings, Network Center, Backup/Recovery, and Dashboard are code-complete and verified. Security Center is 4/5 tabs done (Shield deliberately stubbed). Still open: Connect (real protocol), Shield (real scanning), Mission/Spaces (needs a real compositor), and the network-transparency dashboard (needs PHANTOM's source from Hamza).

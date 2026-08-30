@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Dashboard
+Comment=Live CPU, memory, disk, and process overview
+TryExec=/usr/local/bin/darkos-dashboard.py
+Exec=/usr/local/bin/darkos-dashboard.py
+Icon=utilities-system-monitor
+Categories=System;Monitor;
+StartupNotify=true
+StartupWMClass=darkos-dashboard
+Terminal=false

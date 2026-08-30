@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Backup / Recovery
+Comment=Back up and restore folders
+TryExec=/usr/local/bin/darkos-backup.py
+Exec=/usr/local/bin/darkos-backup.py
+Icon=drive-harddisk-symbolic
+Categories=System;Archiving;
+StartupNotify=true
+StartupWMClass=darkos-backup
+Terminal=false

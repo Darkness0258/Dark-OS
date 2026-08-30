@@ -129,3 +129,10 @@
 - Tokens used: shared sidebar/toolbar/terminal-tabs classes; no new CSS needed.
 - Used in: `darkos-security.py`.
 - Notes: Vault and Encrypt are real cryptography (`cryptography` library — PBKDF2-HMAC-SHA256 key derivation, Fernet authenticated encryption), not a toy scheme, and both the success and failure paths (wrong password/passphrase correctly rejected, no corrupted output ever written) are runtime-verified, not just the happy path — see build-plan.md Phase 5 for exactly what was checked. Shield is a deliberate honest stub (disabled "Run Scan," explanation in place of fake results) — real on-access scanning needs kernel access and daemons no sandbox can respond to, so it isn't faked.
+
+## Backup / Dashboard
+- Purpose: Backup/Recovery (tar-based folder backup + restore) and Dashboard (live CPU/memory/disk/top-processes overview).
+- Variants: Backup — Back Up tab / History+Restore tab, entries with a missing-archive state. Dashboard — normal ticking state only (no error states; every data source it reads is confirmed always-available on any Linux system, unlike Performance/Services elsewhere).
+- Tokens used: shared toolbar/sidebar/statusbar classes; `Gtk.LevelBar` for CPU/memory/disk (same widget as Settings' Storage tab).
+- Used in: `darkos-backup.py`, `darkos-dashboard.py`.
+- Notes: Both fully runtime-verified, not just code-reviewed — Backup's restore was diffed byte-for-byte against the original, Dashboard's CPU reading was confirmed to actually move under a real generated load. Backup uses plain tar archives, not Btrfs snapshots (this sandbox's filesystem is ext2/ext3, and the spec didn't call for snapshots specifically).
