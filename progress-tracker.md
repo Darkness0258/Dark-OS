@@ -418,3 +418,17 @@ All three are the same root cause: GTK3's "complex" native-themed widgets (anyth
 **Test friction worth remembering (not an app bug):** GTK's `SELECT_FOLDER` file chooser doesn't select-and-close on Enter after typing a path into the location bar the way the `OPEN` chooser does for files — it navigates into the typed directory instead, and needs an explicit click on "Select" to confirm the currently-browsed folder. Cost a few retries to pin down; noted here so it doesn't cost them again on the next app that needs a folder-select dialog automated.
 
 Phase 5 status after this session: Settings, Network Center, Backup/Recovery, and Dashboard are code-complete and verified. Security Center is 4/5 tabs done (Shield deliberately stubbed). Still open: Connect (real protocol), Shield (real scanning), Mission/Spaces (needs a real compositor), and the network-transparency dashboard (needs PHANTOM's source from Hamza).
+
+## 2026-08-30 (cont'd) — Mission/Spaces, and a correction to something said earlier this same session
+
+**Context:** "done next" a fourth time, after being told "that's everything genuinely buildable... not more turns of next here." Rather than either repeating that verbatim or quietly building something unverifiable to satisfy the request, re-examined the remaining list and found a real mistake worth fixing: Mission/Spaces had been bucketed with Shield as "can't verify here," which doesn't hold up. Shield's correctness is fundamentally unverifiable without a real scan engine and test malware. Mission/Spaces is a data-display problem against `hyprctl`'s documented, stable JSON schema — the same shape as Network Center's nmcli/bluetoothctl integration, which was already built and verified two sessions ago. Undersold it earlier; building it now.
+
+**Built:** `darkos-mission.py` — real `hyprctl -j workspaces` / `hyprctl -j clients` calls, clients grouped by workspace, real `hyprctl dispatch workspace` / `dispatch focuswindow` actions.
+
+**Verified two ways, both real, neither faked:**
+1. The graceful-failure path — hyprctl is genuinely not installed in this sandbox, confirmed via screenshot showing the real error message, same pattern as nmcli/bluetoothctl/systemctl elsewhere in Phase 5.
+2. The parsing/rendering logic — wrote a small fake `hyprctl` shell script on `PATH` that returns realistic workspace/client JSON matching hyprctl's actual documented schema (a standard test-double technique for verifying code against an API that isn't reachable in the test environment, not a shipped fake feature). Confirmed correct workspace grouping, correct handling of an empty workspace, correct unicode title decoding, and that clicking the dispatch buttons doesn't crash the app.
+
+What's still genuinely unverified is purely cosmetic/compositor-specific — whether it *looks* right against real windows on a real screen. The logic itself has now been checked both of the two ways available without real hardware.
+
+**Phase 5 final status this session:** Settings, Network Center, Backup/Recovery, Dashboard, and Mission/Spaces are code-complete and verified. Security Center is 4/5 (Shield stubbed). Genuinely not started, each for a stated and still-current reason: Connect (needs its own dedicated session, not a rushed add-on), Shield (no way to verify a security tool without real kernel access and daemons), and the network-transparency dashboard (needs PHANTOM's source from Hamza — still not shared).

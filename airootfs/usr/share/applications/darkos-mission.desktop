@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Mission / Spaces
+Comment=Workspace and window overview
+TryExec=/usr/local/bin/darkos-mission.py
+Exec=/usr/local/bin/darkos-mission.py
+Icon=view-grid-symbolic
+Categories=System;Utility;
+StartupNotify=true
+StartupWMClass=darkos-mission
+Terminal=false

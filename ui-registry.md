@@ -136,3 +136,10 @@
 - Tokens used: shared toolbar/sidebar/statusbar classes; `Gtk.LevelBar` for CPU/memory/disk (same widget as Settings' Storage tab).
 - Used in: `darkos-backup.py`, `darkos-dashboard.py`.
 - Notes: Both fully runtime-verified, not just code-reviewed — Backup's restore was diffed byte-for-byte against the original, Dashboard's CPU reading was confirmed to actually move under a real generated load. Backup uses plain tar archives, not Btrfs snapshots (this sandbox's filesystem is ext2/ext3, and the spec didn't call for snapshots specifically).
+
+## Mission / Spaces
+- Purpose: Workspace and window overview + switcher.
+- Variants: Populated (workspaces with/without windows) / unavailable (no compositor to query).
+- Tokens used: shared toolbar/sidebar classes; no new CSS needed.
+- Used in: `darkos-mission.py`.
+- Notes: Real `hyprctl -j workspaces` / `hyprctl -j clients` calls and real `hyprctl dispatch` actions — not the same category of gap as Shield, despite an earlier note in this same session bucketing them together. Shield's correctness is fundamentally unverifiable without a real scan engine and test malware; this is a data-display problem against a documented, stable JSON schema, closer in kind to Network Center's nmcli/bluetoothctl calls. Verified two ways: the real graceful-failure path (hyprctl genuinely absent in this sandbox) and the parsing/rendering logic against a schema-accurate fake `hyprctl` on `PATH` (a standard test-double technique, not a shipped fake) — confirmed correct workspace grouping including an empty-workspace case and confirmed the dispatch buttons don't crash the app.
