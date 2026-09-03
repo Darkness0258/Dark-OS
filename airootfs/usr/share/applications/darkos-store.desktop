@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Store
+Comment=Search and manage packages, updates, and compatibility layers
+TryExec=/usr/local/bin/darkos-store.py
+Exec=/usr/local/bin/darkos-store.py
+Icon=system-software-install
+Categories=System;PackageManager;
+StartupNotify=true
+StartupWMClass=darkos-store
+Terminal=false

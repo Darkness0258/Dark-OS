@@ -432,3 +432,20 @@ Phase 5 status after this session: Settings, Network Center, Backup/Recovery, an
 What's still genuinely unverified is purely cosmetic/compositor-specific — whether it *looks* right against real windows on a real screen. The logic itself has now been checked both of the two ways available without real hardware.
 
 **Phase 5 final status this session:** Settings, Network Center, Backup/Recovery, Dashboard, and Mission/Spaces are code-complete and verified. Security Center is 4/5 (Shield stubbed). Genuinely not started, each for a stated and still-current reason: Connect (needs its own dedicated session, not a rushed add-on), Shield (no way to verify a security tool without real kernel access and daemons), and the network-transparency dashboard (needs PHANTOM's source from Hamza — still not shared).
+
+## 2026-08-31 — Phase 6 started: DevHub complete, Store hits a genuine wall
+
+**Context:** "done next" a fifth time, after being told Phase 5's remaining items were structurally blocked (not a turn-count problem). Rather than keep re-litigating Phase 5, moved to Phase 6 — the natural next step given Hamza's standing instruction to build through all phases, and a fair reading of "next" once a phase is genuinely exhausted.
+
+**Built:** `darkos-devhub.py` (Git, Containers, Virtualization, Plugins, API Client) and `darkos-store.py` (Search, Installed, Updates, Compatibility).
+
+**DevHub split cleanly in half, verified accordingly:**
+- Git and API Client use primitives that are always real (`git` binary, `urllib.request`) — **fully verified against real data**: pointed the Git tab at the actual DarkOS repo and got its real branch (`main`), real dirty-file count (49), and real commit log; sent a live GET from the API Client to PyPI's real JSON API through the actual GUI and got back a real 200 response with real package metadata rendered.
+- Containers/Virtualization get the same real attempt-and-report treatment as everywhere else in this project — docker, podman, qemu-system-x86_64, and virsh are all genuinely absent here, confirmed via screenshot.
+- Plugins is an honest local-manifest registry (not a marketplace) — verified against a real plugin.json dropped into the plugins folder.
+
+**Store hit a wider wall than anything else in this project.** Every single backend — pacman, the AUR RPC, Flatpak/Flathub, Wine/Proton, Waydroid — is genuinely unreachable from this sandbox, not just untested: pacman only exists on Arch; the AUR RPC and Flathub are both outside the network allowlist (confirmed via a real `Forbidden` response from the AUR call, not assumed); Wine/Proton/Waydroid simply aren't installed. Built correctly against each tool's real, documented CLI/API regardless — that's what a real Arch box changes when it runs this, not a redesign — but there's nothing here that could demonstrate one succeeding, unlike Network Center or Mission/Spaces where at least the failure path or a schema-accurate mock was available. Folded "Games" into the Compatibility tab rather than giving it a separate tab that would just repeat the same three unavailable messages. Per architecture.md, installs should route through Shield first — since Shield doesn't exist, the Search tab states that directly and every Install button is disabled outright, rather than silently installing ungated or silently pretending the gate exists.
+
+**Wired Store into the app rail** — the "store" action now launches `darkos-store.py` directly instead of the generic `wofi --show drun` placeholder, same pattern as Settings earlier.
+
+**Still open in Phase 5** (unchanged, not re-attempted this session): Connect, Shield, and the network-transparency dashboard (still needs PHANTOM's source). **Still open in Phase 6:** nothing — both items are code-complete, with Store's real-but-unverifiable-here status stated plainly rather than glossed over.

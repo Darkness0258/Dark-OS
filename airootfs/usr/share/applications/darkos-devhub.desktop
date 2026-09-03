@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=DevHub
+Comment=Git, containers, virtualization, plugins, API client
+TryExec=/usr/local/bin/darkos-devhub.py
+Exec=/usr/local/bin/darkos-devhub.py
+Icon=applications-development
+Categories=Development;
+StartupNotify=true
+StartupWMClass=darkos-devhub
+Terminal=false
