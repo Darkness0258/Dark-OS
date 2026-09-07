@@ -162,4 +162,4 @@ def build_window(app):
 
 
 if __name__ == "__main__":
-    run_app(APP_ID, WM_CLASS, build_window)
+    run_app(APP_ID, WM_CLASS, build_window, multiple_instances=len(sys.argv) > 1)

@@ -15,7 +15,7 @@ import sys
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib  # noqa: E402
+from gi.repository import Gtk, GLib, Gio  # noqa: E402
 
 from darkos_shell.css import apply_css  # noqa: E402
 
@@ -35,14 +35,24 @@ def make_icon_button(icon_name, tooltip, callback, icon_size=Gtk.IconSize.LARGE_
     return button
 
 
-def run_app(application_id, wm_class, build_window):
+def run_app(application_id, wm_class, build_window, *, multiple_instances=False):
     """Standard app bootstrap: prgname -> Gtk.Application -> apply_css ->
     build_window(app) on activate. build_window must return a shown-ready
     Gtk.ApplicationWindow; run_app calls show_all() on it."""
     GLib.set_prgname(wm_class)
-    app = Gtk.Application(application_id=application_id)
+    # File-opening apps opt in so D-Bus activation cannot discard their
+    # arguments. State-owning hubs stay single-instance to avoid competing
+    # in-memory copies of the same vault/calendar/preferences.
+    flags = Gio.ApplicationFlags.NON_UNIQUE if multiple_instances else Gio.ApplicationFlags.DEFAULT_FLAGS
+    app = Gtk.Application(application_id=application_id, flags=flags)
 
     def on_activate(_app):
+        existing = _app.get_active_window()
+        if existing is None and _app.get_windows():
+            existing = _app.get_windows()[0]
+        if existing is not None:
+            existing.present()
+            return
         apply_css()
         win = build_window(_app)
         win.show_all()

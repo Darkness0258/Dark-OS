@@ -93,7 +93,10 @@ readonly BUILD_DEPENDENCIES=(
     qt6-svg
     yaml-cpp
 )
-pacman -S --needed --noconfirm "${BUILD_DEPENDENCIES[@]}"
+# A cached builder image may predate the freshly synchronized repositories.
+# Upgrade the host in the same transaction to avoid an unsupported partial
+# upgrade when installing current Qt/compiler dependencies.
+pacman -Syu --needed --noconfirm "${BUILD_DEPENDENCIES[@]}"
 
 work_root="$(mktemp -d /tmp/darkos-calamares-build.XXXXXX)"
 builder="darkos-pkgbuild-$$"

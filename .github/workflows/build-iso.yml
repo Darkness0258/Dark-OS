@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: write
     container:
@@ -16,15 +19,23 @@ jobs:
       options: --privileged
     steps:
       - name: Ensure git is available for checkout
-        run: pacman -Sy --noconfirm git
+        run: pacman -Syu --needed --noconfirm git
       - name: Check out profile
         uses: actions/checkout@v4
       - name: Install ISO and AUR build dependencies
-        run: pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils git mkinitcpio pacman-contrib python python-yaml
+        run: >-
+          pacman -Syu --needed --noconfirm archiso base-devel curl desktop-file-utils
+          git mkinitcpio pacman-contrib python python-yaml clamav gtk3 gtk-layer-shell
+          python-cairo python-gobject python-cryptography python-pillow vte3
+          poppler-glib xorg-server-xvfb xorg-xauth
       - name: Validate profile sources
         run: |
           set -euo pipefail
-          bash -n build-iso.sh ci/build-calamares.sh ci/verify-iso.sh profiledef.sh
+          for script in build-iso.sh profiledef.sh ci/*.sh; do
+            bash -n "$script"
+          done
+          bash ci/test-build-bootstrap.sh
+          bash ci/test-docker-workspace.sh
           while IFS= read -r script; do
             bash -n "$script"
           done < <(find airootfs/usr/local/bin -maxdepth 1 -type f ! -name '*.py' -print)
@@ -32,8 +43,11 @@ jobs:
           from pathlib import Path
           import yaml
 
-          shell = Path("airootfs/usr/local/bin/darkos-shell.py")
-          compile(shell.read_text(encoding="utf-8"), str(shell), "exec")
+          # Compile every shipped Python module without importing it.  This
+          # catches syntax errors in standalone desktop applications too,
+          # rather than discovering them only after the costly ISO build.
+          for path in Path("airootfs/usr/local/bin").rglob("*.py"):
+              compile(path.read_text(encoding="utf-8"), str(path), "exec")
           paths = list(Path("airootfs/etc/calamares").rglob("*.conf"))
           paths.append(Path("airootfs/usr/share/calamares/branding/darkos/branding.desc"))
           for path in paths:
@@ -42,40 +56,25 @@ jobs:
           for desktop in airootfs/usr/share/applications/*.desktop; do
             desktop-file-validate "$desktop"
           done
+      - name: Run Linux backend and native app regressions
+        run: |
+          set -euo pipefail
+          python ci/test-phase3-linux.py
+          python ci/test-app-kit.py
+          python ci/test-gaming.py
+          python ci/test-network-connect.py
+          python ci/test-store.py
+          python ci/test-calculator-clock.py
+          python ci/test-mail.py
+          python ci/test-performance.py
+          python ci/test-native-storage.py
+          python ci/test-shield.py
+          xvfb-run -a dbus-run-session -- python ci/test-native-apps-linux.py
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
           set -euo pipefail
-          export TERM=xterm
-          mkdir -p /etc/pacman.d
-          pacman-key --init
-          pacman-key --populate archlinux
-          for attempt in 1 2 3; do
-            pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com && break
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-          done
-          pacman-key --lsign-key 3056513887B78AEB
-          pacman -U --needed --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
-          pacman -U --needed --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
-          printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
-          curl --fail --location --retry 3 --retry-all-errors --output strap.sh https://blackarch.org/strap.sh
-          chmod +x strap.sh
-          # strap.sh imports the BlackArch signing key via a keyserver, which
-          # can return "No data" on transient network errors. Retry the key
-          # import before falling back to a manual fetch.
-          for attempt in 1 2 3 4 5; do
-            ./strap.sh && break
-            echo "strap.sh attempt $attempt failed; retrying in 10s..."
-            sleep 10
-          done
-          # Even after a successful exit, strap.sh's selected mirror may have
-          # timed out during the sync. Use the canonical HTTPS endpoint and
-          # require a usable sync database before allowing any package
-          # transaction to continue.
-          printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
-          for attempt in 1 2 3; do
-            pacman -Syy --noconfirm && test -s /var/lib/pacman/sync/blackarch.db && break
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-          done
+          source ci/blackarch-keyring.sh
+          darkos_seed_build_repositories
 
       - name: Record tool versions (diagnose rolling-repo breaks)
         run: |

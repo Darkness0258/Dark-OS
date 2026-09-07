@@ -13,10 +13,13 @@ is a real feature but a materially bigger one — flagged as a follow-up,
 not silently half-built.
 """
 import os
+import ntpath
+from pathlib import PurePosixPath
 import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import zipfile
 
@@ -85,23 +88,65 @@ def list_archive(path):
 
 
 def extract_archive(path, dest):
-    os.makedirs(dest, exist_ok=True)
-    if path.lower().endswith(".zip"):
-        with zipfile.ZipFile(path) as z:
-            z.extractall(dest)
+    """Extract into a new folder only; errors never modify an existing tree."""
+    dest = os.path.abspath(dest)
+    if os.path.lexists(dest):
+        raise FileExistsError(f"Extraction folder already exists: {dest}")
+    staged = tempfile.mkdtemp(prefix=".darkos-extract-", dir=os.path.dirname(dest))
+    try:
+        if path.lower().endswith(".zip"):
+            with zipfile.ZipFile(path) as archive:
+                for name in archive.namelist():
+                    validate_archive_name(name)
+                archive.extractall(staged)
+        else:
+            with tarfile.open(path) as archive:
+                for member in archive.getmembers():
+                    validate_archive_name(member.name)
+                archive.extractall(staged, filter="data")
+        if os.path.lexists(dest):
+            raise FileExistsError(f"Extraction folder already exists: {dest}")
+        os.rename(staged, dest)
+    finally:
+        if os.path.isdir(staged):
+            shutil.rmtree(staged)
+
+
+def validate_archive_name(name):
+    normalized = PurePosixPath(name.replace("\\", "/"))
+    if normalized.is_absolute() or ".." in normalized.parts or ntpath.splitdrive(name)[0]:
+        raise ValueError(f"Unsafe archive path: {name}")
+
+
+def child_path(parent, name):
+    if name in ("", ".", "..") or "/" in name or "\\" in name or os.path.isabs(name):
+        raise ValueError("Enter a name without path separators, . or ..")
+    return os.path.join(parent, name)
+
+
+def paste_entry(source, destination, move=False):
+    if os.path.isdir(source) and not os.path.islink(source):
+        source_root = os.path.realpath(source)
+        if os.path.commonpath((source_root, os.path.realpath(destination))) == source_root:
+            raise ValueError("A folder cannot be pasted inside itself.")
+    if move:
+        Gio.File.new_for_path(source).move(
+            Gio.File.new_for_path(destination), Gio.FileCopyFlags.NOFOLLOW_SYMLINKS, None, None,
+        )
+    elif os.path.isdir(source) and not os.path.islink(source):
+        shutil.copytree(source, destination, symlinks=True)
     else:
-        with tarfile.open(path) as t:
-            # filter="data" (PEP 706): refuse absolute paths / ../ escapes
-            # and device files when extracting an archive of unknown origin.
-            t.extractall(dest, filter="data")
+        Gio.File.new_for_path(source).copy(
+            Gio.File.new_for_path(destination), Gio.FileCopyFlags.NOFOLLOW_SYMLINKS, None, None,
+        )
 
 
 def unique_path(path):
-    if not os.path.exists(path):
+    if not os.path.lexists(path):
         return path
     base, ext = os.path.splitext(path)
     n = 2
-    while os.path.exists(f"{base} ({n}){ext}"):
+    while os.path.lexists(f"{base} ({n}){ext}"):
         n += 1
     return f"{base} ({n}){ext}"
 
@@ -509,9 +554,9 @@ class FileExplorerWindow(Gtk.ApplicationWindow):
         name = self._prompt("New Folder", "Create", "New Folder")
         if name:
             try:
-                os.mkdir(os.path.join(self.current_path, name))
+                os.mkdir(child_path(self.current_path, name))
                 self.refresh()
-            except OSError as e:
+            except (OSError, ValueError) as e:
                 self._show_error(str(e))
 
     def _rename_selected(self, *_):
@@ -522,9 +567,14 @@ class FileExplorerWindow(Gtk.ApplicationWindow):
         new_name = self._prompt("Rename", "Rename", os.path.basename(old))
         if new_name and new_name != os.path.basename(old):
             try:
-                os.rename(old, os.path.join(os.path.dirname(old), new_name))
+                destination = child_path(os.path.dirname(old), new_name)
+                # Gio's no-overwrite move reports an existing target instead
+                # of os.rename silently replacing another document.
+                Gio.File.new_for_path(old).move(
+                    Gio.File.new_for_path(destination), Gio.FileCopyFlags.NONE, None, None,
+                )
                 self.refresh()
-            except OSError as e:
+            except (OSError, ValueError, GLib.Error) as e:
                 self._show_error(str(e))
 
     def _prompt(self, title, action_label, default_text):
@@ -559,21 +609,19 @@ class FileExplorerWindow(Gtk.ApplicationWindow):
         if not self.clipboard_paths:
             return
         errors = []
+        remaining = []
         for src in self.clipboard_paths:
-            if not os.path.exists(src):
+            if not os.path.lexists(src):
+                errors.append(f"{os.path.basename(src)}: source no longer exists")
                 continue
             dest = unique_path(os.path.join(self.current_path, os.path.basename(src)))
             try:
-                if self.clipboard_mode == "cut":
-                    shutil.move(src, dest)
-                elif os.path.isdir(src):
-                    shutil.copytree(src, dest)
-                else:
-                    shutil.copy2(src, dest)
-            except OSError as e:
+                paste_entry(src, dest, move=self.clipboard_mode == "cut")
+            except (OSError, ValueError, GLib.Error) as e:
+                remaining.append(src)
                 errors.append(f"{os.path.basename(src)}: {e}")
         if self.clipboard_mode == "cut":
-            self.clipboard_paths = []
+            self.clipboard_paths = remaining
         self.refresh()
         if errors:
             self._show_error("Some items couldn't be pasted:\n" + "\n".join(errors))
@@ -637,11 +685,11 @@ class FileExplorerWindow(Gtk.ApplicationWindow):
 
     # -- archives --------------------------------------------------------------
     def _extract_here(self, archive_path):
-        dest = os.path.join(os.path.dirname(archive_path), archive_basename(archive_path))
+        dest = unique_path(os.path.join(os.path.dirname(archive_path), archive_basename(archive_path)))
         try:
             extract_archive(archive_path, dest)
             self.refresh()
-        except (OSError, tarfile.TarError, zipfile.BadZipFile) as e:
+        except (OSError, ValueError, RuntimeError, tarfile.TarError, zipfile.BadZipFile) as e:
             self._show_error(f"Couldn't extract: {e}")
 
     def _show_archive_contents(self, archive_path):
@@ -680,9 +728,10 @@ class FileExplorerWindow(Gtk.ApplicationWindow):
             chooser.set_current_folder(self.current_path)
             if chooser.run() == Gtk.ResponseType.OK:
                 try:
-                    extract_archive(archive_path, chooser.get_filename())
+                    dest = unique_path(os.path.join(chooser.get_filename(), archive_basename(archive_path)))
+                    extract_archive(archive_path, dest)
                     self.refresh()
-                except (OSError, tarfile.TarError, zipfile.BadZipFile) as e:
+                except (OSError, ValueError, RuntimeError, tarfile.TarError, zipfile.BadZipFile) as e:
                     self._show_error(f"Couldn't extract: {e}")
             chooser.destroy()
         dialog.destroy()
@@ -701,7 +750,7 @@ class FileExplorerWindow(Gtk.ApplicationWindow):
 def main():
     GLib.set_prgname(WM_CLASS)
     start_path = sys.argv[1] if len(sys.argv) > 1 else None
-    app = Gtk.Application(application_id=APP_ID)
+    app = Gtk.Application(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
 
     def on_activate(_app):
         apply_css()

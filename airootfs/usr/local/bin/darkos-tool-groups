@@ -105,8 +105,8 @@ interactive_pick() {
     fi
 
     if [ "${#selection[@]}" -eq 0 ]; then
-        echo "Nothing selected — exiting." >&2
-        exit 0
+        echo "Nothing selected — no tools were installed." >&2
+        exit 2
     fi
 
     if printf '%s\n' "${selection[@]}" | grep -Fqx all; then
