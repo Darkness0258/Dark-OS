@@ -135,6 +135,31 @@ class StoreTests(unittest.TestCase):
         self.assertIn("not executed", result[0])
         self.assertEqual([call.args[0] for call in run.call_args_list], [["wine", "--version"], ["waydroid", "status"]])
 
+    def test_flatpak_install_uses_user_scope_noninteractive(self):
+        run = Mock(return_value=(True, ""))
+        ok, output = store.StoreWindow._run_flatpak_install(None, "org.example.App", run=run)
+        run.assert_called_once_with(
+            ["flatpak", "install", "--user", "--noninteractive", "-y", "--", "org.example.App"], 600,
+        )
+        self.assertTrue(ok)
+
+    def test_flatpak_install_failure_is_surfaced_not_swallowed(self):
+        run = Mock(return_value=(False, "error: not found"))
+        ok, output = store.StoreWindow._run_flatpak_install(None, "org.example.App", run=run)
+        self.assertFalse(ok)
+        self.assertEqual(output, "error: not found")
+
+    def test_aur_search_keeps_the_raw_name_installable(self):
+        payload = [{"Name": "yay-bin", "Description": "AUR helper"}]
+        with patch.object(store, "aur_search", return_value=(True, payload)):
+            ok, results, error = store.StoreWindow._search_aur(None, "yay")
+        self.assertEqual(results, [("yay-bin", "yay-bin — AUR helper")])
+
+    def test_flatpak_search_exposes_the_app_id_separately_from_display(self):
+        with patch.object(store, "run_tool", return_value=(True, "org.example.App\tExample\tAn app\n")):
+            ok, results, error = store.StoreWindow._search_flatpak(None, "example")
+        self.assertEqual(results, [("org.example.App", "org.example.App — Example — An app")])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

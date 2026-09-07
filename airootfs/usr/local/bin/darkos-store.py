@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Read-only package search, installed packages, updates, and compatibility.
+"""Read-only-except-for-gated-installs package search, installed packages,
+updates, and compatibility.
 
-Backend failures remain visible and all slow work runs outside GTK. Install
-actions stay disabled until the complete Shield installation gate is available.
+Backend failures remain visible and all slow work runs outside GTK. pacman
+and AUR installs go through Shield-scanned gates (darkos-store-gated-install.py,
+darkos-store-gated-aur-install.py); Flatpak installs rely on Flatpak's own
+signature verification and runtime sandbox instead of a Shield scan (see
+_install_flatpak). Each Install button only enables once its own prerequisites
+are confirmed present — fail closed, same rule Shield itself uses.
 """
 import json
 import os
@@ -96,6 +101,7 @@ class StoreWindow(Gtk.ApplicationWindow):
         # Fail closed like Shield itself: no engine, no install button.
         self._shield_ready = shutil.which("clamscan") is not None
         self._aur_ready = self._shield_ready and shutil.which("git") is not None
+        self._flatpak_ready = shutil.which("flatpak") is not None
         self.connect("destroy", self._on_destroy)
 
         notebook = Gtk.Notebook()
@@ -261,6 +267,9 @@ class StoreWindow(Gtk.ApplicationWindow):
                 elif backend == "aur" and self._aur_ready:
                     install_btn.connect("clicked", lambda _b, pkg=pkg_id: self._confirm_aur_install(pkg))
                     install_btn.set_tooltip_text("Clone, review the PKGBUILD, build, scan, then install")
+                elif backend == "flatpak" and self._flatpak_ready:
+                    install_btn.connect("clicked", lambda _b, ref=pkg_id: self._confirm_flatpak_install(ref))
+                    install_btn.set_tooltip_text("Install to your user account — no password needed")
                 else:
                     install_btn.set_sensitive(False)
                     if backend == "pacman":
@@ -268,7 +277,7 @@ class StoreWindow(Gtk.ApplicationWindow):
                     elif backend == "aur":
                         tip = "Disabled until git and Shield are both available"
                     else:
-                        tip = "Flatpak installs are outside this gate's current scope"
+                        tip = "Disabled until flatpak is available"
                     install_btn.set_tooltip_text(tip)
                 row.pack_start(install_btn, False, False, 0)
                 box.pack_start(row, False, False, 0)
@@ -347,6 +356,46 @@ class StoreWindow(Gtk.ApplicationWindow):
             )
             dialog.run()
             dialog.destroy()
+
+    def _confirm_flatpak_install(self, app_id):
+        dialog = Gtk.MessageDialog(
+            transient_for=self, modal=True,
+            message_type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.NONE,
+            text=f"Install {app_id}?",
+            secondary_text=(
+                "Installs to your user account only — no password needed. Flatpak "
+                "verifies the download's signature itself and runs the app sandboxed; "
+                "DarkOS doesn't add a separate Shield scan here the way it does for "
+                "pacman and AUR installs."
+            ),
+        )
+        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Install", Gtk.ResponseType.OK)
+        response = dialog.run()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK:
+            self._install_flatpak(app_id)
+
+    def _install_flatpak(self, app_id):
+        def worker():
+            ok, output = self._run_flatpak_install(app_id)
+            GLib.idle_add(self._show_flatpak_result, app_id, ok, output)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _run_flatpak_install(self, app_id, run=run_tool):
+        return run(["flatpak", "install", "--user", "--noninteractive", "-y", "--", app_id], 600)
+
+    def _show_flatpak_result(self, app_id, ok, output):
+        dialog = Gtk.MessageDialog(
+            transient_for=self, modal=True,
+            message_type=Gtk.MessageType.INFO if ok else Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=f"{app_id} installed." if ok else f"Could not install {app_id}.",
+            secondary_text=None if ok else output,
+        )
+        dialog.run()
+        dialog.destroy()
+        return False
 
     # -- Installed ---------------------------------------------------------------
     def _build_installed_tab(self):
