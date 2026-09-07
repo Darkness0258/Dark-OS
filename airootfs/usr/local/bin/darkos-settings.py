@@ -15,11 +15,14 @@ darkos_shell.user_settings, which tokens.py reads at import time — changing
 them here actually changes the shell's values on next restart, confirmed
 by direct test, not just written to a file nothing reads.
 """
+from dataclasses import dataclass
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
+import threading
 
 import gi
 
@@ -32,6 +35,14 @@ from darkos_shell.user_settings import load_settings, save_settings  # noqa: E40
 
 APP_ID = "org.darkos.Settings"
 WM_CLASS = "darkos-settings"
+POWER_PROFILE_NAMES = ("performance", "balanced", "power-saver")
+POWER_PROFILE_LABELS = {
+    "performance": "Performance",
+    "balanced": "Balanced",
+    "power-saver": "Power saver",
+}
+POWER_PROFILE_QUERY_TIMEOUT = 6
+POWER_PROFILE_SET_TIMEOUT = 45
 
 CATEGORIES = [
     ("system", "System", "computer-symbolic"),
@@ -51,6 +62,103 @@ CATEGORIES = [
     ("permissions", "Permissions", "security-high-symbolic"),
     ("accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic"),
 ]
+
+
+@dataclass(frozen=True)
+class PowerProfileState:
+    supported: tuple[str, ...]
+    active: str
+    details: str
+
+
+@dataclass(frozen=True)
+class PowerProfileResult:
+    success: bool
+    state: PowerProfileState | None
+    message: str
+
+
+class PowerProfileError(RuntimeError):
+    """A missing service, unsupported response, or rejected profile request."""
+
+
+def _powerprofiles_command(arguments, timeout=POWER_PROFILE_QUERY_TIMEOUT):
+    """Use the daemon's own CLI and polkit policy without privilege wrappers."""
+    environment = os.environ.copy()
+    environment["LC_ALL"] = "C"
+    environment["NO_COLOR"] = "1"
+    try:
+        result = subprocess.run(
+            ["powerprofilesctl", *arguments], capture_output=True, text=True,
+            errors="replace", timeout=timeout, env=environment,
+            stdin=subprocess.DEVNULL,
+        )
+    except FileNotFoundError as error:
+        raise PowerProfileError("powerprofilesctl is not installed.") from error
+    except subprocess.TimeoutExpired as error:
+        raise PowerProfileError(
+            f"powerprofilesctl did not finish within {timeout} seconds. "
+            "Refresh to check the current profile."
+        ) from error
+    except OSError as error:
+        raise PowerProfileError(str(error) or type(error).__name__) from error
+    if result.returncode != 0:
+        detail = "\n".join(
+            part.strip() for part in (result.stderr, result.stdout) if part.strip()
+        )
+        raise PowerProfileError(
+            f"powerprofilesctl exited with code {result.returncode}: {detail or 'no diagnostic output'}"
+        )
+    return result.stdout.strip()
+
+
+def query_power_profiles():
+    """Read only profiles actually offered by this machine's daemon."""
+    details = _powerprofiles_command(("list",))
+    found = set(re.findall(
+        r"^\s*\*?\s*(performance|balanced|power-saver):\s*$", details, re.MULTILINE,
+    ))
+    supported = tuple(profile for profile in POWER_PROFILE_NAMES if profile in found)
+    if not supported:
+        raise PowerProfileError("The daemon returned no recognized available power profiles.")
+    active = _powerprofiles_command(("get",))
+    if active not in supported:
+        raise PowerProfileError(f"The daemon returned an unsupported active profile: {active!r}.")
+    return PowerProfileState(supported, active, details)
+
+
+def set_power_profile(profile):
+    """Validate, request an explicit change, then read back the actual state."""
+    if not isinstance(profile, str) or profile not in POWER_PROFILE_NAMES:
+        return PowerProfileResult(False, None, "Select a supported power profile first.")
+    try:
+        before = query_power_profiles()
+    except PowerProfileError as error:
+        return PowerProfileResult(False, None, str(error))
+    if profile not in before.supported:
+        return PowerProfileResult(False, before, f"{profile} is no longer available on this machine.")
+
+    failure = None
+    try:
+        _powerprofiles_command(("set", profile), timeout=POWER_PROFILE_SET_TIMEOUT)
+    except PowerProfileError as error:
+        failure = str(error)
+    try:
+        after = query_power_profiles()
+    except PowerProfileError as error:
+        return PowerProfileResult(
+            False, None,
+            f"{failure or 'The change was requested.'}\nThe current profile could not be verified: {error}",
+        )
+    if failure:
+        return PowerProfileResult(False, after, f"{failure}\nCurrent profile: {after.active}.")
+    if after.active != profile:
+        return PowerProfileResult(
+            False, after,
+            f"Requested {profile}, but the daemon reports {after.active}. "
+            "Another application or a system power policy may have changed it.",
+        )
+    return PowerProfileResult(True, after, f"Current power profile: {after.active}.")
 
 
 def human_size(n):
@@ -87,6 +195,11 @@ class SettingsWindow(Gtk.ApplicationWindow):
         super().__init__(application=app, title="Settings")
         self.set_default_size(920, 620)
         add_class(self, "app-window")
+        self._closed = False
+        self._power_profile_busy = False
+        self._power_profile_generation = 0
+        self._power_profile_state = None
+        self.connect("destroy", self._on_destroy)
 
         self.settings = load_settings()
 
@@ -151,6 +264,12 @@ class SettingsWindow(Gtk.ApplicationWindow):
     def _on_category_selected(self, _box, row):
         if row:
             self.stack.set_visible_child_name(row.category_id)
+            if row.category_id == "performance":
+                self._refresh_power_profiles()
+
+    def _on_destroy(self, *_):
+        self._closed = True
+        self._power_profile_generation += 1
 
     def _save(self, key, value):
         self.settings[key] = value
@@ -198,6 +317,34 @@ class SettingsWindow(Gtk.ApplicationWindow):
     # -- Performance -----------------------------------------------------------
     def _build_performance_tab(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.pack_start(section_label("Power profile"), False, False, 0)
+        self.power_profile_current = Gtk.Label(label="Checking current power profile…", xalign=0, wrap=True)
+        box.pack_start(self.power_profile_current, False, False, 0)
+        profile_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.power_profile_combo = Gtk.ComboBoxText()
+        self.power_profile_combo.set_sensitive(False)
+        self.power_profile_combo.connect("changed", self._update_power_profile_set_button)
+        profile_row.pack_start(self.power_profile_combo, True, True, 0)
+        self.power_profile_set = Gtk.Button(label="Set profile")
+        add_class(self.power_profile_set, "action-button")
+        self.power_profile_set.set_sensitive(False)
+        self.power_profile_set.connect("clicked", self._set_selected_power_profile)
+        profile_row.pack_start(self.power_profile_set, False, False, 0)
+        self.power_profile_refresh = Gtk.Button(label="Refresh")
+        add_class(self.power_profile_refresh, "icon-button")
+        self.power_profile_refresh.connect("clicked", self._refresh_power_profiles)
+        profile_row.pack_start(self.power_profile_refresh, False, False, 0)
+        box.pack_start(profile_row, False, False, 0)
+        self.power_profile_feedback = Gtk.Label(
+            label="Available profiles depend on your hardware. Changes use the system's authorization policy.",
+            xalign=0, wrap=True,
+        )
+        box.pack_start(self.power_profile_feedback, False, False, 0)
+        box.pack_start(section_label("Kernel"), False, False, 0)
+        box.pack_start(kv_row("Current kernel", platform.release()), False, False, 0)
+        box.pack_start(Gtk.Label(
+            label="Kernel and scheduler package selection are not implemented here.", xalign=0, wrap=True,
+        ), False, False, 0)
         box.pack_start(section_label("CPU governor"), False, False, 0)
         cpu_dirs = sorted(p for p in os.listdir("/sys/devices/system/cpu") if p.startswith("cpu") and p[3:].isdigit()) \
             if os.path.isdir("/sys/devices/system/cpu") else []
@@ -217,7 +364,77 @@ class SettingsWindow(Gtk.ApplicationWindow):
                       "shows real per-core values on real hardware.",
                 xalign=0, wrap=True,
             ), False, False, 0)
+        self._refresh_power_profiles()
         return box
+
+    def _update_power_profile_set_button(self, *_):
+        selected = self.power_profile_combo.get_active_id()
+        state = self._power_profile_state
+        self.power_profile_set.set_sensitive(
+            not self._power_profile_busy and state is not None
+            and selected in state.supported and selected != state.active
+        )
+
+    def _refresh_power_profiles(self, *_):
+        self._start_power_profile_job()
+
+    def _set_selected_power_profile(self, *_):
+        selected = self.power_profile_combo.get_active_id()
+        state = self._power_profile_state
+        if state is None or selected not in POWER_PROFILE_NAMES or selected not in state.supported:
+            self.power_profile_feedback.set_text("Refresh and select an available power profile first.")
+            return
+        self._start_power_profile_job(selected)
+
+    def _start_power_profile_job(self, selected=None):
+        if self._closed or self._power_profile_busy:
+            return
+        self._power_profile_busy = True
+        self._power_profile_generation += 1
+        generation = self._power_profile_generation
+        self.power_profile_combo.set_sensitive(False)
+        self.power_profile_set.set_sensitive(False)
+        self.power_profile_refresh.set_sensitive(False)
+        self.power_profile_feedback.set_text(
+            f"Requesting {selected}… Complete any system authorization prompt."
+            if selected else "Reading supported power profiles…"
+        )
+        threading.Thread(
+            target=self._power_profile_worker, args=(generation, selected),
+            name="darkos-settings-power-profile", daemon=True,
+        ).start()
+
+    def _power_profile_worker(self, generation, selected):
+        try:
+            if selected is None:
+                state = query_power_profiles()
+                result = PowerProfileResult(True, state, "Select a profile and choose Set profile to apply it.")
+            else:
+                result = set_power_profile(selected)
+        except Exception as error:
+            result = PowerProfileResult(False, None, str(error) or type(error).__name__)
+        GLib.idle_add(self._apply_power_profile_result, generation, result)
+
+    def _apply_power_profile_result(self, generation, result):
+        if self._closed or generation != self._power_profile_generation:
+            return False
+        self._power_profile_busy = False
+        self._power_profile_state = result.state
+        self.power_profile_combo.remove_all()
+        if result.state is not None:
+            for profile in result.state.supported:
+                self.power_profile_combo.append(profile, POWER_PROFILE_LABELS[profile])
+            self.power_profile_combo.set_active_id(result.state.active)
+            self.power_profile_current.set_text(f"Current power profile: {result.state.active}")
+            self.power_profile_current.set_tooltip_text(result.state.details)
+        else:
+            self.power_profile_current.set_text("Power profile unavailable")
+            self.power_profile_current.set_tooltip_text(None)
+        self.power_profile_combo.set_sensitive(result.state is not None)
+        self.power_profile_refresh.set_sensitive(True)
+        self.power_profile_feedback.set_text(result.message)
+        self._update_power_profile_set_button()
+        return False
 
     # -- Config ----------------------------------------------------------------
     def _build_config_tab(self):

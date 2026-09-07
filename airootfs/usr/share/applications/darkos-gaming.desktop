@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gaming Hub
+Comment=Launch game platforms and guarded compatibility tools
+TryExec=/usr/local/bin/darkos-gaming.py
+Exec=/usr/local/bin/darkos-gaming.py
+Icon=applications-games
+Categories=Game;
+StartupNotify=true
+StartupWMClass=darkos-gaming
+Terminal=false

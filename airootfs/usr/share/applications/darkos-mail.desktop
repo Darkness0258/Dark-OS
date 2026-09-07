@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Mail
+Comment=Read a TLS inbox and send confirmed plain-text messages
+TryExec=/usr/local/bin/darkos-mail.py
+Exec=/usr/local/bin/darkos-mail.py
+Icon=internet-mail
+Categories=Network;Email;
+StartupNotify=true
+StartupWMClass=darkos-mail
+Terminal=false

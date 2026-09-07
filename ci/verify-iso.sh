@@ -61,6 +61,80 @@ for relative in usr/bin/plymouthd \
     }
 done
 
+readonly native_app_scripts=(
+    usr/local/bin/darkos-backup.py
+    usr/local/bin/darkos-calculator.py
+    usr/local/bin/darkos-calendar.py
+    usr/local/bin/darkos-clipboard.py
+    usr/local/bin/darkos-clock.py
+    usr/local/bin/darkos-dashboard.py
+    usr/local/bin/darkos-devhub.py
+    usr/local/bin/darkos-downloads.py
+    usr/local/bin/darkos-emoji.py
+    usr/local/bin/darkos-files.py
+    usr/local/bin/darkos-gallery.py
+    usr/local/bin/darkos-gaming.py
+    usr/local/bin/darkos-mail.py
+    usr/local/bin/darkos-mission.py
+    usr/local/bin/darkos-network.py
+    usr/local/bin/darkos-notes.py
+    usr/local/bin/darkos-reader.py
+    usr/local/bin/darkos-security.py
+    usr/local/bin/darkos-settings.py
+    usr/local/bin/darkos-store.py
+    usr/local/bin/darkos-terminal.py
+)
+readonly native_desktop_entries=(
+    usr/share/applications/darkos-backup.desktop
+    usr/share/applications/darkos-calculator.desktop
+    usr/share/applications/darkos-calendar.desktop
+    usr/share/applications/darkos-clipboard.desktop
+    usr/share/applications/darkos-clock.desktop
+    usr/share/applications/darkos-dashboard.desktop
+    usr/share/applications/darkos-devhub.desktop
+    usr/share/applications/darkos-downloads.desktop
+    usr/share/applications/darkos-emoji.desktop
+    usr/share/applications/darkos-files.desktop
+    usr/share/applications/darkos-gallery.desktop
+    usr/share/applications/darkos-gaming.desktop
+    usr/share/applications/darkos-installer.desktop
+    usr/share/applications/darkos-mail.desktop
+    usr/share/applications/darkos-mission.desktop
+    usr/share/applications/darkos-network.desktop
+    usr/share/applications/darkos-notes.desktop
+    usr/share/applications/darkos-reader.desktop
+    usr/share/applications/darkos-security.desktop
+    usr/share/applications/darkos-settings.desktop
+    usr/share/applications/darkos-store.desktop
+    usr/share/applications/darkos-tool-groups.desktop
+    usr/share/applications/the-void.desktop
+)
+readonly phase7_executables=(
+    usr/bin/snapshot
+    usr/bin/firefox
+    usr/bin/geary
+    usr/bin/kooha
+    usr/bin/lutris
+    usr/bin/mpv
+    usr/bin/steam
+    usr/bin/waydroid
+    usr/bin/wine
+    usr/bin/winetricks
+)
+readonly phase5_executables=(
+    usr/bin/clamscan
+    usr/bin/freshclam
+    usr/bin/kdeconnect-app
+    usr/bin/kdeconnect-cli
+    usr/bin/kdeconnectd
+    usr/bin/powerprofilesctl
+)
+readonly phase5_activation_files=(
+    usr/lib/systemd/system/power-profiles-daemon.service
+    usr/share/dbus-1/system-services/org.freedesktop.UPower.PowerProfiles.service
+    usr/share/polkit-1/actions/power-profiles-daemon.policy
+)
+
 payload=(
     etc/calamares/settings.conf
     etc/darkos-build-sha
@@ -88,6 +162,8 @@ payload=(
     etc/xdg/hypr/hyprlock.conf
     etc/xdg/waybar/config
     etc/xdg/waybar/style.css
+    etc/mpv/scripts/mpris.so
+    usr/lib/mpv-mpris/mpris.so
     etc/systemd/system/multi-user.target.wants/NetworkManager.service
     etc/systemd/system/multi-user.target.wants/bluetooth.service
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
@@ -116,6 +192,9 @@ payload=(
     usr/bin/pamixer
     usr/bin/playerctl
     usr/bin/vmtoolsd
+    "${phase5_executables[@]}"
+    "${phase5_activation_files[@]}"
+    "${phase7_executables[@]}"
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
     usr/local/bin/darkos-ai-snapshot
@@ -132,6 +211,7 @@ payload=(
     usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/shield.py
     usr/local/bin/darkos_shell/system_sampler.py
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
@@ -141,7 +221,12 @@ payload=(
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
-    usr/share/applications/darkos-installer.desktop
+    usr/local/bin/generate-wallpaper.py
+    "${native_app_scripts[@]}"
+    usr/local/bin/darkos_shell/app_kit.py
+    usr/local/bin/darkos_shell/user_settings.py
+    "${native_desktop_entries[@]}"
+    etc/xdg/mimeapps.list
     usr/share/backgrounds/darkos/darkos-wallpaper.png
     usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
@@ -185,6 +270,7 @@ required_files=(
     etc/xdg/hypr/hyprlock.conf
     etc/xdg/waybar/config
     etc/xdg/waybar/style.css
+    usr/lib/mpv-mpris/mpris.so
     etc/systemd/system/ensure-network.service
     etc/systemd/system/pacman-init.service
     usr/bin/calamares
@@ -202,8 +288,16 @@ required_files=(
     usr/bin/pamixer
     usr/bin/playerctl
     usr/bin/vmtoolsd
+    "${phase5_executables[@]}"
+    "${phase5_activation_files[@]}"
     usr/local/bin/darkos-ai-snapshot
-    usr/share/applications/darkos-installer.desktop
+    usr/local/bin/generate-wallpaper.py
+    "${native_app_scripts[@]}"
+    usr/local/bin/darkos_shell/app_kit.py
+    usr/local/bin/darkos_shell/shield.py
+    usr/local/bin/darkos_shell/user_settings.py
+    "${native_desktop_entries[@]}"
+    etc/xdg/mimeapps.list
     usr/share/backgrounds/darkos/darkos-wallpaper.png
     usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
@@ -224,6 +318,19 @@ for relative in "${required_files[@]}"; do
         exit 1
     fi
 done
+
+# The Arch package installs an absolute link. Following it with test -s (or
+# readlink -f) outside a chroot would inspect the build host's /usr/lib instead
+# of the ISO. Verify its literal target and the extracted regular library.
+mpv_mpris_link="$extracted/etc/mpv/scripts/mpris.so"
+mpv_mpris_library="$extracted/usr/lib/mpv-mpris/mpris.so"
+if [[ ! -L "$mpv_mpris_link" \
+    || "$(readlink "$mpv_mpris_link")" != /usr/lib/mpv-mpris/mpris.so \
+    || -L "$mpv_mpris_library" || ! -f "$mpv_mpris_library" \
+    || ! -s "$mpv_mpris_library" ]]; then
+    printf 'mpv MPRIS autoload link or extracted library is invalid\n' >&2
+    exit 1
+fi
 
 build_sha_file="$extracted/etc/darkos-build-sha"
 if [[ "$(wc -l < "$build_sha_file")" -ne 1 ]]; then
@@ -258,7 +365,7 @@ for relative in usr/bin/arecord usr/bin/brightnessctl usr/bin/btrfs \
     usr/bin/calamares usr/bin/cage usr/bin/ckbcomp usr/bin/espeak-ng \
     usr/bin/hypridle usr/bin/hyprlock usr/bin/pamixer usr/bin/playerctl \
     usr/bin/plymouth-set-default-theme usr/bin/regreet usr/bin/unsquashfs \
-    usr/bin/vmtoolsd; do
+    usr/bin/vmtoolsd "${phase5_executables[@]}" "${phase7_executables[@]}"; do
     if [[ ! -x "$extracted/$relative" ]]; then
         printf 'Required ISO executable is not executable: /%s\n' "$relative" >&2
         exit 1
@@ -449,18 +556,23 @@ scripts=(
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
+    usr/local/bin/generate-wallpaper.py
+    "${native_app_scripts[@]}"
 )
 readonly library_modules=(
     usr/local/bin/darkos_shell/__init__.py
     usr/local/bin/darkos_shell/ai_brain.py
     usr/local/bin/darkos_shell/activity_detector.py
     usr/local/bin/darkos_shell/actions.py
+    usr/local/bin/darkos_shell/app_kit.py
     usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/shield.py
     usr/local/bin/darkos_shell/system_sampler.py
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
+    usr/local/bin/darkos_shell/user_settings.py
 )
 for relative in "${scripts[@]}"; do
     path="$extracted/$relative"
@@ -471,6 +583,26 @@ for relative in "${scripts[@]}"; do
     fi
     if grep -q $'\r' "$path"; then
         printf 'ISO script contains CRLF data: /%s\n' "$relative" >&2
+        exit 1
+    fi
+done
+
+# A desktop entry with TryExec quietly disappears from application menus when
+# its target is not executable. Verify the direct app entries against the
+# extracted artifact, not merely the source tree.
+for relative in "${native_desktop_entries[@]}"; do
+    desktop="$extracted/$relative"
+    try_exec="$(awk -F= '/^TryExec=/{sub(/^[^=]*=/, ""); print; exit}' "$desktop")"
+    exec_line="$(awk -F= '/^Exec=/{sub(/^[^=]*=/, ""); print; exit}' "$desktop")"
+    try_target="${try_exec%% *}"
+    exec_target="${exec_line%% *}"
+    if [[ -z "$try_target" || -z "$exec_target" || "$try_target" != "$exec_target" ]]; then
+        printf 'Desktop entry has inconsistent Exec/TryExec: /%s\n' "$relative" >&2
+        exit 1
+    fi
+    if [[ "$try_target" != /usr/local/bin/* || ! -x "$extracted$try_target" ]]; then
+        printf 'Desktop entry target is not executable in the ISO: /%s -> %s\n' \
+            "$relative" "$try_target" >&2
         exit 1
     fi
 done
@@ -806,12 +938,15 @@ grep -Fq "set_grub_option GRUB_CMDLINE_LINUX_DEFAULT" \
 }
 
 for package in adwaita-icon-theme alsa-utils blackarch-keyring blackarch-mirrorlist \
-    btrfs-progs brightnessctl calamares cage ckbcomp chaotic-keyring \
-    chaotic-mirrorlist espeak-ng firefox greetd greetd-regreet gtk3 \
-    gtk-layer-shell hypridle hyprlock inter-font lvm2 mkinitcpio-nfs-utils \
-    nbd neovim open-vm-tools pamixer pipewire pipewire-pulse playerctl \
-    plymouth pv python-cairo python-gobject ranger rtkit squashfs-tools \
-    syslinux wireplumber blueman accountsservice; do
+    btrfs-progs brightnessctl calamares cage ckbcomp clamav chaotic-keyring \
+    chaotic-mirrorlist snapshot espeak-ng firefox flatpak geary greetd \
+    greetd-regreet gtk3 gtk-layer-shell hypridle hyprlock inter-font kdeconnect kooha \
+    lib32-nvidia-utils lib32-vulkan-intel lib32-vulkan-nouveau \
+    lib32-vulkan-radeon lutris lvm2 mkinitcpio-nfs-utils mpv mpv-mpris nbd neovim \
+    open-vm-tools pamixer pipewire pipewire-pulse playerctl plymouth power-profiles-daemon pv \
+    python-cairo python-gobject python-pillow ranger rtkit squashfs-tools \
+    steam syslinux v4l-utils waydroid wine wine-gecko wine-mono winetricks \
+    wireplumber blueman accountsservice; do
     grep -Eq "^${package}[[:space:]]" "$pkglist" || {
         printf 'Required package is absent from the ISO package list: %s\n' "$package" >&2
         exit 1

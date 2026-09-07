@@ -18,7 +18,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Vte", "2.91")
-from gi.repository import Gdk, GLib, Gtk, Pango, Vte  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Vte  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.css import apply_css  # noqa: E402
@@ -234,7 +234,7 @@ def parse_args(argv):
 def main():
     GLib.set_prgname(WM_CLASS)
     cwd, command = parse_args(sys.argv)
-    app = Gtk.Application(application_id=APP_ID)
+    app = Gtk.Application(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
 
     def on_activate(_app):
         apply_css()

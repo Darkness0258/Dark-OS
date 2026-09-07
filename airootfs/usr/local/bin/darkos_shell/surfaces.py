@@ -164,14 +164,14 @@ class DarkOSDockWindow(Gtk.Window):
         dock.set_halign(Gtk.Align.CENTER)
 
         left_apps = (
-            ("files", "folder-symbolic", "Files", ["/usr/local/bin/the-void.sh", "-e", "ranger"]),
+            ("files", "folder-symbolic", "Files", ["/usr/local/bin/darkos-files.py"]),
             ("terminal", "utilities-terminal-symbolic", "Terminal", ["/usr/local/bin/the-void.sh"]),
             ("browser", "web-browser-symbolic", "Browser", ["firefox"]),
         )
         right_apps = (
-            ("notes", "accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/the-void.sh", "-e", "nvim"]),
-            ("store", "system-software-install-symbolic", "Store", ["wofi", "--show", "drun"]),
-            ("settings", "preferences-system-symbolic", "Settings", ["wofi", "--show", "drun"]),
+            ("notes", "accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/darkos-notes.py"]),
+            ("store", "system-software-install-symbolic", "Store", ["/usr/local/bin/darkos-store.py"]),
+            ("settings", "preferences-system-symbolic", "Settings", ["/usr/local/bin/darkos-settings.py"]),
         )
         self._dock_icons = {}
 
