@@ -520,6 +520,7 @@ What's still genuinely unverified is purely cosmetic/compositor-specific — whe
 **Checked the two sibling pre-flight checks so this isn't a one-off patch:** `assert_source_symlinks` only covers a fixed, unrelated set of infrastructure symlinks (sshd/NetworkManager placeholders); `assert_archiso_hook_packages` only checks `packages.x86_64` for specific mkinitcpio-hook package names. Neither applies to these two scripts. Also confirmed `git` and `base-devel` (AUR script's actual runtime dependencies) are already in `packages.x86_64` — no new package to add there. Grepped the whole repo for every reference to both new filenames to confirm no third registration point was missed.
 
 **Owning it plainly:** I checked `build-iso.sh`'s array contents directly two sessions ago when the exec-bit question came up and concluded the new-app registration was fine — which it was, for the check I was looking at. I didn't know `profiledef.sh` carried a second, independent list until this failure surfaced it. Full sweep re-run after the fix: 53 files py_compile clean, all bash syntax clean, `git diff --check` clean, 148/148 tests still passing.
+<<<<<<< HEAD
 
 ## 2026-09-06 (cont'd, 6th) — Comprehensive audit + the real shell crash + Phase 8 onboarding
 
@@ -538,3 +539,5 @@ What's still genuinely unverified is purely cosmetic/compositor-specific — whe
 **Full re-verification after everything:** 53 files py_compile clean, all `.sh` files plus the extensionless `darkos-firstboot-tools` bash-syntax clean, `git diff --check` clean, 148/148 existing tests still passing, all 21 native apps *and* the shell chrome itself confirmed to construct without crashing.
 
 **Ceiling, stated plainly:** still cannot build a real ISO, boot one, or test on real hardware — same Arch/Docker/VM limitation as every prior session. What changed today is the category of what's been checked: this pass exercised actual execution (the shell smoke test, the stubbed onboarding runs, the extracted `assert_profile_permissions` re-run) everywhere real execution was reachable, not just static reading. The `wofi` rendering itself and a real terminal-handoff install still need a live Wayland session to see for real.
+=======
+>>>>>>> 45be6dc479688e1866db1b15b78ec566c3d5a1b5

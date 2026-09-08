@@ -222,8 +222,11 @@ payload=(
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
     usr/local/bin/generate-wallpaper.py
+<<<<<<< HEAD
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
+=======
+>>>>>>> 45be6dc479688e1866db1b15b78ec566c3d5a1b5
     "${native_app_scripts[@]}"
     usr/local/bin/darkos_shell/app_kit.py
     usr/local/bin/darkos_shell/user_settings.py
@@ -559,8 +562,11 @@ scripts=(
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
     usr/local/bin/generate-wallpaper.py
+<<<<<<< HEAD
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
+=======
+>>>>>>> 45be6dc479688e1866db1b15b78ec566c3d5a1b5
     "${native_app_scripts[@]}"
 )
 readonly library_modules=(

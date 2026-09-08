@@ -76,6 +76,7 @@ file_permissions=(
   ["/usr/local/bin/darkos-terminal.py"]="0:0:755"
   ["/usr/local/bin/darkos_shell/__init__.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/actions.py"]="0:0:644"
+<<<<<<< HEAD
   ["/usr/local/bin/darkos_shell/activity_detector.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/ai_brain.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/app_kit.py"]="0:0:644"
@@ -87,6 +88,9 @@ file_permissions=(
   ["/usr/local/bin/darkos_shell/system_sampler.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/tokens.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/user_settings.py"]="0:0:644"
+=======
+  ["/usr/local/bin/darkos_shell/shield.py"]="0:0:644"
+>>>>>>> 45be6dc479688e1866db1b15b78ec566c3d5a1b5
   ["/usr/local/bin/darkos-installer"]="0:0:755"
   ["/usr/local/bin/darkos-lock"]="0:0:755"
   ["/usr/local/bin/start-hyprland"]="0:0:755"
