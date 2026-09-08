@@ -7,7 +7,7 @@ import gi
 gi.require_version("GtkLayerShell", "0.1")
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import GLib, Gtk, GtkLayerShell
+from gi.repository import GLib, Gtk, GtkLayerShell, Pango
 
 from darkos_shell.canvases import (
     AIOrbCanvas,
@@ -53,7 +53,7 @@ def make_label(text, class_name=None, align=Gtk.Align.START, wrap=False):
     widget.set_xalign(0.0 if align == Gtk.Align.START else 0.5)
     widget.set_line_wrap(wrap)
     if wrap:
-        widget.set_line_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        widget.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
     if class_name:
         add_class(widget, class_name)
     return widget
@@ -164,14 +164,14 @@ class DarkOSDockWindow(Gtk.Window):
         dock.set_halign(Gtk.Align.CENTER)
 
         left_apps = (
-            ("files", "folder-symbolic", "Files", ["/usr/local/bin/the-void.sh", "-e", "ranger"]),
+            ("files", "folder-symbolic", "Files", ["/usr/local/bin/darkos-files.py"]),
             ("terminal", "utilities-terminal-symbolic", "Terminal", ["/usr/local/bin/the-void.sh"]),
             ("browser", "web-browser-symbolic", "Browser", ["firefox"]),
         )
         right_apps = (
-            ("notes", "accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/the-void.sh", "-e", "nvim"]),
-            ("store", "system-software-install-symbolic", "Store", ["wofi", "--show", "drun"]),
-            ("settings", "preferences-system-symbolic", "Settings", ["wofi", "--show", "drun"]),
+            ("notes", "accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/darkos-notes.py"]),
+            ("store", "system-software-install-symbolic", "Store", ["/usr/local/bin/darkos-store.py"]),
+            ("settings", "preferences-system-symbolic", "Settings", ["/usr/local/bin/darkos-settings.py"]),
         )
         self._dock_icons = {}
 

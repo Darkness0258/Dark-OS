@@ -7,6 +7,7 @@ stopwatch are session-only (resetting them on app close is standard
 behavior for these, not a gap).
 """
 import json
+import math
 import os
 import sys
 import time
@@ -71,6 +72,7 @@ class ClockWindow(Gtk.ApplicationWindow):
         self.timer_total = 0
         self.timer_remaining = 0
         self.timer_running = False
+        self.timer_deadline = None
 
         self.stopwatch_elapsed = 0.0
         self.stopwatch_running = False
@@ -272,14 +274,18 @@ class ClockWindow(Gtk.ApplicationWindow):
             if self.timer_remaining <= 0:
                 return
             self.timer_running = True
+            self.timer_deadline = time.monotonic() + self.timer_remaining
             self.timer_start_btn.set_tooltip_text("Pause")
         else:
+            self.timer_remaining = max(0, self.timer_deadline - time.monotonic())
             self.timer_running = False
+            self.timer_deadline = None
             self.timer_start_btn.set_tooltip_text("Start")
 
     def _timer_reset(self, *_):
         self.timer_running = False
         self.timer_remaining = 0
+        self.timer_deadline = None
         self.timer_label.set_markup("<span size='36000'>00:00</span>")
 
     # -- Stopwatch tab ---------------------------------------------------------
@@ -364,12 +370,16 @@ class ClockWindow(Gtk.ApplicationWindow):
                 self._toast(alarm["label"])
 
         if self.timer_running:
-            self.timer_remaining -= 1
+            # GTK callbacks can arrive late; elapsed time, not callback count,
+            # determines when the timer expires.
+            self.timer_remaining = max(0, self.timer_deadline - time.monotonic())
             if self.timer_remaining <= 0:
                 self.timer_remaining = 0
                 self.timer_running = False
+                self.timer_deadline = None
+                self.timer_start_btn.set_tooltip_text("Start")
                 self._toast("Timer finished")
-            self.timer_label.set_markup(f"<span size='36000'>{format_hms(self.timer_remaining)}</span>")
+            self.timer_label.set_markup(f"<span size='36000'>{format_hms(math.ceil(self.timer_remaining))}</span>")
 
         if self.stopwatch_running:
             elapsed = time.monotonic() - self.stopwatch_started_at

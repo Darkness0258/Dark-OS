@@ -53,6 +53,7 @@ class NotesWindow(Gtk.ApplicationWindow):
         self.dirty = False
         self.save_timeout_id = None
         self.standalone_mode = bool(open_path)
+        self.connect("destroy", self._on_destroy)
 
         body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.add(body)
@@ -193,6 +194,9 @@ class NotesWindow(Gtk.ApplicationWindow):
             self._reload_note_list()
 
     # -- editing ---------------------------------------------------------------
+    def _on_destroy(self, *_):
+        self._flush_pending_save()
+
     def _load_file(self, path, is_note=False):
         self._flush_pending_save()
         try:
@@ -237,7 +241,8 @@ class NotesWindow(Gtk.ApplicationWindow):
         if self.save_timeout_id:
             GLib.source_remove(self.save_timeout_id)
             self.save_timeout_id = None
-            self._write_current()
+            if not self.standalone_mode:
+                self._write_current()
 
     def _write_current(self):
         if not self.current_path:
@@ -260,4 +265,4 @@ def build_window_for(open_path):
 
 if __name__ == "__main__":
     arg_path = sys.argv[1] if len(sys.argv) > 1 else None
-    run_app(APP_ID, WM_CLASS, build_window_for(arg_path))
+    run_app(APP_ID, WM_CLASS, build_window_for(arg_path), multiple_instances=bool(arg_path))
