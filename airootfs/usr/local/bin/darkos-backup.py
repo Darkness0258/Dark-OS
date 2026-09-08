@@ -10,8 +10,11 @@ when, from where, and how big it was.
 """
 import json
 import os
+from pathlib import Path, PurePosixPath
+import shutil
 import sys
 import tarfile
+import tempfile
 import time
 
 import gi
@@ -45,17 +48,81 @@ def load_manifest():
     try:
         with open(manifest_path(), "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, list) else []
-    except (OSError, json.JSONDecodeError):
+        if not isinstance(data, list) or not all(isinstance(entry, dict)
+                and all(isinstance(entry.get(key), str) for key in ("archive", "source", "timestamp"))
+                and all(type(entry.get(key)) is int and entry[key] >= 0
+                        for key in ("size", "file_count")) for entry in data):
+            raise ValueError("Backup history has an invalid format; it was left unchanged.")
+        return data
+    except FileNotFoundError:
         return []
 
 
 def save_manifest(entries):
+    path = manifest_path()
+    descriptor, staged = tempfile.mkstemp(prefix=".manifest-", dir=os.path.dirname(path))
     try:
-        with open(manifest_path(), "w", encoding="utf-8") as f:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as f:
             json.dump(entries, f, indent=2)
-    except OSError:
-        pass
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(staged, path)
+    finally:
+        if os.path.exists(staged):
+            os.unlink(staged)
+
+
+def create_backup(source, destination):
+    """Create a unique complete archive, excluding a nested backup destination."""
+    source, destination = Path(source).resolve(), Path(destination).resolve()
+    if not source.is_dir() or source == destination:
+        raise ValueError("Choose an existing source folder and a different backup destination.")
+    destination.mkdir(parents=True, exist_ok=True)
+    name = source.name or "root"
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    excluded = None
+    if destination.is_relative_to(source):
+        excluded = (PurePosixPath(name) / destination.relative_to(source).as_posix()).as_posix()
+    file_count = 0
+
+    def include(member):
+        nonlocal file_count
+        if excluded and (member.name == excluded or member.name.startswith(excluded + "/")):
+            return None
+        if member.isfile():
+            file_count += 1
+        return member
+
+    descriptor, archive = tempfile.mkstemp(prefix=f"{name}-{timestamp}-", suffix=".tar.gz", dir=destination)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            with tarfile.open(fileobj=output, mode="w:gz") as tar:
+                # Recursive add preserves empty directories and symlinks. Any
+                # unreadable member fails the backup instead of claiming success.
+                tar.add(source, arcname=name, filter=include)
+            output.flush()
+            os.fsync(output.fileno())
+        return {"archive": archive, "source": str(source), "timestamp": timestamp,
+                "size": os.path.getsize(archive), "file_count": file_count}
+    except BaseException:
+        os.unlink(archive)
+        raise
+
+
+def restore_backup(archive, destination):
+    """Restore into a fresh private folder, leaving existing files untouched."""
+    restored = tempfile.mkdtemp(prefix="darkos-restored-", dir=destination)
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            for member in tar.getmembers():
+                name = PurePosixPath(member.name.replace("\\", "/"))
+                if name.is_absolute() or ".." in name.parts:
+                    raise tarfile.ExtractError(f"Unsafe archive path: {member.name}")
+            tar.extractall(restored, filter="data")
+        return restored
+    except BaseException:
+        shutil.rmtree(restored)
+        raise
 
 
 class BackupWindow(Gtk.ApplicationWindow):
@@ -131,39 +198,20 @@ class BackupWindow(Gtk.ApplicationWindow):
             self.backup_status_label.set_text(f"Can't use destination: {e}")
             return
 
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        base_name = os.path.basename(self.source_path.rstrip("/")) or "backup"
-        archive_name = f"{base_name}-{timestamp}.tar.gz"
-        archive_path = os.path.join(self.dest_dir, archive_name)
-
-        file_count = 0
         try:
-            with tarfile.open(archive_path, "w:gz") as tar:
-                for root, _dirs, files in os.walk(self.source_path):
-                    for fname in files:
-                        full = os.path.join(root, fname)
-                        arcname = os.path.relpath(full, os.path.dirname(self.source_path.rstrip("/")))
-                        try:
-                            tar.add(full, arcname=arcname)
-                            file_count += 1
-                        except OSError:
-                            continue  # unreadable file (permissions, broken symlink) — skip, don't abort the whole backup
-        except OSError as e:
+            entry = create_backup(self.source_path, self.dest_dir)
+        except (OSError, ValueError, tarfile.TarError) as e:
             self.backup_status_label.set_text(f"Backup failed: {e}")
             return
-
-        size = os.path.getsize(archive_path)
-        manifest = load_manifest()
-        manifest.insert(0, {
-            "archive": archive_path,
-            "source": self.source_path,
-            "timestamp": timestamp,
-            "size": size,
-            "file_count": file_count,
-        })
-        save_manifest(manifest)
+        try:
+            manifest = load_manifest()
+            manifest.insert(0, entry)
+            save_manifest(manifest)
+        except (OSError, ValueError) as e:
+            self.backup_status_label.set_text(f"Archive saved to {entry['archive']}, but history could not be saved: {e}")
+            return
         self.backup_status_label.set_text(
-            f"Backed up {file_count} files ({human_size(size)}) to {archive_path}"
+            f"Backed up {entry['file_count']} files ({human_size(entry['size'])}) to {entry['archive']}"
         )
         self._refresh_history()
 
@@ -191,7 +239,12 @@ class BackupWindow(Gtk.ApplicationWindow):
     def _refresh_history(self):
         for child in list(self.history_list.get_children()):
             self.history_list.remove(child)
-        manifest = load_manifest()
+        try:
+            manifest = load_manifest()
+        except (OSError, ValueError) as error:
+            self.history_list.add(Gtk.Label(label=f"Could not read backup history: {error}", xalign=0, wrap=True))
+            self.history_list.show_all()
+            return
         if not manifest:
             row = Gtk.ListBoxRow(selectable=False)
             row.add(Gtk.Label(label="No backups yet.", xalign=0))
@@ -211,7 +264,7 @@ class BackupWindow(Gtk.ApplicationWindow):
             row.pack_start(restore_btn, False, False, 0)
             del_btn = Gtk.Button(label="Delete")
             add_class(del_btn, "icon-button")
-            del_btn.connect("clicked", self._make_history_deleter(idx))
+            del_btn.connect("clicked", self._make_history_deleter(entry["archive"]))
             row.pack_start(del_btn, False, False, 0)
             self.history_list.add(row)
         self.history_list.show_all()
@@ -223,11 +276,8 @@ class BackupWindow(Gtk.ApplicationWindow):
             if chooser.run() == Gtk.ResponseType.OK:
                 dest = chooser.get_filename()
                 try:
-                    with tarfile.open(entry["archive"], "r:gz") as tar:
-                        # filter="data" (PEP 706): refuse absolute paths / ../
-                        # escapes and device files from an archive of unknown origin.
-                        tar.extractall(dest, filter="data")
-                    self._show_message(f"Restored to {dest}")
+                    restored = restore_backup(entry["archive"], dest)
+                    self._show_message(f"Restored to {restored}")
                 except (OSError, tarfile.TarError) as e:
                     self._show_message(f"Restore failed: {e}", error=True)
             chooser.destroy()
@@ -242,17 +292,30 @@ class BackupWindow(Gtk.ApplicationWindow):
         dialog.run()
         dialog.destroy()
 
-    def _make_history_deleter(self, idx):
+    def _make_history_deleter(self, archive):
         def _delete(*_):
-            manifest = load_manifest()
-            if 0 <= idx < len(manifest):
-                entry = manifest.pop(idx)
+            dialog = Gtk.MessageDialog(
+                transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.NONE, text="Delete this backup archive permanently?",
+            )
+            dialog.format_secondary_text(archive)
+            dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Delete Backup", Gtk.ResponseType.OK)
+            response = dialog.run()
+            dialog.destroy()
+            if response != Gtk.ResponseType.OK:
+                return
+            try:
+                manifest = load_manifest()
+            except (OSError, ValueError) as error:
+                self._show_message(f"Could not read backup history: {error}", error=True)
+                return
+            if any(entry["archive"] == archive for entry in manifest):
                 try:
-                    if os.path.exists(entry["archive"]):
-                        os.remove(entry["archive"])
-                except OSError:
-                    pass
-                save_manifest(manifest)
+                    if os.path.lexists(archive):
+                        os.remove(archive)
+                    save_manifest([entry for entry in manifest if entry["archive"] != archive])
+                except OSError as e:
+                    self._show_message(f"Could not delete backup or update history: {e}", error=True)
                 self._refresh_history()
         return _delete
 

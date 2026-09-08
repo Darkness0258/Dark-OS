@@ -15,14 +15,18 @@ DarkOS is a real startup product — not a demo, not a theme pack, not a Windows
 
 ## Features
 
+Current completion status: [through-Phase-7 audit](ci/phase-7-audit.md).
+Several Phase 5–7 requirements remain open; package declarations and GTK startup
+checks are not a claim of full daily-driver or hardware acceptance.
+
 - **Arch Linux under the hood** — rolling releases, pacman + AUR, full software ecosystem
 - **BlackArch layered in** — 2,900+ security tools available as opt-in groups at install time
 - **Hyprland compositor** — Wayland-native, GPU-accelerated, tiling + floating, spring animations, blur and rounded corners
 - **Cinematic glassmorphism shell** — pure black backgrounds, glass panels with compositor-rendered blur, electric cyan `#00e5ff` primary, neon blue `#2d7bff` secondary
 - **Voice-controlled AI assistant** — STT/TTS/brain, OS control via D-Bus + `hyprctl`, generic in-app control via AT-SPI, push-to-talk (SUPER+SPACE), activity-aware dock highlighting
-- **~27 native apps** (Settings hub, File Explorer, Terminal, Notes, Calendar, etc.) + unmodified hosted software (Firefox, mpv, Docker, Steam)
+- **Native and hosted app tiers** — 21 native GTK applications are implemented toward the ~27-app catalog, including Settings, Files, Terminal, Gaming Hub, and basic Mail. The hosted tier includes Firefox, mpv, Geary, GNOME Camera (`snapshot`), Kooha, Wine, Steam, Lutris, and Waydroid. Gaming Hub checks local availability before enabling its launch actions.
 - **Calamares graphical installer**
-- **Windows compatibility** via Wine 11 / Bottles / Proton / QEMU/KVM
+- **Windows compatibility** via Wine / Bottles / Proton / QEMU/KVM
 
 ## Desktop Preview
 
@@ -52,9 +56,11 @@ Set-Location 'D:\Projects\Dark OS'
 docker compose run --rm --build darkos
 ```
 
-Compose bind-mounts the repository at `/workspace` and runs
-`ci/docker-build-iso.sh`, which installs the ArchISO dependencies, builds the
-image, and runs the artifact verifier. To retain the builder's temporary work
+Compose bind-mounts the repository at `/workspace`. The builder image supplies
+ArchISO dependencies; `ci/docker-build-iso.sh` stages the current source on a
+Linux filesystem so Windows' synthetic file modes cannot break permission
+checks. It seeds repository trust, builds and verifies the ISO, then publishes
+the verified images back to `out/`. To retain the builder's temporary work
 directories for troubleshooting, add the debug override:
 
 ```powershell
@@ -138,20 +144,20 @@ own Groq and OpenRouter keys after installation.
 
 ## Phase 2 Verification
 
-Phase 2 was validated end-to-end on a fresh erase-disk UEFI installation in VMware Workstation with the complete shell chrome and login stack active:
+The shipped Phase 2 login stack and shell chrome were validated on a fresh erase-disk UEFI installation in VMware Workstation. The Cairo AI Core HUD ring landed after that pass and still needs a real-session visual check:
 
 1. **Plymouth Boot Splash**: The DarkOS `CONTROL EVERYTHING` boot animation loads cleanly during initramfs kernel execution.
 2. **ReGreet Login Display Manager**: The `greetd` + `cage` + `regreet` stack starts on boot with the DarkOS wallpaper, session selector (Hyprland), and user authentication.
-3. **Desktop Shell Chrome**: Post-login Hyprland environment launches the complete UI surface:
+3. **Desktop Shell Chrome**: Post-login Hyprland launches the verified shell surface:
    - **Top Bar & Left Rail**: Status indicators, workspace switcher, and quick launcher rail.
-   - **Center HUD & System Gauges**: Central radar/dial aesthetic with live CPU, RAM, and Disk telemetry gauges.
+   - **Center HUD & System Gauges**: live CPU, RAM, and Disk telemetry gauges; the later Cairo radar/dial HUD implementation is pending its own real-session visual validation.
    - **Floating Dock**: Enlarged, glowing central AI Orb surrounded by pinned core application shortcuts.
    - **Right Column Panels**: Fully populated and rendered in standard production order:
      - `Notifications` (System feed, Recent Mako popups, and Clear All action)
      - `Now Playing` (Album art tile, track metadata, progress bar, and media transport controls)
      - `Connectivity` (3×2 grid of 6 toggles: Wi-Fi, Bluetooth, Dark Mode, Night Light, Focus, Airplane, plus real Audio Volume and Display Brightness sliders)
      - `Calendar` (Fixed bottom panel with monthly date grid and month navigation)
-4. **The Void & BlackArch First-Boot Flow**: `darkos-firstboot-tools` prompts on initial desktop entry, launching The Void terminal wrapper (`kitty` with VM software rendering fallback) to execute `darkos-tool-groups`, which performs live pacman database synchronization and presents the interactive BlackArch tool group selector.
+4. **The Void & BlackArch First-Boot Flow**: `darkos-firstboot-tools` prompts on initial desktop entry, launching the VTE-backed The Void wrapper (`darkos-terminal.py`) to execute `darkos-tool-groups`, which performs live pacman database synchronization and presents the interactive BlackArch tool group selector.
 
 ## Project Structure
 
@@ -176,7 +182,7 @@ Phase 2 was validated end-to-end on a fresh erase-disk UEFI installation in VMwa
 ├── profiledef.sh                # archiso profile metadata
 ├── build-iso.sh                 # Local build wrapper
 ├── architecture.md              # Stack, app catalog, AI control design
-├── build-plan.md                # 8-phase phased roadmap
+├── build-plan.md                # 9-phase phased roadmap
 ├── project-overview.md          # Product vision and success criteria
 ├── ui-tokens.md                 # Design tokens (colors, spacing, type)
 ├── ui-rules.md                  # Layout and motion conventions
@@ -211,22 +217,24 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 
 | Phase | Goal |
 |---|---|
-| 1 | Bootable and installable Arch + Hyprland + BlackArch ISO ✓ |
-| 2 | Core shell chrome (dock, panels, lock, login, boot animation done; HUD ring graphic pending) |
-| 3 | AI assistant (STT/TTS/brain, OS control) ✅ runtime verified via SSH |
+| 1 | Bootable and installable Arch + Hyprland + BlackArch ISO — historical VM verification; changed-image acceptance tracked in the audit |
+| 2 | Core shell chrome implemented; current HUD/Hyprland acceptance remains open |
+| 3 | AI assistant — historical SSH/VMware checks; microphone and installed-Btrfs acceptance remain open |
 | 4 | Daily-use native apps |
 | 5 | System management (Settings, Network, Security) |
 | 6 | Store & DevHub |
-| 7 | Hosted apps, Mail, Gaming |
+| 7 | Hosted apps, native Mail, Gaming Hub — implementation present; target acceptance continues |
 | 8 | Distributable (real hardware, onboarding) |
+| 9 | DarkOS Cloud (accounts, tiers, opt-in services) |
 
 Full details in [build-plan.md](build-plan.md).
 
 ## Status
 
-- **Phase 1 is complete and VM-verified** — CI produces installable UEFI ISOs published as GitHub Releases from `main`.
-- **Phase 2 shell chrome is done and VM-verified** — Plymouth boot animation, ReGreet display manager, Hyprland glassmorphism shell (dock with AI Orb, left icon rail, floating side panels with Notifications, Now Playing, Connectivity, and Calendar), hyprlock screen, and first-boot tool group installer are fully verified on installed UEFI hardware. The AI Core HUD ring graphic is the remaining Phase 2 item.
-- **Phase 3 (AI Assistant) is core-wired and runtime-verified via SSH + VMware** — OpenRouter chat round-trip, Groq STT transcription, espeak-ng TTS playback, D-Bus/hyprctl OS control (volume, workspaces), AT-SPI text extraction, explain-this, snapshot-before-act Btrfs safety (code path verified; full creation pending real install + mutating action test), context-aware shell with activity-driven dock highlighting, and Command Center (SUPER+H) are all verified. Two items need real hardware testing: push-to-talk gesture (hold SUPER+SPACE, speak, hear TTS back — VMware virtual mic does not forward host audio), and actual dock highlight visual rendering on physical hardware.
+- **Phases 1–2 have historical VM evidence** — the boot/install/session checks above cover their recorded ISO revisions. The Cairo AI Core HUD is implemented; its current Hyprland rendering and the changed image's boot/install/reboot acceptance remain tracked in the audit.
+- **Phase 3 has historical SSH/VMware and current regression evidence** — chat, speech-provider integration, OS controls, AT-SPI extraction, explain-this, and context-aware shell behavior have recorded checks. Real push-to-talk microphone/audio, installed-Btrfs safety snapshots, and target visual behavior still require acceptance.
+- **Settings Performance has guarded power-profile controls** — it reads available profiles with `powerprofilesctl`, applies an explicit selection through the system authorization policy, and reads back the actual result. Kernel/scheduler package selection remains unfinished.
+- **Phase 7 implementation is present with acceptance still open** — basic native Mail provides a read-only IMAPS inbox and confirmed plain-text SMTPS sending, with account details and drafts kept in memory for the session. A real mailbox send/receive test remains open. Gaming Hub supports native launchers and installed Bottles Flatpaks; GNOME Camera (`snapshot`) supplies webcam capture and Kooha supplies recording. Hosted Windows/Steam workloads, Waydroid initialization, camera, and Wayland capture still need target testing.
 
 Known risks and edge cases are documented in [CLAUDE.md](CLAUDE.md) (internal, for AI tooling).
 

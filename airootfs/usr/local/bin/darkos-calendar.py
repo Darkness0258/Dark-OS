@@ -7,8 +7,10 @@ that's a real follow-up feature, this is a straightforward "what's on this
 day" calendar.
 """
 import json
+from datetime import date
 import os
 import sys
+import tempfile
 
 import gi
 
@@ -33,20 +35,29 @@ def load_events():
     path = data_path()
     if not os.path.exists(path):
         return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError("Calendar events must contain a JSON object.")
+    for day, events in data.items():
+        date.fromisoformat(day)
+        if not isinstance(events, list) or not all(isinstance(event, str) for event in events):
+            raise ValueError(f"Calendar events for {day} must be a list of text entries.")
+    return data
 
 
 def save_events(events):
+    path = data_path()
+    descriptor, staged = tempfile.mkstemp(prefix=".calendar-", dir=os.path.dirname(path))
     try:
-        with open(data_path(), "w", encoding="utf-8") as f:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as f:
             json.dump(events, f, indent=2, sort_keys=True)
-    except OSError:
-        pass
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(staged, path)
+    finally:
+        if os.path.exists(staged):
+            os.unlink(staged)
 
 
 def iso_date(year, month_0indexed, day):
@@ -59,7 +70,12 @@ class CalendarWindow(Gtk.ApplicationWindow):
         self.set_default_size(760, 480)
         add_class(self, "app-window")
 
-        self.events = load_events()
+        load_error = None
+        try:
+            self.events = load_events()
+        except (OSError, ValueError) as error:
+            self.events = {}
+            load_error = str(error)
 
         body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.add(body)
@@ -100,6 +116,8 @@ class CalendarWindow(Gtk.ApplicationWindow):
 
         self._mark_current_month()
         self._refresh_day()
+        if load_error:
+            GLib.idle_add(self._show_error, f"Could not load calendar events: {load_error}")
 
     # -- date helpers ------------------------------------------------------
     def _selected_iso(self):
@@ -155,15 +173,37 @@ class CalendarWindow(Gtk.ApplicationWindow):
 
     def _make_remover(self, iso, idx):
         def _remove(*_):
-            events = self.events.get(iso, [])
+            try:
+                updated = load_events()
+            except (OSError, ValueError) as error:
+                self._show_error(f"Could not load calendar events: {error}")
+                return
+            events = updated.get(iso, [])
             if 0 <= idx < len(events):
                 events.pop(idx)
                 if not events:
-                    self.events.pop(iso, None)
-                save_events(self.events)
-                self._mark_current_month()
-                self._refresh_day()
+                    updated.pop(iso, None)
+                self._commit_events(updated)
         return _remove
+
+    def _commit_events(self, updated):
+        try:
+            save_events(updated)
+        except (OSError, ValueError) as error:
+            self._show_error(f"Could not save calendar events: {error}")
+            return
+        self.events = updated
+        self._mark_current_month()
+        self._refresh_day()
+
+    def _show_error(self, message):
+        dialog = Gtk.MessageDialog(
+            transient_for=self, modal=True, message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK, text=message,
+        )
+        dialog.run()
+        dialog.destroy()
+        return False
 
     def _add_event(self):
         dialog = Gtk.Dialog(title="Add Event", transient_for=self, modal=True)
@@ -180,10 +220,13 @@ class CalendarWindow(Gtk.ApplicationWindow):
             text = entry.get_text().strip()
             if text:
                 iso = self._selected_iso()
-                self.events.setdefault(iso, []).append(text)
-                save_events(self.events)
-                self._mark_current_month()
-                self._refresh_day()
+                try:
+                    updated = load_events()
+                    updated.setdefault(iso, []).append(text)
+                except (OSError, ValueError) as error:
+                    self._show_error(f"Could not load calendar events: {error}")
+                else:
+                    self._commit_events(updated)
         dialog.destroy()
 
 

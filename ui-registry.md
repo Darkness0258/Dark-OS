@@ -1,5 +1,9 @@
 # UI Registry
 
+The current payload contains 21 native GTK applications, including Gaming Hub
+and Mail. This registry describes their implemented surfaces; target-system
+acceptance and remaining phase requirements are tracked in [ci/phase-7-audit.md](ci/phase-7-audit.md).
+
 ## WaybarTopBar
 - Purpose: Persistent logo, workspace, date/time, tray, display, Bluetooth, network, sound, battery, avatar, control, and power status.
 - Variants: Resting, hover, active workspace, warning battery, critical battery.
@@ -19,7 +23,7 @@
 - Variants: Resting, hover, keyboard focus.
 - Tokens used: Elevated background, border, primary/text colors, `space-xs/sm`, 8px control radius, 16px panel radius.
 - Used in: `DarkOSIconRail`; TOP-layer namespace `darkos-rail`.
-- Notes: Missing future apps report an honest phase stub instead of claiming launch success.
+- Notes: Available actions launch their native or upstream target directly, including Gaming Hub; only missing future apps report an honest phase stub instead of claiming launch success.
 
 ## LeftInformationPanels
 - Purpose: Left-of-center AI chat preview, weather status, and live CPU/GPU/RAM/storage/network overview.
@@ -40,7 +44,7 @@
 - Variants: Sleeping, listening, thinking, speaking, brief error pulse.
 - Tokens used: Background, primary/secondary/accent/danger colors, `space-xs/sm/md`, 8px controls, 24px dock radius.
 - Used in: `DarkOSDockWindow` and `AIOrbCanvas`; TOP-layer namespace `darkos-dock`.
-- Notes: Store and Settings intentionally remain `wofi --show drun` placeholders.
+- Notes: Files, Terminal, Browser, Notes, Store, and Settings each launch their direct target. Wofi remains a generic application launcher and BlackArch tool-picker dialog, not the Store or Settings implementation.
 
 ## SecureLockScreen
 - Purpose: PAM-authenticated, ext-session-lock-v1 session protection.
@@ -71,17 +75,17 @@
 - Notes: Normal floating GTK3 window, not layer-shell — glass/rounding comes from Hyprland's `decoration{}` + the `darkos-files` windowrule, not custom CSS alpha. Every control is a stock GTK3 widget (TreeView/ListBox/dialogs) so AT-SPI can drive it generically. Archive support previews + extracts/compresses; browsing inside an archive like a folder is a documented follow-up, not built yet.
 
 ## NativeTerminal
-- Purpose: "The Void" — tabbed terminal emulator replacing the kitty-backed Phase 1 default.
+- Purpose: "The Void" — a tabbed terminal emulator backed by VTE.
 - Variants: Single tab, multiple tabs, active/inactive tab, child-exited (auto-closes tab).
 - Tokens used: `color-primary` (active tab underline + bright-cyan ANSI slot), `color-bg-alt`, a dedicated 16-slot ANSI palette derived from the token set, monospace token.
-- Used in: `TerminalWindow`/`TerminalPage` in `darkos-terminal.py`; launched via `the-void.sh` (app rail "terminal" action, and by anything that shelled out to the old kitty wrapper — `-e CMD` contract preserved).
+- Used in: `TerminalWindow`/`TerminalPage` in `darkos-terminal.py`; launched via `the-void.sh` from the app rail and other command callers. The `-e CMD` contract is preserved for those callers.
 - Notes: Vte.Terminal owns actual emulation (PTY/ANSI/scrollback); this component is chrome only. Normal floating window like FileExplorer, same AT-SPI reasoning. `--cwd DIR` is a DarkOS-specific addition Files uses for "Open Terminal Here."
 
 ## Notes
 - Purpose: Sidebar-driven notes list + plain-text editor; doubles as a general small-file text editor via `argv[1]`.
 - Variants: Notes-list mode (sidebar visible, autosave), standalone file mode (no sidebar, explicit Save button).
 - Tokens used: `color-bg-alt`, `color-bg-elevated`, sidebar/toolbar/statusbar classes shared with FileExplorer.
-- Used in: `NotesWindow` in `darkos-notes.py`; app rail "notes" action (previously launched nvim in a terminal).
+- Used in: `NotesWindow` in `darkos-notes.py`; launched directly by the app rail.
 - Notes: Notes are plain `.txt` files under `~/Documents/DarkOS Notes/`, not a proprietary format — browsable from FileExplorer too.
 
 ## Calendar
@@ -118,17 +122,18 @@
 
 ## Settings / NetworkCenter
 - Purpose: Phase 5's system-management surface — one Settings app with sixteen tabs, plus a separate Network Center for Wi-Fi/Bluetooth/Connect/Cloud.
-- Variants: Settings — real-data tabs (System/Devices/Users/Storage), write-through-to-tokens tabs (Fonts/Icons/Themes/Wallpaper/Motion/Designer), graceful-failure tabs (Performance/Services), honest-stub tabs (Permissions, Accessibility's backend wiring). Network Center — real-data-or-real-error for Wi-Fi/Bluetooth, UI-shell-only for Connect, placeholder for Cloud.
+- Variants: Settings — real-data tabs (System/Devices/Users/Storage), write-through-to-tokens tabs (Fonts/Icons/Themes/Wallpaper/Motion/Designer), Performance profile loading/available/applying/error states, Services availability/error states, and unfinished Permissions/Accessibility enforcement. Network Center — asynchronous Wi-Fi/Bluetooth status, KDE Connect D-Bus/CLI integration with device acceptance pending, placeholder for Phase 9 Cloud.
 - Tokens used: shared sidebar/toolbar/statusbar/terminal-tabs classes throughout; `Gtk.LevelBar` (Storage) and `Gtk.FontChooserWidget`/`Gtk.ColorButton`/`Gtk.Scale` (Fonts/Themes/Designer) are stock widgets, no custom styling needed beyond the usual dark-background node-targeting.
-- Used in: `darkos-settings.py`, `darkos-network.py`; rail's "settings" action now launches Settings directly instead of the `wofi --show drun` placeholder.
+- Used in: `darkos-settings.py`, `darkos-network.py`; the rail's "settings" action launches Settings directly.
 - Notes: `darkos_shell/user_settings.py` is the new shared read/write layer — `tokens.py` imports it at module load, so accent color, corner radius, and reduce-motion are live values with hardcoded fallbacks, not a write-only JSON file. Confirmed by direct test (write settings.json, re-import tokens, values change) and by wiring `REDUCE_MOTION` into the HUD's own tick handler as the first real consumer. Two configparser gotchas (default key-lowercasing, and `write()`'s spacing not matching this repo's `.desktop` convention) were caught and fixed in Startup's toggle before shipping — see build-plan.md Phase 5 for detail.
+- Performance: `powerprofilesctl list/get` supplies available profiles and current state before enabling the selector. Set rechecks support, uses the system authorization policy, and reads back the result; permission errors, timeouts, and mismatches remain visible. Background requests are bounded and ignore callbacks after window closure. CPU governors and kernel version remain read-only; kernel/scheduler package selection is still open.
 
 ## SecurityCenter
-- Purpose: Vault (password/secret manager), Privacy toggles, Shield (antivirus — honest stub), Permissions, and a file Encrypt/Decrypt utility.
+- Purpose: Vault (password/secret manager), Privacy preferences, Shield on-demand ClamAV scans, staged Permissions, and a file Encrypt/Decrypt utility.
 - Variants: Vault locked (create vs. unlock forms) / unlocked (entry list); Encrypt idle / file chosen / success / wrong-passphrase error.
 - Tokens used: shared sidebar/toolbar/terminal-tabs classes; no new CSS needed.
 - Used in: `darkos-security.py`.
-- Notes: Vault and Encrypt are real cryptography (`cryptography` library — PBKDF2-HMAC-SHA256 key derivation, Fernet authenticated encryption), not a toy scheme, and both the success and failure paths (wrong password/passphrase correctly rejected, no corrupted output ever written) are runtime-verified, not just the happy path — see build-plan.md Phase 5 for exactly what was checked. Shield is a deliberate honest stub (disabled "Run Scan," explanation in place of fake results) — real on-access scanning needs kernel access and daemons no sandbox can respond to, so it isn't faked.
+- Notes: Vault/Encrypt use PBKDF2-HMAC-SHA256 and Fernet. The 2026-09-06 Arch/GTK regressions verify private output modes, wrong-password rejection, round trips, and refusal to overwrite existing outputs or recreate an existing vault. Shield runs cancellable file/folder scans and reports incomplete/error states; a real ClamAV synthetic-signature test passes. Continuous protection, quarantine, and integrity baselines remain open. See ci/phase-7-audit.md.
 
 ## Backup / Dashboard
 - Purpose: Backup/Recovery (tar-based folder backup + restore) and Dashboard (live CPU/memory/disk/top-processes overview).
@@ -142,11 +147,34 @@
 - Variants: Populated (workspaces with/without windows) / unavailable (no compositor to query).
 - Tokens used: shared toolbar/sidebar classes; no new CSS needed.
 - Used in: `darkos-mission.py`.
-- Notes: Real `hyprctl -j workspaces` / `hyprctl -j clients` calls and real `hyprctl dispatch` actions — not the same category of gap as Shield, despite an earlier note in this same session bucketing them together. Shield's correctness is fundamentally unverifiable without a real scan engine and test malware; this is a data-display problem against a documented, stable JSON schema, closer in kind to Network Center's nmcli/bluetoothctl calls. Verified two ways: the real graceful-failure path (hyprctl genuinely absent in this sandbox) and the parsing/rendering logic against a schema-accurate fake `hyprctl` on `PATH` (a standard test-double technique, not a shipped fake) — confirmed correct workspace grouping including an empty-workspace case and confirmed the dispatch buttons don't crash the app.
+- Notes: Uses `hyprctl -j workspaces`, `hyprctl -j clients`, and `hyprctl dispatch`. Historical checks exercised the actual missing-command path in the original sandbox and parsing/rendering against a schema-accurate test double on `PATH`, including empty workspaces and dispatch buttons. Those checks do not replace target Hyprland acceptance. Shield's separate real-engine evidence is recorded under SecurityCenter.
 
 ## Store / DevHub
 - Purpose: Phase 6's software-management surface — Store (Search/Installed/Updates/Compatibility across pacman/AUR/Flatpak/Wine/Waydroid) and DevHub (Git/Containers/Virtualization/Plugins/API Client).
-- Variants: Store — every backend in a real-unavailable state in this sandbox (pacman genuinely doesn't exist off Arch, AUR RPC and Flathub are both outside the network allowlist, Wine/Waydroid uninstalled). DevHub — Git and API Client have real-success states (verified against the actual DarkOS repo and a live PyPI request); Containers/Virtualization are real-unavailable like Store.
+- Variants: Store — loading, results/empty results, installed-package lists, available updates, and explicit backend errors. DevHub — Git and API Client success/error states; Containers/Virtualization depend on their installed engines. Earlier sandbox checks recorded unavailable Store backends and real Git/API-client results; current Arch checks are listed below.
 - Tokens used: shared toolbar/sidebar/terminal-tabs classes throughout; no new CSS needed.
-- Used in: `darkos-store.py`, `darkos-devhub.py`; rail's "store" action now launches Store directly instead of the `wofi --show drun` placeholder.
-- Notes: Store is the one place in this project where literally every backend hit the sandbox's ceiling at once — still built correctly against each tool's real, documented interface (this is what changes on a real Arch box, not a redesign), just with nothing here to show it succeeding. DevHub's git/API-client half is the counterexample in the same app: real primitives, fully verified. Both note the Shield-gating requirement from architecture.md explicitly rather than silently ignoring it, since Shield doesn't exist yet.
+- Used in: `darkos-store.py`, `darkos-devhub.py`; the rail's "store" action launches Store directly.
+- Notes: Store is currently read-only. Backend queries run off GTK with bounded/coalesced requests and explicit errors; eight focused regressions and Arch/GTK startup pass. Package installation remains disabled pending the full Shield installation gate. On-demand scans alone do not unlock installation. DevHub's Git/API-client verification is recorded separately in build-plan.md.
+
+## GamingHub
+- Purpose: Phase 7 status and launch surface for installed gaming platforms and compatibility layers.
+- Variants: Checking, command absent, command found with a successful or failed probe, and launch requested.
+- Tokens used: Shared `app-window`, `sidebar-row`, and `action-button` styling.
+- Used in: `darkos-gaming.py`, `darkos-gaming.desktop`, and the rail's `gaming` action.
+- Notes: Native launcher discovery reads executable/package metadata without starting Steam; Proton discovery reads files without executing Proton. Bottles also supports an installed `com.usebottles.bottles` Flatpak. Wine configuration and Winetricks have guarded launch actions. Waydroid requires an existing session, displays initialization guidance, and reports command failures. Bottles and standalone Proton are conditional local installations. Real games, Android apps, and target Wayland/hardware behavior still need acceptance.
+
+## Mail
+
+- Purpose: Basic native inbox reading and confirmed plain-text email sending.
+- Variants: Account entry, loading/cancelled/failed request, inbox/empty inbox, bounded text preview, compose, review-before-send, and submission result.
+- Tokens used: Shared `app-window` / `icon-button` classes and dark styling for stock entry, list, and text-view widgets.
+- Used in: `MailWindow` in `darkos-mail.py`, `darkos-mail.desktop`, and the assistant's `mail` launch action.
+- Notes: Account details, passwords, and drafts remain in memory for the session. IMAPS opens the inbox read-only; SMTPS submits only after an explicit review/confirmation. Both use certificate-verified implicit TLS. SMTP acceptance is distinguished from delivery confirmation; Mail does not save a Sent copy. HTML, attachments, OAuth, and persisted accounts are not implemented. Automated protocol/UI checks do not establish acceptance against a real mailbox.
+
+## HostedCameraAndRecorder
+
+- Purpose: Webcam capture through GNOME Camera (`snapshot`) and screen/audio capture through Kooha.
+- Variants: Upstream device, capture, and error states.
+- Tokens used: Upstream app styling with Hyprland window decorations.
+- Used in: Profile packages and the assistant's `camera` / `recorder` launch actions.
+- Notes: `snapshot` replaces the unavailable Cheese package. These are hosted upstream apps; native Camera/Recorder hubs remain catalog plans. Webcam, microphone, and Wayland capture acceptance remain open.
