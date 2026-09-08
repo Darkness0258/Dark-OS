@@ -98,20 +98,15 @@ case "$choice" in
 esac
 
 # Launch the BlackArch tool-group picker in a terminal so sudo can prompt
-# for the install password. The static shell program creates the completion
-# marker only after the picker has selected and successfully installed a group;
-# The Void itself is a GUI process and cannot relay its child's status.
-if [ -x /usr/local/bin/the-void.sh ]; then
-    /usr/local/bin/the-void.sh -e /bin/sh -c \
-        'sudo "$1" && mkdir -p "$2" && touch "$3"' \
-        darkos-firstboot-tools \
-        /usr/local/bin/darkos-tool-groups \
-        "$MARKER_DIR" \
-        "$tools_done" || exit 1
+# for the install password. Go through The Void (the project's terminal
+# wrapper), not bare kitty, so the selector also opens inside VMs where
+# kitty cannot create an OpenGL context.
+if command -v kitty >/dev/null 2>&1; then
+    /usr/local/bin/the-void.sh -e sudo /usr/local/bin/darkos-tool-groups || exit 1
 else
     # Fallback: run the wofi-based picker directly (no terminal output).
-    if sudo /usr/local/bin/darkos-tool-groups; then
-        mkdir -p "$MARKER_DIR"
-        touch "$tools_done"
-    fi
+    sudo /usr/local/bin/darkos-tool-groups || exit 1
 fi
+
+mkdir -p "$MARKER_DIR"
+touch "$DONE_MARKER"
