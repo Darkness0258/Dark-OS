@@ -38,9 +38,18 @@ class ActionDispatcher:
             "firefox": ["firefox"],
             "browser": ["firefox"],
             "terminal": ["/usr/local/bin/the-void.sh"],
-            "files": ["/usr/local/bin/the-void.sh", "-e", "ranger"],
-            "notes": ["/usr/local/bin/the-void.sh", "-e", "nvim"],
-            "settings": ["wofi", "--show", "drun"],
+            "files": ["/usr/local/bin/darkos-files.py"],
+            "notes": ["/usr/local/bin/darkos-notes.py"],
+            "settings": ["/usr/local/bin/darkos-settings.py"],
+            "store": ["/usr/local/bin/darkos-store.py"],
+            "gallery": ["/usr/local/bin/darkos-gallery.py"],
+            "media": ["mpv", "--player-operation-mode=pseudo-gui"],
+            "music": ["mpv", "--player-operation-mode=pseudo-gui"],
+            "gaming": ["/usr/local/bin/darkos-gaming.py"],
+            "mail": ["/usr/local/bin/darkos-mail.py"],
+            "camera": ["snapshot"],
+            "recorder": ["kooha"],
+            "waydroid": ["waydroid", "show-full-ui"],
         }
         cmd = apps.get(app_name.strip().lower())
         if cmd is None:

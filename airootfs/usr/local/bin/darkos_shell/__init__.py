@@ -367,6 +367,9 @@ class DarkOSApplication(Gtk.Application):
             "browser": ["firefox"],
             "store": ["/usr/local/bin/darkos-store.py"],
             "notes": ["/usr/local/bin/darkos-notes.py"],
+            "gallery": ["/usr/local/bin/darkos-gallery.py"],
+            "music": ["mpv", "--player-operation-mode=pseudo-gui"],
+            "gaming": ["/usr/local/bin/darkos-gaming.py"],
         }
         if action == "ai":
             if not self.left.is_visible():

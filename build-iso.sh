@@ -50,9 +50,37 @@ readonly build_sha
     exit 1
 }
 
-# Every executable shipped by DarkOS is listed once here.  The source checkout
+# Every desktop-launched Python application is an executable payload, rather
+# than a Python library.  Keep this list explicit so a lost executable bit on
+# a Windows checkout cannot silently hide its desktop entry (TryExec requires
+# an executable target).
+readonly native_app_scripts=(
+    usr/local/bin/darkos-backup.py
+    usr/local/bin/darkos-calculator.py
+    usr/local/bin/darkos-calendar.py
+    usr/local/bin/darkos-clipboard.py
+    usr/local/bin/darkos-clock.py
+    usr/local/bin/darkos-dashboard.py
+    usr/local/bin/darkos-devhub.py
+    usr/local/bin/darkos-downloads.py
+    usr/local/bin/darkos-emoji.py
+    usr/local/bin/darkos-files.py
+    usr/local/bin/darkos-gallery.py
+    usr/local/bin/darkos-gaming.py
+    usr/local/bin/darkos-mail.py
+    usr/local/bin/darkos-mission.py
+    usr/local/bin/darkos-network.py
+    usr/local/bin/darkos-notes.py
+    usr/local/bin/darkos-reader.py
+    usr/local/bin/darkos-security.py
+    usr/local/bin/darkos-settings.py
+    usr/local/bin/darkos-store.py
+    usr/local/bin/darkos-terminal.py
+)
+
+# Every executable shipped by DarkOS is listed once here. The source checkout
 # and staged profile are repaired and checked before mkarchiso runs, and the
-# actual SquashFS is extracted and checked after the ISO is built.  A stale
+# actual SquashFS is extracted and checked after the ISO is built. A stale
 # work directory or a lost Windows executable bit can therefore never produce
 # another silently broken ISO.
 readonly runtime_scripts=(
@@ -71,7 +99,11 @@ readonly runtime_scripts=(
     usr/local/bin/choose-mirror
     usr/local/bin/ensure-network
     usr/local/bin/livecd-sound
+    usr/local/bin/generate-wallpaper.py
+    usr/local/bin/darkos-store-gated-install.py
+    usr/local/bin/darkos-store-gated-aur-install.py
     root/.automated_script.sh
+    "${native_app_scripts[@]}"
 )
 
 readonly bash_scripts=(
@@ -92,32 +124,43 @@ readonly bash_scripts=(
     root/.automated_script.sh
 )
 readonly python_scripts=(
+    "${native_app_scripts[@]}"
     usr/local/bin/darkos-shell.py
+    usr/local/bin/generate-wallpaper.py
+    usr/local/bin/darkos-store-gated-install.py
+    usr/local/bin/darkos-store-gated-aur-install.py
     usr/local/bin/darkos_shell/__init__.py
     usr/local/bin/darkos_shell/ai_brain.py
     usr/local/bin/darkos_shell/activity_detector.py
     usr/local/bin/darkos_shell/actions.py
+    usr/local/bin/darkos_shell/app_kit.py
     usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/shield.py
     usr/local/bin/darkos_shell/system_sampler.py
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
+    usr/local/bin/darkos_shell/user_settings.py
 )
 
 # Library modules (not mode-755 executables) that must be byte-identical
 # between source and squashfs. These are also in python_scripts for py_compile.
 readonly cmp_scripts=(
+    "${native_app_scripts[@]}"
     usr/local/bin/darkos_shell/__init__.py
     usr/local/bin/darkos_shell/ai_brain.py
     usr/local/bin/darkos_shell/activity_detector.py
     usr/local/bin/darkos_shell/actions.py
+    usr/local/bin/darkos_shell/app_kit.py
     usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
+    usr/local/bin/darkos_shell/shield.py
     usr/local/bin/darkos_shell/system_sampler.py
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
+    usr/local/bin/darkos_shell/user_settings.py
 )
 
 readonly archiso_hook_packages=(

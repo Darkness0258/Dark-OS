@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """DarkOS Security Center — Vault, Privacy, Shield, Permissions, Encrypt.
 
-Vault and Encrypt use real, standard primitives (PBKDF2-HMAC-SHA256 key
-derivation + Fernet authenticated encryption from the `cryptography`
-library) — not a homemade scheme. Shield is a deliberate honest stub, same
-treatment as Connect in Network Center: real on-access scanning needs
-fanotify (CAP_SYS_ADMIN) and real ClamAV/rkhunter/AIDE daemons this sandbox
-can't grant or verify even in principle, so it isn't faked here.
+Vault and Encrypt use PBKDF2-HMAC-SHA256 and authenticated Fernet encryption.
+Shield runs cancellable, on-demand ClamAV scans. Continuous monitoring and
+system integrity baselines require a separate configured service.
 """
 import base64
 import json
 import os
 import subprocess
 import sys
+import tempfile
+import threading
+from pathlib import Path
 
 import gi
 
@@ -25,11 +25,14 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.app_kit import add_class, run_app  # noqa: E402
+from darkos_shell.shield import scan_path  # noqa: E402
 
 APP_ID = "org.darkos.SecurityCenter"
 WM_CLASS = "darkos-security"
 KDF_ITERATIONS = 480_000
 SALT_LEN = 16
+DATA_DIR_MODE = 0o700
+VAULT_MODE = 0o600
 
 
 def derive_key(password, salt):
@@ -37,16 +40,46 @@ def derive_key(password, salt):
     return base64.urlsafe_b64encode(kdf.derive(password.encode("utf-8")))
 
 
-def vault_path():
+def write_private_new(path, data):
+    """Publish a complete private file without replacing any existing path.
+
+    A hard link makes publication atomic and rejects existing files, including
+    symlinks. Unsupported filesystems fail explicitly instead of overwriting.
+    """
+    parent = os.path.dirname(os.path.abspath(path))
+    fd, temporary = tempfile.mkstemp(prefix=".darkos-private-", dir=parent)
+    try:
+        os.fchmod(fd, VAULT_MODE)
+        with os.fdopen(fd, "wb") as stream:
+            fd = None
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path)
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.unlink(temporary)
+
+
+def darkos_data_dir():
     d = os.path.join(GLib.get_user_data_dir(), "darkos")
-    os.makedirs(d, exist_ok=True)
-    return os.path.join(d, "vault.dat")
+    os.makedirs(d, mode=DATA_DIR_MODE, exist_ok=True)
+    # os.makedirs() does not update an existing directory's permissions.
+    os.chmod(d, DATA_DIR_MODE)
+    return d
+
+
+def vault_path():
+    path = os.path.join(darkos_data_dir(), "vault.dat")
+    # Repair vaults written by older DarkOS versions with the user's umask.
+    if os.path.exists(path):
+        os.chmod(path, VAULT_MODE)
+    return path
 
 
 def privacy_settings_path():
-    d = os.path.join(GLib.get_user_data_dir(), "darkos")
-    os.makedirs(d, exist_ok=True)
-    return os.path.join(d, "privacy-settings.json")
+    return os.path.join(darkos_data_dir(), "privacy-settings.json")
 
 
 def load_privacy_settings():
@@ -76,6 +109,9 @@ class SecurityWindow(Gtk.ApplicationWindow):
         self.vault_key = None
         self.vault_salt = None
         self.vault_entries = []
+        self._closed = False
+        self._scan_cancel = threading.Event()
+        self.connect("destroy", self._on_destroy)
 
         notebook = Gtk.Notebook()
         add_class(notebook, "terminal-tabs")
@@ -149,7 +185,12 @@ class SecurityWindow(Gtk.ApplicationWindow):
         self.vault_salt = os.urandom(SALT_LEN)
         self.vault_key = derive_key(pw, self.vault_salt)
         self.vault_entries = []
-        self._save_vault()
+        try:
+            self._save_vault(new=True)
+        except OSError as error:
+            self.vault_key = self.vault_salt = None
+            self.vault_error_label.set_text(f"Couldn't create vault: {error}")
+            return
         self._refresh_vault_list()
         self.vault_stack.set_visible_child_name("unlocked")
 
@@ -161,9 +202,16 @@ class SecurityWindow(Gtk.ApplicationWindow):
             salt, token = raw[:SALT_LEN], raw[SALT_LEN:]
             key = derive_key(pw, salt)
             plaintext = Fernet(key).decrypt(token)
+            entries = json.loads(plaintext.decode("utf-8"))
+            if not isinstance(entries, list) or not all(
+                isinstance(entry, dict) and all(
+                    isinstance(k, str) and isinstance(v, str) for k, v in entry.items()
+                ) for entry in entries
+            ):
+                raise ValueError("Invalid vault entry format")
             self.vault_salt = salt
             self.vault_key = key
-            self.vault_entries = json.loads(plaintext.decode("utf-8"))
+            self.vault_entries = entries
         except InvalidToken:
             self.vault_error_label.set_text("Wrong password")
             return
@@ -173,10 +221,40 @@ class SecurityWindow(Gtk.ApplicationWindow):
         self._refresh_vault_list()
         self.vault_stack.set_visible_child_name("unlocked")
 
-    def _save_vault(self):
+    def _save_vault(self, new=False):
         token = Fernet(self.vault_key).encrypt(json.dumps(self.vault_entries).encode("utf-8"))
-        with open(vault_path(), "wb") as f:
-            f.write(self.vault_salt + token)
+        path = vault_path()
+        if new:
+            write_private_new(path, self.vault_salt + token)
+            return
+        fd, temp_path = tempfile.mkstemp(prefix=".vault-", dir=os.path.dirname(path))
+        try:
+            # mkstemp is private by default; fchmod also protects against a
+            # permissive umask or platform-specific tempfile behavior.
+            os.fchmod(fd, VAULT_MODE)
+            with os.fdopen(fd, "wb") as f:
+                fd = None
+                f.write(self.vault_salt + token)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, path)
+            temp_path = None
+            dir_fd = os.open(
+                os.path.dirname(path),
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        finally:
+            if fd is not None:
+                os.close(fd)
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except FileNotFoundError:
+                    pass
 
     def _lock_vault(self, *_):
         self.vault_key = None
@@ -184,6 +262,11 @@ class SecurityWindow(Gtk.ApplicationWindow):
         self.vault_entries = []
         self.vault_pw_entry.set_text("")
         self.vault_error_label.set_text("")
+        # A newly created vault must return to Unlock, not the old Create
+        # screen, or a second password could silently replace the vault.
+        self.vault_stack.remove(self.vault_stack.get_child_by_name("locked"))
+        self.vault_stack.add_named(self._build_vault_lock_screen(), "locked")
+        self.vault_stack.show_all()
         self.vault_stack.set_visible_child_name("locked")
 
     def _refresh_vault_list(self):
@@ -222,10 +305,34 @@ class SecurityWindow(Gtk.ApplicationWindow):
     def _make_vault_deleter(self, idx):
         def _delete(*_):
             if 0 <= idx < len(self.vault_entries):
-                self.vault_entries.pop(idx)
-                self._save_vault()
+                dialog = Gtk.MessageDialog(
+                    transient_for=self, modal=True,
+                    message_type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.OK_CANCEL,
+                    text="Delete this vault entry?",
+                )
+                dialog.format_secondary_text("This removes the saved entry permanently.")
+                approved = dialog.run() == Gtk.ResponseType.OK
+                dialog.destroy()
+                if not approved:
+                    return
+                removed = self.vault_entries.pop(idx)
+                try:
+                    self._save_vault()
+                except OSError as error:
+                    self.vault_entries.insert(idx, removed)
+                    self._show_vault_error(error)
                 self._refresh_vault_list()
         return _delete
+
+    def _show_vault_error(self, error):
+        dialog = Gtk.MessageDialog(
+            transient_for=self, modal=True,
+            message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK,
+            text="The vault change could not be saved.",
+        )
+        dialog.format_secondary_text(str(error))
+        dialog.run()
+        dialog.destroy()
 
     def _add_vault_entry(self, *_):
         dialog = Gtk.Dialog(title="Add Vault Entry", transient_for=self, modal=True)
@@ -248,7 +355,11 @@ class SecurityWindow(Gtk.ApplicationWindow):
             new_entry = {k: e.get_text() for k, e in fields.items()}
             if new_entry.get("title"):
                 self.vault_entries.append(new_entry)
-                self._save_vault()
+                try:
+                    self._save_vault()
+                except OSError as error:
+                    self.vault_entries.pop()
+                    self._show_vault_error(error)
                 self._refresh_vault_list()
         dialog.destroy()
 
@@ -287,26 +398,80 @@ class SecurityWindow(Gtk.ApplicationWindow):
         return _toggle
 
     # -- Shield ------------------------------------------------------------------
+    def _on_destroy(self, *_):
+        self._closed = True
+        self._scan_cancel.set()
+
     def _build_shield_tab(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         box.set_border_width(20)
         box.pack_start(Gtk.Label(label="<b>Shield</b>", xalign=0, use_markup=True), False, False, 0)
         box.pack_start(Gtk.Label(
-            label="Not implemented — and deliberately not faked. Real on-access scanning needs "
-                  "fanotify, which needs CAP_SYS_ADMIN and a real kernel this sandbox doesn't grant "
-                  "even in principle, plus actual ClamAV/rkhunter/AIDE daemons to scan and baseline "
-                  "against. There's no way to verify a security tool here — writing one blind, with "
-                  "no way to confirm it catches or misses anything, would be worse than waiting "
-                  "until it can be built and checked on real hardware.",
+            label="Scan a file or folder with ClamAV. Update definitions before scanning. "
+                  "Scans leave files in place and report threats, unreadable content, or scan limits. "
+                  "Continuous protection, quarantine, and system integrity checks are not enabled.",
             xalign=0, wrap=True,
         ), False, False, 8)
-        scan_btn = Gtk.Button(label="Run Scan")
-        add_class(scan_btn, "icon-button")
-        scan_btn.set_sensitive(False)
-        scan_btn.set_halign(Gtk.Align.START)
-        scan_btn.set_tooltip_text("Not wired to a real scan engine yet")
-        box.pack_start(scan_btn, False, False, 0)
+        actions = Gtk.Box(spacing=8)
+        self._scan_buttons = []
+        for label, folder in (("Scan file…", False), ("Scan folder…", True)):
+            button = Gtk.Button(label=label)
+            button.connect("clicked", lambda _button, directory=folder: self._choose_scan(directory))
+            actions.pack_start(button, False, False, 0)
+            self._scan_buttons.append(button)
+        update = Gtk.Button(label="Update definitions…")
+        update.connect("clicked", self._update_definitions)
+        actions.pack_start(update, False, False, 0)
+        self._scan_buttons.append(update)
+        self._cancel_scan = Gtk.Button(label="Cancel scan")
+        self._cancel_scan.set_sensitive(False)
+        self._cancel_scan.connect("clicked", lambda *_: self._scan_cancel.set())
+        actions.pack_start(self._cancel_scan, False, False, 0)
+        box.pack_start(actions, False, False, 0)
+        self._scan_report = Gtk.TextView(editable=False, cursor_visible=False, monospace=True)
+        self._scan_report.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self._scan_report.get_buffer().set_text("Choose a file or folder to start a scan.")
+        scroll = Gtk.ScrolledWindow()
+        scroll.add(self._scan_report)
+        box.pack_start(scroll, True, True, 0)
         return box
+
+    def _update_definitions(self, *_):
+        try:
+            subprocess.Popen([
+                "/usr/local/bin/the-void.sh", "-e", "/bin/sh", "-c",
+                'sudo freshclam; result=$?; printf "\\nDefinition update exit status: %s\\nPress Enter to close.\\n" "$result"; read -r reply; exit "$result"',
+            ])
+        except OSError as error:
+            self._scan_report.get_buffer().set_text(f"Could not open definition updater: {error}")
+
+    def _choose_scan(self, folder):
+        action = Gtk.FileChooserAction.SELECT_FOLDER if folder else Gtk.FileChooserAction.OPEN
+        chooser = Gtk.FileChooserDialog(title="Select scan target", transient_for=self, action=action)
+        chooser.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Scan", Gtk.ResponseType.OK)
+        selected = chooser.get_filename() if chooser.run() == Gtk.ResponseType.OK else None
+        chooser.destroy()
+        if not selected:
+            return
+        self._scan_cancel = threading.Event()
+        for button in self._scan_buttons:
+            button.set_sensitive(False)
+        self._cancel_scan.set_sensitive(True)
+        self._scan_report.get_buffer().set_text(f"Scanning {selected}…")
+        threading.Thread(target=self._scan_worker, args=(Path(selected), self._scan_cancel), daemon=True).start()
+
+    def _scan_worker(self, target, cancel):
+        result = scan_path(target, cancel)
+        GLib.idle_add(self._scan_finished, result)
+
+    def _scan_finished(self, result):
+        if self._closed:
+            return False
+        self._scan_report.get_buffer().set_text(result.detail)
+        for button in self._scan_buttons:
+            button.set_sensitive(True)
+        self._cancel_scan.set_sensitive(False)
+        return False
 
     # -- Permissions -------------------------------------------------------------
     def _build_permissions_tab(self):
@@ -382,8 +547,7 @@ class SecurityWindow(Gtk.ApplicationWindow):
             key = derive_key(self.encrypt_pw_entry.get_text(), salt)
             token = Fernet(key).encrypt(data)
             out_path = self._encrypt_target + ".darkvault"
-            with open(out_path, "wb") as f:
-                f.write(salt + token)
+            write_private_new(out_path, salt + token)
             self.encrypt_status_label.set_text(f"Encrypted to {out_path}")
         except OSError as e:
             self.encrypt_status_label.set_text(f"Couldn't encrypt: {e}")
@@ -399,8 +563,7 @@ class SecurityWindow(Gtk.ApplicationWindow):
             key = derive_key(self.encrypt_pw_entry.get_text(), salt)
             data = Fernet(key).decrypt(token)
             out_path = self._encrypt_target[:-10] if self._encrypt_target.endswith(".darkvault") else self._encrypt_target + ".decrypted"
-            with open(out_path, "wb") as f:
-                f.write(data)
+            write_private_new(out_path, data)
             self.encrypt_status_label.set_text(f"Decrypted to {out_path}")
         except InvalidToken:
             self.encrypt_status_label.set_text("Wrong passphrase, or not a valid encrypted file.")

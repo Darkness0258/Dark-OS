@@ -1,58 +1,58 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly BLACKARCH_STRAP_SHA256="58ce783cf584d9000d42f78b51780e0b58fb2d1671abf9bca1f2a486d5368dd4"
-
-cd /workspace
-
-printf '==> Initializing pacman keys...\n'
-export TERM=xterm
-mkdir -p /etc/pacman.d
-pacman-key --init
-pacman-key --populate archlinux
-
-printf '==> Installing ISO and AUR build dependencies...\n'
-# Base dependencies already baked into container image
-
-printf '==> Seeding Chaotic-AUR and BlackArch mirrorlists and keyrings...\n'
-for attempt in 1 2 3; do
-  pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com && break
-  if [ "$attempt" -eq 3 ]; then exit 1; fi
-done
-pacman-key --lsign-key 3056513887B78AEB
-
-download_chaotic() {
-  local pkg="$1"
-  for url in "https://cdn-mirror.chaotic.cx/chaotic-aur/${pkg}" "https://geo-mirror.chaotic.cx/chaotic-aur/${pkg}"; do
-    if curl --fail --location --retry 5 --retry-connrefused --retry-delay 2 --connect-timeout 15 -m 60 --output "/tmp/${pkg}" "${url}"; then
-      return 0
-    fi
-  done
-  return 1
+darkos_stage_docker_source() {
+    local source_root="$1" build_root="$2"
+    # Windows bind mounts expose synthetic 0777 modes and may ignore chmod.
+    # Build on a Linux filesystem so exact payload modes remain enforceable.
+    tar -C "$source_root" --exclude='./.git' --exclude='./out' \
+        --exclude='./.claude' --exclude='__pycache__' -cf - . \
+        | tar -C "$build_root" -xf -
 }
 
-download_chaotic "chaotic-keyring.pkg.tar.zst"
-pacman -U --needed --noconfirm "/tmp/chaotic-keyring.pkg.tar.zst"
+darkos_publish_docker_iso() (
+    set -Eeuo pipefail
+    local source_iso="$1" output_dir="$2" pending
+    pending=$(mktemp "$output_dir/.darkos-iso.XXXXXX")
+    trap 'rm -f -- "$pending"' EXIT
+    cp -- "$source_iso" "$pending" || exit "$?"
+    cmp -s "$source_iso" "$pending" || exit "$?"
+    chmod 0644 "$pending" || exit "$?"
+    mv -f -- "$pending" "$output_dir/$(basename "$source_iso")"
+)
 
-download_chaotic "chaotic-mirrorlist.pkg.tar.zst"
-pacman -U --needed --noconfirm "/tmp/chaotic-mirrorlist.pkg.tar.zst"
+main() (
+    set -Eeuo pipefail
+    cd /workspace
+    export DARKOS_BUILD_SHA="${DARKOS_BUILD_SHA:-$(git -c safe.directory=/workspace rev-parse HEAD)}"
+    local build_root
+    build_root=$(mktemp -d /tmp/darkos-docker-source.XXXXXX)
+    cleanup() {
+        if [[ "${DARKOS_KEEP_WORK:-0}" == 1 ]]; then
+            printf 'Preserving Linux source workspace: %s\n' "$build_root"
+        else
+            rm -rf -- "$build_root"
+        fi
+    }
+    trap cleanup EXIT
+    darkos_stage_docker_source /workspace "$build_root"
+    cd "$build_root"
+    source ci/blackarch-keyring.sh
+    printf '==> Seeding Chaotic-AUR and BlackArch mirrorlists and keyrings...\n'
+    darkos_seed_build_repositories
+    printf '==> Starting DarkOS ISO Build in %s...\n' "$build_root"
+    bash build-iso.sh
 
-printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
-# Make all container-level pacman invocations non-interactive (strap.sh spawns its own pacman calls)
-grep -qxF 'NoConfirm' /etc/pacman.conf || sed -i '/^\[options\]/a NoConfirm' /etc/pacman.conf
-curl --fail --location --retry 3 --retry-all-errors --output /tmp/strap.sh https://blackarch.org/strap.sh
-printf '%s  %s\n' "$BLACKARCH_STRAP_SHA256" /tmp/strap.sh \
-  | sha256sum --check --strict -
-chmod +x /tmp/strap.sh
-(cd /tmp && (yes "" 2>/dev/null || true) | ./strap.sh || true)
+    # Publish only after build-iso.sh has passed its embedded-payload checks.
+    # A failed copy never replaces the previous verified image on the host.
+    [[ -s out/darkos.iso ]] || { printf 'Verified stable ISO is missing\n' >&2; exit 1; }
+    mkdir -p /workspace/out
+    for iso in out/darkos-*.iso out/darkos.iso; do
+        [[ -s "$iso" ]] || { printf 'Verified ISO is missing: %s\n' "$iso" >&2; exit 1; }
+        darkos_publish_docker_iso "$iso" /workspace/out
+    done
+)
 
-printf '%s\n' 'Server = https://blackarch.org/blackarch/$repo/os/$arch' > /etc/pacman.d/blackarch-mirrorlist
-for attempt in 1 2 3; do
-  pacman -Syy --noconfirm && test -s /var/lib/pacman/sync/blackarch.db && break
-  if [ "$attempt" -eq 3 ]; then exit 1; fi
-done
-
-printf '==> Starting DarkOS ISO Build...\n'
-git config --global --add safe.directory /workspace
-export DARKOS_BUILD_SHA="$(git rev-parse HEAD)"
-bash build-iso.sh
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

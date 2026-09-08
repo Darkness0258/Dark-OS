@@ -7,6 +7,7 @@ so nothing but arithmetic can ever execute, regardless of what's typed or
 pasted in.
 """
 import ast
+import math
 import operator
 import os
 import sys
@@ -28,6 +29,16 @@ _BIN_OPS = {
     ast.Mod: operator.mod, ast.Pow: operator.pow,
 }
 _UNARY_OPS = {ast.USub: operator.neg, ast.UAdd: operator.pos}
+MAX_EXPRESSION_LENGTH = 512
+MAX_INTEGER_BITS = 4096
+
+
+def bounded_number(value):
+    if type(value) is int and value.bit_length() <= MAX_INTEGER_BITS:
+        return value
+    if type(value) is float and math.isfinite(value):
+        return value
+    raise ValueError("result is outside the supported real-number range")
 
 
 def safe_eval(expr):
@@ -35,21 +46,32 @@ def safe_eval(expr):
     ValueError for anything that isn't a numeric literal or +-*/%** — no
     names, calls, attributes, subscripts, or comparisons are ever allowed
     to reach Python's evaluator."""
-    expr = expr.strip().replace("×", "*").replace("÷", "/").replace("^", "**")
+    expr = expr.strip().replace("×", "*").replace("÷", "/").replace("−", "-").replace("^", "**")
     if not expr:
         raise ValueError("empty expression")
+    if len(expr) > MAX_EXPRESSION_LENGTH:
+        raise ValueError("expression is too long")
     try:
         node = ast.parse(expr, mode="eval").body
     except SyntaxError as e:
         raise ValueError(str(e)) from e
+    if sum(1 for _ in ast.walk(node)) > 128:
+        raise ValueError("expression is too complex")
 
     def _eval(n):
-        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
-            return n.value
+        if isinstance(n, ast.Constant) and type(n.value) in (int, float):
+            return bounded_number(n.value)
         if isinstance(n, ast.BinOp) and type(n.op) in _BIN_OPS:
-            return _BIN_OPS[type(n.op)](_eval(n.left), _eval(n.right))
+            left, right = _eval(n.left), _eval(n.right)
+            if isinstance(n.op, ast.Pow):
+                if abs(right) > MAX_INTEGER_BITS:
+                    raise ValueError("exponent is too large")
+                if type(left) is int and type(right) is int and abs(left) > 1 and right > 0:
+                    if right > MAX_INTEGER_BITS // (abs(left).bit_length() - 1):
+                        raise ValueError("power would exceed the integer limit")
+            return bounded_number(_BIN_OPS[type(n.op)](left, right))
         if isinstance(n, ast.UnaryOp) and type(n.op) in _UNARY_OPS:
-            return _UNARY_OPS[type(n.op)](_eval(n.operand))
+            return bounded_number(_UNARY_OPS[type(n.op)](_eval(n.operand)))
         raise ValueError("only plain arithmetic is allowed")
 
     return _eval(node)

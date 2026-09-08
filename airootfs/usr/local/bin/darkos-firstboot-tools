@@ -1,35 +1,85 @@
 #!/bin/bash
-# DarkOS first-boot BlackArch tool-group picker.
+# DarkOS first-boot onboarding: performance profile, then BlackArch tools.
 #
-# Runs on every Hyprland start via exec-once, but only acts once:
-#   - Skips on the live ISO (/run/archiso exists)
-#   - Skips if the completion marker already exists
-#   - Otherwise, shows a wofi dialog asking whether to install
-#     BlackArch tool groups, and launches the picker in a terminal
-#     so the user can enter their sudo password.
+# Runs on every Hyprland start via exec-once, but only acts once per step:
+#   - Skips entirely on the live ISO (/run/archiso exists)
+#   - Each step has its own completion marker, so declining or completing
+#     one doesn't affect the other, and a failed or cancelled step is
+#     offered again next session instead of becoming permanently stuck.
 #
-# The marker lives in the user's home (not /var/lib) because this
-# script runs as the logged-in user, not root, and the installed
-# system's wheel sudo requires a password.
+# Markers live in the user's home (not /var/lib) because this script runs
+# as the logged-in user, not root, and the installed system's wheel sudo
+# requires a password.
 
 set -euo pipefail
 
 MARKER_DIR="${HOME}/.config/darkos"
-DONE_MARKER="${MARKER_DIR}/firstboot-tools.done"
-DECLINED_MARKER="${MARKER_DIR}/firstboot-tools.declined"
 
-# Live ISO — never run the picker here.
+# Live ISO — never run onboarding here.
 [ -d /run/archiso ] && exit 0
+
+# wofi is required for every prompt below.
+if ! command -v wofi >/dev/null 2>&1; then
+    exit 0
+fi
+
+# --- Step 1: performance profile --------------------------------------------
+# No sudo needed: power-profiles-daemon authorizes the active session user
+# directly over D-Bus (see darkos-settings.py's _powerprofiles_command,
+# which talks to the same daemon the same way for the Settings app).
+performance_done="${MARKER_DIR}/firstboot-performance.done"
+performance_declined="${MARKER_DIR}/firstboot-performance.declined"
+
+if [ ! -f "$performance_done" ] && [ ! -f "$performance_declined" ] \
+        && command -v powerprofilesctl >/dev/null 2>&1; then
+    available=$(powerprofilesctl list 2>/dev/null \
+        | grep -oE '^[[:space:]]*\*?[[:space:]]*(performance|balanced|power-saver):' \
+        | sed -E 's/^[[:space:]]*\*?[[:space:]]*//; s/:$//' || true)
+
+    menu=""
+    if printf '%s\n' "$available" | grep -qx "performance"; then
+        menu="${menu}Performance"$'\n'
+    fi
+    if printf '%s\n' "$available" | grep -qx "balanced"; then
+        menu="${menu}Balanced"$'\n'
+    fi
+    if printf '%s\n' "$available" | grep -qx "power-saver"; then
+        menu="${menu}Power saver"$'\n'
+    fi
+
+    # Only prompt if the daemon actually offered something real to choose.
+    if [ -n "$menu" ]; then
+        menu="${menu}Skip - don't ask again"
+        choice=$(printf '%s\n' "$menu" \
+            | wofi --show dmenu --prompt "Choose a performance profile" 2>/dev/null || true)
+
+        profile=""
+        case "$choice" in
+            Performance) profile=performance ;;
+            Balanced) profile=balanced ;;
+            "Power saver") profile=power-saver ;;
+            "Skip - don't ask again")
+                mkdir -p "$MARKER_DIR"
+                touch "$performance_declined"
+                ;;
+            *) : ;;  # cancelled — no marker, ask again next session
+        esac
+
+        if [ -n "$profile" ] && powerprofilesctl set "$profile" >/dev/null 2>&1; then
+            mkdir -p "$MARKER_DIR"
+            touch "$performance_done"
+        fi
+    fi
+fi
+
+# --- Step 2: BlackArch tool groups -------------------------------------------
+tools_done="${MARKER_DIR}/firstboot-tools.done"
+tools_declined="${MARKER_DIR}/firstboot-tools.declined"
 
 # Stop after a successful setup or an explicit decline. A failed install has
 # no marker, so it is offered again on the next session instead of becoming
 # permanently impossible to retry.
-if [ -f "$DONE_MARKER" ] || [ -f "$DECLINED_MARKER" ]; then
-    exit 0
-fi
-
-# wofi is required for the GUI dialog.
-if ! command -v wofi >/dev/null 2>&1; then
+if [ -f "$tools_done" ] || [ -f "$tools_declined" ]; then
     exit 0
 fi
 
@@ -42,21 +92,26 @@ choice=$(printf "Yes - Select tools now\nNo - Don't ask again" \
 case "$choice" in
     No*)
         mkdir -p "$MARKER_DIR"
-        touch "$DECLINED_MARKER"
+        touch "$tools_declined"
         exit 0
         ;;
 esac
 
 # Launch the BlackArch tool-group picker in a terminal so sudo can prompt
-# for the install password. Go through The Void (the project's terminal
-# wrapper), not bare kitty, so the selector also opens inside VMs where
-# kitty cannot create an OpenGL context.
-if command -v kitty >/dev/null 2>&1; then
-    /usr/local/bin/the-void.sh -e sudo /usr/local/bin/darkos-tool-groups || exit 1
+# for the install password. The static shell program creates the completion
+# marker only after the picker has selected and successfully installed a group;
+# The Void itself is a GUI process and cannot relay its child's status.
+if [ -x /usr/local/bin/the-void.sh ]; then
+    /usr/local/bin/the-void.sh -e /bin/sh -c \
+        'sudo "$1" && mkdir -p "$2" && touch "$3"' \
+        darkos-firstboot-tools \
+        /usr/local/bin/darkos-tool-groups \
+        "$MARKER_DIR" \
+        "$tools_done" || exit 1
 else
     # Fallback: run the wofi-based picker directly (no terminal output).
-    sudo /usr/local/bin/darkos-tool-groups || exit 1
+    if sudo /usr/local/bin/darkos-tool-groups; then
+        mkdir -p "$MARKER_DIR"
+        touch "$tools_done"
+    fi
 fi
-
-mkdir -p "$MARKER_DIR"
-touch "$DONE_MARKER"
