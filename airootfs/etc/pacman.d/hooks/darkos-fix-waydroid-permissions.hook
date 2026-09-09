@@ -1,0 +1,32 @@
+# Chaotic-AUR's waydroid package has shipped /usr/bin/waydroid without the
+# executable bit before; this keeps DarkOS working even if that happens
+# again, on the ISO build and on a real install's future upgrades alike.
+#
+# profiledef.sh's file_permissions can't reach this file: mkarchiso runs
+# _make_custom_airootfs (which applies file_permissions) before _make_packages
+# (which pacstraps this package in) — confirmed by reading mkarchiso's own
+# build order, not assumed. A pacman hook is the correct place to fix
+# something after a specific package installs.
+#
+# Deliberately NOT marked for removal from the live system: if the upstream
+# package needs this fix during the ISO build, a user's own later
+# `pacman -Syu` deserves the same protection, not just this one image.
+#
+# Scoped to waydroid because that's the one confirmed by an actual CI failure.
+# If a future build reports the same "not executable" error for another
+# package (wine and winetricks are next in the same check, unverified so
+# far), add another Target= / Depends= / chmod line here rather than a
+# separate hook file.
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = waydroid
+
+[Action]
+Description = Ensuring Waydroid's CLI is executable after install/upgrade...
+When = PostTransaction
+Depends = waydroid
+Depends = coreutils
+Exec = /usr/bin/chmod 0755 /usr/bin/waydroid

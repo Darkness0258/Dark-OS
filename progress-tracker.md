@@ -538,3 +538,25 @@ What's still genuinely unverified is purely cosmetic/compositor-specific — whe
 **Full re-verification after everything:** 53 files py_compile clean, all `.sh` files plus the extensionless `darkos-firstboot-tools` bash-syntax clean, `git diff --check` clean, 148/148 existing tests still passing, all 21 native apps *and* the shell chrome itself confirmed to construct without crashing.
 
 **Ceiling, stated plainly:** still cannot build a real ISO, boot one, or test on real hardware — same Arch/Docker/VM limitation as every prior session. What changed today is the category of what's been checked: this pass exercised actual execution (the shell smoke test, the stubbed onboarding runs, the extracted `assert_profile_permissions` re-run) everywhere real execution was reachable, not just static reading. The `wofi` rendering itself and a real terminal-handoff install still need a live Wayland session to see for real.
+
+## 2026-09-08 — Real CI progress: past ISO build, into a package-permissions gap
+
+**Context:** New CI screenshot after the merge-conflict and generate-wallpaper.py fixes. Good news first: "Verifying executable modes inside the built SquashFS..." hit 106/106 100% — the profiledef.sh fix from two sessions ago is confirmed working in the real pipeline, and the ISO itself built successfully (3.7G, xorriso completed). The build is now reaching stages that never ran before, because every earlier failure always stopped the pipeline first.
+
+**New failure:** `ci/verify-iso.sh` extracts the built ISO and checks a combined list of ~30 system-package binaries for `-x`. It reached `/usr/bin/waydroid` and failed there — meaning everything checked before it (arecord through steam) passed, and everything after it (wine, winetricks) was never reached, so their status is still unknown.
+
+**Investigated properly rather than guessing at a fix:** cloned archiso's real upstream source (`github.com/archlinux/archiso`) to check two things I wasn't fully certain about rather than trust memory:
+1. Whether `customize_airootfs.sh` (an older archiso convention for post-pacstrap fixups) still exists — it doesn't; grepped the current source, confirmed absent.
+2. The actual call order in `mkarchiso`'s `_build_iso_base()`: `_make_custom_airootfs` (applies `profiledef.sh`'s `file_permissions`) runs *before* `_make_packages` (pacstrap). This means `file_permissions` can only ever fix files that ship in this repo's own `airootfs/` tree — it structurally cannot reach anything a package installs, including `/usr/bin/waydroid`. Confirmed by reading the actual function-call sequence, not inferred.
+
+**Root cause, most likely:** Chaotic-AUR's `waydroid` package (waydroid isn't in the official repos) shipping `/usr/bin/waydroid` without its executable bit — can't confirm this against the real package without network access to Chaotic-AUR, which isn't reachable from this sandbox either.
+
+**Fix:** a pacman hook, not a profiledef.sh entry — the correct mechanism for "do something after a specific package installs." Confirmed the exact `.hook` file syntax against archiso's own real example hooks (`uncomment-mirrors.hook`) rather than guessing at the format. New file: `airootfs/etc/pacman.d/hooks/darkos-fix-waydroid-permissions.hook`, triggers on `Type = Package, Target = waydroid`, `PostTransaction`, runs `chmod 0755 /usr/bin/waydroid`.
+
+Deliberately **not** marked for build-only removal (archiso has an existing hook, `zzzz99-remove-custom-hooks-from-airootfs.hook`, that auto-deletes any hook file containing the literal string "remove from airootfs" — confirmed my new file doesn't contain that phrase, so it survives into the installed system). Reasoning: if the upstream package has this defect during the ISO build, a real DarkOS install's own future `pacman -Syu` deserves the same protection, not just this one image.
+
+**Scoped to waydroid only, on purpose:** the check stops at the first failure, so wine and winetricks (next in the same list) are unverified, not confirmed-clean. Didn't extend the hook to cover them speculatively — no evidence either way yet, and guessing wrong just adds noise. Documented directly in the hook file's own comments: if a future build reports the same error for another package, extend this same hook (another `Target=`/`Depends=`/chmod line) rather than creating a new file each time.
+
+**Also reconfirmed:** ran a repo-wide grep for leftover `<<<<<<<`/`=======`/`>>>>>>>` conflict markers — clean (one incidental match in `Installation_guide` is a plain text divider, not a marker). `generate-wallpaper.py` is restored and real (184 lines, 6.5KB) — confirmed via direct inspection.
+
+**Not verified, same honest ceiling as always:** whether the hook actually fires and fixes the permission for real — that needs an actual `pacstrap`/`mkarchiso` run against the real `waydroid` package, which no environment available this session (or the last several) can do. The `.hook` syntax and trigger logic are confirmed correct against real archiso source; whether Chaotic-AUR's package genuinely has this defect is inferred from the CI failure, not independently confirmed.
