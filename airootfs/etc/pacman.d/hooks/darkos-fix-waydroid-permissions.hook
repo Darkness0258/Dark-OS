@@ -1,22 +1,32 @@
-# Chaotic-AUR's waydroid package has shipped /usr/bin/waydroid without the
-# executable bit before; this keeps DarkOS working even if that happens
-# again, on the ISO build and on a real install's future upgrades alike.
+# Belt-and-suspenders permission fix for Waydroid's CLI entry point.
 #
-# profiledef.sh's file_permissions can't reach this file: mkarchiso runs
-# _make_custom_airootfs (which applies file_permissions) before _make_packages
-# (which pacstraps this package in) — confirmed by reading mkarchiso's own
-# build order, not assumed. A pacman hook is the correct place to fix
-# something after a specific package installs.
+# /usr/bin/waydroid is a symlink installed by Waydroid's own upstream
+# Makefile (`ln -sf ... $(INSTALL_BIN_DIR)/waydroid`, confirmed by reading
+# it directly at github.com/waydroid/waydroid), pointing at a waydroid.py
+# that upstream's own `cp -a` already ships executable. This hook is a
+# defensive re-assertion in case a future Chaotic-AUR repackage ever loses
+# that bit — chmod on a symlink follows it to the real target, which is
+# the correct behavior here.
 #
-# Deliberately NOT marked for removal from the live system: if the upstream
-# package needs this fix during the ISO build, a user's own later
-# `pacman -Syu` deserves the same protection, not just this one image.
+# profiledef.sh's file_permissions can't reach this file at all: mkarchiso
+# runs _make_custom_airootfs (which applies file_permissions) before
+# _make_packages (which pacstraps this package in) — confirmed by reading
+# mkarchiso's own build order, not assumed. A pacman hook is the correct
+# place to fix something after a specific package installs.
 #
-# Scoped to waydroid because that's the one confirmed by an actual CI failure.
-# If a future build reports the same "not executable" error for another
-# package (wine and winetricks are next in the same check, unverified so
-# far), add another Target= / Depends= / chmod line here rather than a
-# separate hook file.
+# Deliberately NOT marked for removal from the live system: if this ever
+# needs to fire, a real install's future `pacman -Syu` deserves the same
+# protection, not just this one image.
+#
+# Note on what actually broke CI: the real cause of the "not executable"
+# verify-iso.sh failure this hook was originally written for turned out to
+# be a false positive in the checker itself — ci/verify-iso.sh's selective
+# `unsquashfs` extraction pulls in the /usr/bin/waydroid symlink but not
+# its target directory, so the target is correctly absent from that narrow
+# extraction, not actually missing from the real ISO. Fixed at the source:
+# ci/verify-iso.sh now checks symlinks by presence of a real link target
+# instead of requiring -x through a target it never extracted. This hook
+# stays anyway as real, if currently unproven-necessary, defense in depth.
 
 [Trigger]
 Operation = Install
@@ -28,5 +38,4 @@ Target = waydroid
 Description = Ensuring Waydroid's CLI is executable after install/upgrade...
 When = PostTransaction
 Depends = waydroid
-Depends = coreutils
 Exec = /usr/bin/chmod 0755 /usr/bin/waydroid

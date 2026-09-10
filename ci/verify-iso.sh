@@ -368,7 +368,24 @@ for relative in usr/bin/arecord usr/bin/brightnessctl usr/bin/btrfs \
     usr/bin/hypridle usr/bin/hyprlock usr/bin/pamixer usr/bin/playerctl \
     usr/bin/plymouth-set-default-theme usr/bin/regreet usr/bin/unsquashfs \
     usr/bin/vmtoolsd "${phase5_executables[@]}" "${phase7_executables[@]}"; do
-    if [[ ! -x "$extracted/$relative" ]]; then
+    path="$extracted/$relative"
+    if [[ -L "$path" ]]; then
+        # Some upstreams (Waydroid's own Makefile, confirmed against its real
+        # source) install their /usr/bin entry as a symlink into /usr/lib or
+        # /usr/share. unsquashfs here only extracts the exact paths listed
+        # above, not a symlink's target directory, so -x on the extracted
+        # link is checking a target this selective extraction never pulled
+        # in - not evidence the real ISO is broken. A present, non-empty
+        # link is the verification bar a partial extraction can actually
+        # support; regular files below still require a real, checkable -x.
+        target="$(readlink -- "$path")"
+        if [[ -z "$target" ]]; then
+            printf 'Required ISO executable symlink has no target: /%s\n' "$relative" >&2
+            exit 1
+        fi
+        continue
+    fi
+    if [[ ! -x "$path" ]]; then
         printf 'Required ISO executable is not executable: /%s\n' "$relative" >&2
         exit 1
     fi
