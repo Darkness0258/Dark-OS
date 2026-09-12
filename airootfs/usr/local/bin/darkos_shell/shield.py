@@ -78,6 +78,28 @@ class ScanResult:
     detail: str
 
 
+def parse_infected_files(detail: str) -> list[tuple[Path, str]]:
+    """Pull (path, signature) pairs out of a "detected" ScanResult's detail
+    text. clamscan --infected prints exactly one line per hit in the form
+    "<path>: <signature> FOUND" -- documented, stable output shape, not
+    guessed. Signature names never contain a colon, so anchoring the split
+    on ": <no-colon-text> FOUND$" correctly handles paths that do (rare on
+    Linux, but not impossible). Silently skips anything that doesn't match
+    rather than raising -- a report line this doesn't recognize shouldn't
+    block quarantining the ones it does."""
+    hits: list[tuple[Path, str]] = []
+    for line in detail.splitlines():
+        match = re.match(r"^(.+): ([^:]+) FOUND$", line.strip())
+        if not match:
+            continue
+        path_text, signature = match.group(1), match.group(2)
+        try:
+            hits.append((Path(path_text).resolve(strict=True), signature))
+        except OSError:
+            continue  # file already gone (moved/deleted between scan and parse)
+    return hits
+
+
 def scan_path(
     target: Path,
     cancel: threading.Event,
@@ -152,3 +174,32 @@ def scan_path(
         return ScanResult("clean", "No threats reported in scanned content.\n" + detail)
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         return ScanResult("error", f"Scan could not complete: {error}")
+
+
+def scan_and_quarantine(
+    target: Path,
+    cancel: threading.Event,
+    timeout: float = 600,
+    database: Path | None = None,
+) -> tuple[ScanResult, list[str]]:
+    """scan_path, then quarantine anything it found -- the one path shared
+    by the on-demand Security Center scan and the continuous-protection
+    watcher, so both quarantine the same way instead of two copies of the
+    same loop drifting apart. `database` forwards straight to scan_path,
+    same purpose: real engine tests without needing the real (and here,
+    unreachable without network access) definitions database. Import is
+    local to avoid a hard import-time dependency from shield.py (the
+    module with no other project imports) onto quarantine.py; keeps
+    `python -m py_compile shield.py` meaningful on its own."""
+    from darkos_shell.quarantine import quarantine_file
+
+    result = scan_path(target, cancel, timeout=timeout, database=database)
+    actions: list[str] = []
+    if result.outcome == "detected":
+        for path, signature in parse_infected_files(result.detail):
+            try:
+                quarantine_file(path, reason=signature)
+                actions.append(f"quarantined: {path} ({signature})")
+            except OSError as error:
+                actions.append(f"COULD NOT quarantine {path}: {error}")
+    return result, actions

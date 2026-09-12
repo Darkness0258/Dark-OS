@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -24,6 +25,14 @@ assert SPEC is not None and SPEC.loader is not None
 shield = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = shield
 SPEC.loader.exec_module(shield)
+
+QSPEC = importlib.util.spec_from_file_location(
+    "darkos_quarantine_test_target", ROOT / "airootfs/usr/local/bin/darkos_shell/quarantine.py"
+)
+assert QSPEC is not None and QSPEC.loader is not None
+quarantine = importlib.util.module_from_spec(QSPEC)
+sys.modules[QSPEC.name] = quarantine
+QSPEC.loader.exec_module(quarantine)
 
 
 class ScannerTests(unittest.TestCase):
@@ -87,6 +96,29 @@ class ScannerTests(unittest.TestCase):
     def test_detection(self) -> None:
         result, _ = self.simulate(1, b"sample: Synthetic.Test FOUND\nScanned files: 1\n")
         self.assertEqual(result.outcome, "detected")
+
+    def test_parse_infected_files_extracts_path_and_signature(self) -> None:
+        hit_path = self.root / "hit.txt"
+        hit_path.write_text("x", encoding="utf-8")
+        detail = f"{hit_path}: Synthetic.Test-1 FOUND\nScanned files: 1\n"
+        hits = shield.parse_infected_files(detail)
+        self.assertEqual(hits, [(hit_path.resolve(), "Synthetic.Test-1")])
+
+    def test_parse_infected_files_handles_colon_in_path(self) -> None:
+        hit_path = self.root / "weird:name.txt"
+        hit_path.write_text("x", encoding="utf-8")
+        detail = f"{hit_path}: Synthetic.Test-2 FOUND\n"
+        hits = shield.parse_infected_files(detail)
+        self.assertEqual(hits, [(hit_path.resolve(), "Synthetic.Test-2")])
+
+    def test_parse_infected_files_skips_files_gone_since_scan(self) -> None:
+        gone = self.root / "already-deleted.txt"
+        detail = f"{gone}: Synthetic.Test-3 FOUND\n"
+        self.assertEqual(shield.parse_infected_files(detail), [])
+
+    def test_parse_infected_files_ignores_non_matching_lines(self) -> None:
+        detail = "----------- SCAN SUMMARY -----------\nScanned files: 4\nInfected files: 0\n"
+        self.assertEqual(shield.parse_infected_files(detail), [])
 
     def test_errors_and_empty_scans_fail_closed(self) -> None:
         for code, report in (
@@ -282,6 +314,41 @@ class RealEngineTests(unittest.TestCase):
         self.assertEqual(result.outcome, "error", result.detail)
         result = shield.scan_path(self.target, self.cancel, database=empty)
         self.assertEqual(result.outcome, "error", result.detail)
+
+    def test_real_detection_parses_and_quarantines_correctly(self) -> None:
+        """End-to-end against the real engine: detect, parse the real
+        clamscan output (not a mocked string), quarantine, confirm the
+        original is gone and the quarantine record is byte-correct."""
+        payload = b"DARKOS_SYNTHETIC_SCANNER_TEST_PAYLOAD_QUARANTINE"
+        database = self.root / "quarantine-test.ndb"
+        database.write_text(f"DarkOS.QuarantineTest:0:*:{payload.hex()}\n", encoding="ascii")
+        self.target.write_bytes(payload)
+        original_sha = hashlib.sha256(payload).hexdigest()
+
+        result = shield.scan_path(self.target, self.cancel, database=database)
+        self.assertEqual(result.outcome, "detected", result.detail)
+
+        hits = shield.parse_infected_files(result.detail)
+        self.assertEqual(len(hits), 1, result.detail)
+        hit_path, signature = hits[0]
+        self.assertEqual(hit_path, self.target.resolve())
+        # ClamAV appends ".UNOFFICIAL" for signatures from a non-official
+        # database (learned by running this for real, not assumed) --
+        # checking the prefix is correct and more robust than pinning the
+        # exact suffix to one ClamAV version's behavior.
+        self.assertTrue(signature.startswith("DarkOS.QuarantineTest"), signature)
+
+        fake_quarantine_dir = self.root / "quarantine-store"
+        with patch.object(quarantine, "QUARANTINE_DIR", fake_quarantine_dir):
+            entry = quarantine.quarantine_file(hit_path, reason=signature)
+            self.assertFalse(self.target.exists(), "original must be gone after quarantine")
+            self.assertEqual(entry.sha256, original_sha)
+            listed = quarantine.list_quarantine()
+            self.assertEqual(len(listed), 1)
+            self.assertTrue(listed[0].reason.startswith("DarkOS.QuarantineTest"))
+            ok, _msg = quarantine.restore(entry.id)
+            self.assertTrue(ok)
+            self.assertEqual(self.target.read_bytes(), payload)
 
 
 if __name__ == "__main__":

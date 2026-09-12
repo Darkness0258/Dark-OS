@@ -25,7 +25,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.app_kit import add_class, run_app  # noqa: E402
-from darkos_shell.shield import scan_path  # noqa: E402
+from darkos_shell.shield import scan_and_quarantine  # noqa: E402
 
 APP_ID = "org.darkos.SecurityCenter"
 WM_CLASS = "darkos-security"
@@ -461,13 +461,14 @@ class SecurityWindow(Gtk.ApplicationWindow):
         threading.Thread(target=self._scan_worker, args=(Path(selected), self._scan_cancel), daemon=True).start()
 
     def _scan_worker(self, target, cancel):
-        result = scan_path(target, cancel)
-        GLib.idle_add(self._scan_finished, result)
+        result, actions = scan_and_quarantine(target, cancel)
+        quarantine_summary = ("\n\nQuarantine:\n" + "\n".join(f"  {a}" for a in actions)) if actions else ""
+        GLib.idle_add(self._scan_finished, result, quarantine_summary)
 
-    def _scan_finished(self, result):
+    def _scan_finished(self, result, quarantine_summary=""):
         if self._closed:
             return False
-        self._scan_report.get_buffer().set_text(result.detail)
+        self._scan_report.get_buffer().set_text(result.detail + quarantine_summary)
         for button in self._scan_buttons:
             button.set_sensitive(True)
         self._cancel_scan.set_sensitive(False)

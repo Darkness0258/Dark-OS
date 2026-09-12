@@ -245,8 +245,12 @@ CSS_STYLE = f"""
     border-radius: 999px;
 }}
 
+/* trough needs an opaque dark background, not an alpha overlay: GTK paints
+   its own stock-light trough underneath first, so a low-alpha color (the
+   original alpha({COLOR_TEXT}, 0.08) here) blends toward white instead of
+   toward dark. Same fix shape as calendar/notebook/textview above. */
 scale trough {{
-    background-color: alpha({COLOR_TEXT}, 0.08);
+    background-color: {COLOR_BG_ALT};
     border-radius: {RADIUS_CONTROL}px;
     min-height: 6px;
 }}
@@ -262,6 +266,50 @@ scale slider {{
     border-radius: 50%;
     min-width: 14px;
     min-height: 14px;
+}}
+
+/* GtkLevelBar had no rule at all yet -- same stock-light trough issue as
+   scale above, confirmed by rendering it (see the redesign-plan audit). */
+levelbar trough {{
+    background-color: {COLOR_BG_ALT};
+    border-radius: {RADIUS_CONTROL}px;
+    min-height: 6px;
+}}
+
+levelbar block.filled {{
+    background-color: {COLOR_PRIMARY};
+    border-radius: {RADIUS_CONTROL}px;
+}}
+
+levelbar block.empty {{
+    background-color: transparent;
+}}
+
+/* Same trough issue as scale/levelbar, same fix. Also: GTK defaults both
+   progressbar's fill and switch's "on" state to its own suggested-action
+   blue, not this app's accent -- COLOR_PRIMARY everywhere fixes both. */
+progressbar trough {{
+    background-color: {COLOR_BG_ALT};
+    border-radius: {RADIUS_CONTROL}px;
+}}
+
+progressbar progress {{
+    background-color: {COLOR_PRIMARY};
+    border-radius: {RADIUS_CONTROL}px;
+}}
+
+switch {{
+    background-color: {COLOR_BG_ALT};
+    border-radius: {RADIUS_CONTROL}px;
+}}
+
+switch:checked {{
+    background-color: {COLOR_PRIMARY};
+}}
+
+switch slider {{
+    background-color: {COLOR_TEXT};
+    border-radius: 50%;
 }}
 
 separator {{

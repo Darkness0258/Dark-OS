@@ -246,6 +246,8 @@ class AIBrain:
         """Send messages to the brain. Returns error stub on failure."""
         with self._operation_lock:
             prepared = _with_system_prompt(messages)
+            if self._try_cloud_ai(prepared, timeout):
+                return self._last_result
             if self._try_openrouter(prepared, timeout):
                 return self._last_result
             if self._try_local_llm(prepared, timeout):
@@ -374,6 +376,23 @@ class AIBrain:
             return False
 
     # ── Cloud Brain: OpenRouter ────────────────────────────────────────
+
+    def _try_cloud_ai(self, messages: list, timeout: float) -> bool:
+        """Phase 9 hosted tier -- see darkos_cloud.py. A no-op today (no
+        Supabase project exists yet, see that module's docstring); once
+        one does, this needs no changes, only env vars set."""
+        try:
+            from darkos_shell.darkos_cloud import call_cloud_ai
+            reply = call_cloud_ai(messages, timeout=timeout)
+            if not reply:
+                return False
+            self._last_result = reply
+            self._last_error = None
+            self._offline_mode = False
+            return True
+        except Exception as exc:
+            self._last_error = f"Cloud AI failed: {exc}"
+            return False
 
     def _try_openrouter(self, messages: list, timeout: float) -> bool:
         if not self._openrouter_key:

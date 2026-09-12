@@ -196,10 +196,21 @@ class DarkOSApplication(Gtk.Application):
     # ── Activity detection → layout ─────────────────────────────────────
 
     def _on_activity_changed(self, profile_name, profile_data):
-        """Swap dock highlight and panel visibility per activity profile."""
+        """Swap dock highlight always; only adjust Command Center panels if
+        Command Center is already open.
+
+        Dock highlight is part of the always-on base layer, so it updates
+        regardless. left/right are Command Center panels, though -- if we
+        show/hide them while Command Center is closed, it visibly pops open
+        on its own the moment the user switches apps, with no --toggle
+        pressed. That's the bug this guard closes (see ui-rules.md's known
+        activity_detector/Command-Center conflict, and the redesign-plan
+        audit that confirmed it by tracing this method)."""
         if self.dock is None:
             return
         self.dock.set_activity_profile(profile_data.get("dock_highlight"))
+        if self.hud is None or not self.hud.is_visible():
+            return
         if self.left is not None:
             visible = profile_data.get("show_chat", True)
             if visible and not self.left.is_visible():
@@ -296,9 +307,12 @@ class DarkOSApplication(Gtk.Application):
             self._toggle_window(self.left)
             self._toggle_window(self.right)
         if args.toggle_command_center:
-            # HUD visibility is the source of truth for "open" — unlike
-            # left/right, activity_detector never touches it, so it can't
-            # drift out of sync the way independently-toggled windows could.
+            # HUD visibility is the source of truth for "open". Safe to rely
+            # on now that _on_activity_changed only touches left/right while
+            # the HUD is already visible (guarded there, not here) -- before
+            # that guard, activity changes could show/hide left/right while
+            # Command Center was closed, which is what made it look like it
+            # was opening/closing on its own.
             opening = not self.hud.is_visible()
             for window in (self.hud, self.left, self.right):
                 if opening:
