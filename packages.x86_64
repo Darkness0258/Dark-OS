@@ -94,6 +94,7 @@ adwaita-icon-theme
 gtk-layer-shell
 swaybg
 mako
+libnotify
 brightnessctl
 pamixer
 playerctl

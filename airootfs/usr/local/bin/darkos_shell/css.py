@@ -312,6 +312,22 @@ switch slider {{
     border-radius: 50%;
 }}
 
+/* Same stock-light-chrome gap as scale/levelbar/progressbar above, this
+   time on Gtk.ListBox -- found rendering the real Quarantine list, same
+   as those were found: by actually looking, not assumed. */
+list {{
+    background-color: transparent;
+}}
+
+row {{
+    background-color: {COLOR_BG_ALT};
+    color: {COLOR_TEXT};
+}}
+
+row:hover {{
+    background-color: {COLOR_BG_ELEVATED};
+}}
+
 separator {{
     background-color: alpha({COLOR_TEXT}, 0.12);
     min-height: 1px;

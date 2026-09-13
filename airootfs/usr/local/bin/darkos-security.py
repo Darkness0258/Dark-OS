@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""DarkOS Security Center — Vault, Privacy, Shield, Permissions, Encrypt.
+"""DarkOS Security Center — Vault, Privacy, Shield, Quarantine, Permissions, Encrypt.
 
 Vault and Encrypt use PBKDF2-HMAC-SHA256 and authenticated Fernet encryption.
-Shield runs cancellable, on-demand ClamAV scans. Continuous monitoring and
-system integrity baselines require a separate configured service.
+Shield runs cancellable, on-demand ClamAV scans and continuous protection
+(darkos-protect.py, launched separately via hyprland.conf) on Downloads and
+Desktop; both quarantine through the same shield.scan_and_quarantine path,
+reviewed and restored from the Quarantine tab. System integrity baselines
+(rkhunter/AIDE) are not enabled yet.
 """
 import base64
 import json
@@ -12,12 +15,13 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import GLib, Gtk, Pango  # noqa: E402
 
 from cryptography.fernet import Fernet, InvalidToken  # noqa: E402
 from cryptography.hazmat.primitives import hashes  # noqa: E402
@@ -26,6 +30,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.app_kit import add_class, run_app  # noqa: E402
 from darkos_shell.shield import scan_and_quarantine  # noqa: E402
+from darkos_shell import quarantine  # noqa: E402
+from darkos_shell.user_settings import load_settings, save_settings  # noqa: E402
 
 APP_ID = "org.darkos.SecurityCenter"
 WM_CLASS = "darkos-security"
@@ -118,6 +124,7 @@ class SecurityWindow(Gtk.ApplicationWindow):
         notebook.append_page(self._build_vault_tab(), Gtk.Label(label="Vault"))
         notebook.append_page(self._build_privacy_tab(), Gtk.Label(label="Privacy"))
         notebook.append_page(self._build_shield_tab(), Gtk.Label(label="Shield"))
+        notebook.append_page(self._build_quarantine_tab(), Gtk.Label(label="Quarantine"))
         notebook.append_page(self._build_permissions_tab(), Gtk.Label(label="Permissions"))
         notebook.append_page(self._build_encrypt_tab(), Gtk.Label(label="Encrypt"))
         self.add(notebook)
@@ -408,10 +415,27 @@ class SecurityWindow(Gtk.ApplicationWindow):
         box.pack_start(Gtk.Label(label="<b>Shield</b>", xalign=0, use_markup=True), False, False, 0)
         box.pack_start(Gtk.Label(
             label="Scan a file or folder with ClamAV. Update definitions before scanning. "
-                  "Scans leave files in place and report threats, unreadable content, or scan limits. "
-                  "Continuous protection, quarantine, and system integrity checks are not enabled.",
+                  "A detected file is moved to Quarantine, not deleted or left in place — "
+                  "see the Quarantine tab to review or restore it. System integrity checks "
+                  "(rkhunter/AIDE) are not enabled yet.",
             xalign=0, wrap=True,
         ), False, False, 8)
+        protection_row = Gtk.Box(spacing=10)
+        protection_row.pack_start(
+            Gtk.Label(label="Continuous protection (Downloads, Desktop)", xalign=0), True, True, 0
+        )
+        settings = load_settings()
+        self._protection_switch = Gtk.Switch()
+        self._protection_switch.set_active(bool(settings.get("shield_protection_enabled", True)))
+        self._protection_switch.connect("state-set", self._on_protection_toggled)
+        protection_row.pack_start(self._protection_switch, False, False, 0)
+        box.pack_start(protection_row, False, False, 0)
+        box.pack_start(Gtk.Label(
+            label="Takes effect within about 30 seconds, not instantly — darkos-protect.py "
+                  "checks this on its regular cycle rather than needing a live-reload path.",
+            xalign=0, wrap=True,
+        ), False, False, 0)
+        add_class(box.get_children()[-1], "body-muted")
         actions = Gtk.Box(spacing=8)
         self._scan_buttons = []
         for label, folder in (("Scan file…", False), ("Scan folder…", True)):
@@ -445,6 +469,12 @@ class SecurityWindow(Gtk.ApplicationWindow):
         except OSError as error:
             self._scan_report.get_buffer().set_text(f"Could not open definition updater: {error}")
 
+    def _on_protection_toggled(self, switch, state):
+        settings = load_settings()
+        settings["shield_protection_enabled"] = state
+        save_settings(settings)
+        return False  # let GTK update the switch's visual state normally
+
     def _choose_scan(self, folder):
         action = Gtk.FileChooserAction.SELECT_FOLDER if folder else Gtk.FileChooserAction.OPEN
         chooser = Gtk.FileChooserDialog(title="Select scan target", transient_for=self, action=action)
@@ -472,7 +502,99 @@ class SecurityWindow(Gtk.ApplicationWindow):
         for button in self._scan_buttons:
             button.set_sensitive(True)
         self._cancel_scan.set_sensitive(False)
+        if quarantine_summary:
+            self._refresh_quarantine_list()  # a scan just quarantined something -- show it now, not only after a manual Refresh click
         return False
+
+    # -- Quarantine ----------------------------------------------------------------
+    def _build_quarantine_tab(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_border_width(20)
+        header = Gtk.Box(spacing=8)
+        header.pack_start(
+            Gtk.Label(label="<b>Quarantine</b>", xalign=0, use_markup=True), True, True, 0
+        )
+        refresh = Gtk.Button(label="Refresh")
+        refresh.connect("clicked", lambda *_: self._refresh_quarantine_list())
+        header.pack_start(refresh, False, False, 0)
+        box.pack_start(header, False, False, 0)
+        box.pack_start(Gtk.Label(
+            label="Files Shield has flagged, moved aside rather than deleted -- by a manual "
+                  "scan or by continuous protection running in the background. Restore puts a "
+                  "file back where it came from (or somewhere else, if that spot's occupied "
+                  "now); permanent delete cannot be undone.",
+            xalign=0, wrap=True,
+        ), False, False, 0)
+        self._quarantine_list = Gtk.ListBox()
+        self._quarantine_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        scroll = Gtk.ScrolledWindow()
+        scroll.add(self._quarantine_list)
+        box.pack_start(scroll, True, True, 0)
+        self._quarantine_status = Gtk.Label(label="", xalign=0, wrap=True)
+        box.pack_start(self._quarantine_status, False, False, 0)
+        self._refresh_quarantine_list()
+        return box
+
+    def _refresh_quarantine_list(self):
+        for child in list(self._quarantine_list.get_children()):
+            self._quarantine_list.remove(child)
+        entries = quarantine.list_quarantine()
+        if not entries:
+            empty = Gtk.Label(label="Nothing in quarantine.", xalign=0)
+            empty.set_margin_top(8)
+            empty.set_margin_bottom(8)
+            self._quarantine_list.add(empty)
+        else:
+            for entry in entries:
+                self._quarantine_list.add(self._quarantine_row(entry))
+        self._quarantine_list.show_all()
+
+    def _quarantine_row(self, entry):
+        row = Gtk.ListBoxRow()
+        row.set_selectable(False)
+        outer = Gtk.Box(spacing=12)
+        outer.set_border_width(8)
+
+        details = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        details.set_hexpand(True)
+        name = Path(entry.original_path).name
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(entry.quarantined_at))
+        name_label = Gtk.Label(label=name, xalign=0)
+        name_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        name_label.set_max_width_chars(40)
+        details.pack_start(name_label, False, False, 0)
+        meta = Gtk.Label(
+            label=f"{entry.reason}  ·  {when}  ·  was: {entry.original_path}", xalign=0
+        )
+        meta.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        meta.set_max_width_chars(50)
+        meta.set_tooltip_text(entry.original_path)
+        add_class(meta, "body-muted")
+        details.pack_start(meta, False, False, 0)
+        outer.pack_start(details, True, True, 0)
+
+        restore = Gtk.Button(label="Restore")
+        restore.connect("clicked", lambda *_, entry_id=entry.id: self._restore_entry(entry_id))
+        outer.pack_start(restore, False, False, 0)
+
+        delete = Gtk.Button(label="Delete permanently")
+        delete.connect("clicked", lambda *_, entry_id=entry.id: self._delete_entry(entry_id))
+        outer.pack_start(delete, False, False, 0)
+
+        row.add(outer)
+        return row
+
+    def _restore_entry(self, entry_id):
+        ok, message = quarantine.restore(entry_id)
+        self._quarantine_status.set_text(message)
+        self._refresh_quarantine_list()
+
+    def _delete_entry(self, entry_id):
+        if quarantine.permanent_delete(entry_id):
+            self._quarantine_status.set_text("Deleted permanently.")
+        else:
+            self._quarantine_status.set_text("Could not find that entry -- already gone?")
+        self._refresh_quarantine_list()
 
     # -- Permissions -------------------------------------------------------------
     def _build_permissions_tab(self):

@@ -137,5 +137,62 @@ class FullLoopTests(unittest.TestCase):
             self.assertEqual(len(quarantine.list_quarantine()), 1)
 
 
+class ReconcileToggleTests(unittest.TestCase):
+    """darkos-protect.py's _reconcile: the settings.json toggle actually
+    starts/stops the real watcher, not just a flag nobody reads."""
+
+    def setUp(self) -> None:
+        self.home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
+        self.home_patcher = patch.dict("os.environ", {"HOME": self.home})
+        self.home_patcher.start()
+        self.addCleanup(self.home_patcher.stop)
+
+        from darkos_shell import user_settings
+
+        self.user_settings = user_settings
+
+        spec = importlib.util.spec_from_file_location(
+            "darkos_protect_test_target", BIN / "darkos-protect.py"
+        )
+        assert spec is not None and spec.loader is not None
+        self.protect = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.protect)
+
+        self.watchdir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.watchdir, ignore_errors=True)
+        self.seen: list[Path] = []
+        self.watcher = ContinuousWatcher(
+            [self.watchdir], lambda p: self.seen.append(p)
+        )
+
+    def tearDown(self) -> None:
+        self.watcher.stop()
+
+    def test_off_by_setting_reconcile_never_starts_it(self) -> None:
+        self.user_settings.save_settings({"shield_protection_enabled": False})
+        running = self.protect._reconcile(self.watcher, running=False)
+        self.assertFalse(running)
+        (self.watchdir / "dropped.txt").write_bytes(b"x")
+        time.sleep(1.0)
+        self.assertEqual(self.seen, [])
+
+    def test_toggled_on_then_off_actually_starts_and_stops_the_watcher(self) -> None:
+        self.user_settings.save_settings({"shield_protection_enabled": True})
+        running = self.protect._reconcile(self.watcher, running=False)
+        self.assertTrue(running)
+        target = self.watchdir / "dropped.txt"
+        target.write_bytes(b"x")
+        self.assertTrue(_wait_until(lambda: self.seen == [target]))
+
+        self.seen.clear()
+        self.user_settings.save_settings({"shield_protection_enabled": False})
+        running = self.protect._reconcile(self.watcher, running=running)
+        self.assertFalse(running)
+        (self.watchdir / "dropped-after-off.txt").write_bytes(b"x")
+        time.sleep(1.0)
+        self.assertEqual(self.seen, [], "must not still be catching files once turned off")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

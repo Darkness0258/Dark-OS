@@ -1,0 +1,256 @@
+diff --git a/airootfs/usr/local/bin/darkos-protect.py b/airootfs/usr/local/bin/darkos-protect.py
+index e40db69..5d24833 100644
+--- a/airootfs/usr/local/bin/darkos-protect.py
++++ b/airootfs/usr/local/bin/darkos-protect.py
+@@ -98,23 +98,45 @@ def _on_file_ready(path: Path) -> None:
+         log.info("scan error on %s: %s", path, result.detail)
+ 
+ 
++def _reconcile(watcher: ContinuousWatcher, running: bool) -> bool:
++    """One settings-check-and-react step: start the watcher if protection
++    is enabled and it isn't running, stop it if disabled and it is,
++    otherwise just rescan(). Returns the new running state. Pulled out of
++    main()'s loop so this can actually be tested without waiting through
++    real 30-second sleeps for every transition."""
++    from darkos_shell.user_settings import load_settings
++
++    enabled = load_settings().get("shield_protection_enabled", True)
++    if enabled and not running:
++        try:
++            watcher.start()
++            log.info("protection turned on -- watching: %s", [str(p) for p in watcher._watch_paths])
++            return True
++        except InotifyUnavailable as error:
++            log.error("cannot start: %s", error)
++            return False
++    if not enabled and running:
++        watcher.stop()
++        log.info("protection turned off")
++        return False
++    if running:
++        watcher.rescan()  # picks up a Downloads/Desktop that didn't exist at start
++    return running
++
++
+ def main() -> int:
+     _setup_logging()
+     watcher = ContinuousWatcher(WATCH_PATHS, _on_file_ready)
+-    try:
+-        watcher.start()
+-    except InotifyUnavailable as error:
+-        log.error("cannot start: %s", error)
+-        return 1
+-    log.info("watching: %s", [str(p) for p in WATCH_PATHS])
++    running = _reconcile(watcher, running=False)
+     try:
+         while True:
+             time.sleep(30)
+-            watcher.rescan()  # cheap; picks up a Downloads/Desktop that didn't exist at start
++            running = _reconcile(watcher, running)
+     except KeyboardInterrupt:
+         pass
+     finally:
+-        watcher.stop()
++        if running:
++            watcher.stop()
+     return 0
+ 
+ 
+diff --git a/airootfs/usr/local/bin/darkos-security.py b/airootfs/usr/local/bin/darkos-security.py
+index 875a613..0359324 100644
+--- a/airootfs/usr/local/bin/darkos-security.py
++++ b/airootfs/usr/local/bin/darkos-security.py
+@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ from darkos_shell.app_kit import add_class, run_app  # noqa: E402
+ from darkos_shell.shield import scan_and_quarantine  # noqa: E402
+ from darkos_shell import quarantine  # noqa: E402
++from darkos_shell.user_settings import load_settings, save_settings  # noqa: E402
+ 
+ APP_ID = "org.darkos.SecurityCenter"
+ WM_CLASS = "darkos-security"
+@@ -415,11 +416,26 @@ class SecurityWindow(Gtk.ApplicationWindow):
+         box.pack_start(Gtk.Label(
+             label="Scan a file or folder with ClamAV. Update definitions before scanning. "
+                   "A detected file is moved to Quarantine, not deleted or left in place — "
+-                  "see the Quarantine tab to review or restore it. Continuous protection "
+-                  "watches Downloads and Desktop automatically. System integrity checks "
++                  "see the Quarantine tab to review or restore it. System integrity checks "
+                   "(rkhunter/AIDE) are not enabled yet.",
+             xalign=0, wrap=True,
+         ), False, False, 8)
++        protection_row = Gtk.Box(spacing=10)
++        protection_row.pack_start(
++            Gtk.Label(label="Continuous protection (Downloads, Desktop)", xalign=0), True, True, 0
++        )
++        settings = load_settings()
++        self._protection_switch = Gtk.Switch()
++        self._protection_switch.set_active(bool(settings.get("shield_protection_enabled", True)))
++        self._protection_switch.connect("state-set", self._on_protection_toggled)
++        protection_row.pack_start(self._protection_switch, False, False, 0)
++        box.pack_start(protection_row, False, False, 0)
++        box.pack_start(Gtk.Label(
++            label="Takes effect within about 30 seconds, not instantly — darkos-protect.py "
++                  "checks this on its regular cycle rather than needing a live-reload path.",
++            xalign=0, wrap=True,
++        ), False, False, 0)
++        add_class(box.get_children()[-1], "body-muted")
+         actions = Gtk.Box(spacing=8)
+         self._scan_buttons = []
+         for label, folder in (("Scan file…", False), ("Scan folder…", True)):
+@@ -453,6 +469,12 @@ class SecurityWindow(Gtk.ApplicationWindow):
+         except OSError as error:
+             self._scan_report.get_buffer().set_text(f"Could not open definition updater: {error}")
+ 
++    def _on_protection_toggled(self, switch, state):
++        settings = load_settings()
++        settings["shield_protection_enabled"] = state
++        save_settings(settings)
++        return False  # let GTK update the switch's visual state normally
++
+     def _choose_scan(self, folder):
+         action = Gtk.FileChooserAction.SELECT_FOLDER if folder else Gtk.FileChooserAction.OPEN
+         chooser = Gtk.FileChooserDialog(title="Select scan target", transient_for=self, action=action)
+diff --git a/airootfs/usr/local/bin/darkos_shell/user_settings.py b/airootfs/usr/local/bin/darkos_shell/user_settings.py
+index 08f9bd2..ca23815 100644
+--- a/airootfs/usr/local/bin/darkos_shell/user_settings.py
++++ b/airootfs/usr/local/bin/darkos_shell/user_settings.py
+@@ -23,6 +23,7 @@ DEFAULTS = {
+     "a11y_magnifier": False,
+     "a11y_sticky_keys": False,
+     "a11y_eye_control": False,
++    "shield_protection_enabled": True,
+ }
+ 
+ 
+diff --git a/build-plan.md b/build-plan.md
+index 38e7f85..b062849 100644
+--- a/build-plan.md
++++ b/build-plan.md
+@@ -66,7 +66,12 @@ Goal — Settings actually manages the system. This is where most of the origina
+ - [x] Network Center (Wi-Fi, Bluetooth, Connect, Cloud) **code complete 2026-08-29** — `darkos-network.py`. Wi-Fi/Bluetooth shell out to `nmcli`/`bluetoothctl` (the correct approach — NetworkManager/BlueZ own real hardware state, this doesn't reimplement that) and report the real failure rather than a fake device list. **Runtime-verified against two different real failure modes** in this sandbox: `nmcli` exits cleanly with "Could not connect: No such file or directory" (no NetworkManager running) and `bluetoothctl` actually aborts outright (SIGABRT, no D-Bus) — confirmed the app catches both without crashing itself and shows the real error text either way. Cloud tab is a stub (nothing exists to connect to before Phase 9).
+ - [~] Connect (Network Center tab), **integrated 2026-09-06** — upstream `kdeconnect` owns discovery, TLS pairing, and plugins. The native tab reads typed D-Bus device status and offers confirmed pair/unpair, ring, and file sharing; notification/clipboard permissions remain in upstream settings. Thirteen hardware-free regressions and real GTK startup pass. Actual pairing and transfers still require a phone and a desktop session.
+ - [~] Security Center (Vault, Privacy, Shield, Permissions, Encrypt) **partially complete 2026-08-30** — `darkos-security.py`, Vault and Encrypt operational, with remaining security scope tracked below: Vault and Encrypt use real, standard primitives (PBKDF2-HMAC-SHA256, 480,000 iterations + Fernet authenticated encryption from the `cryptography` library — not homemade crypto). **Runtime-verified end to end, including the failure paths that actually matter for a security tool, not just the happy path:** created a vault, added a real entry, locked it, unlocked with the correct password (succeeded) and a wrong password (correctly rejected, vault stayed locked) — confirmed via screenshots of both outcomes. Encrypted a real test file, confirmed the output is genuine ciphertext (checked the plaintext bytes do not appear anywhere in the encrypted file), decrypted with the correct passphrase and got back byte-identical content, then decrypted with a wrong passphrase and confirmed it's rejected with no corrupted output file ever written. Privacy tab is real saved toggles (staged for future enforcement, stated as such — DarkOS has no telemetry to begin with). Permissions tab mirrors Settings' own honest stub. **Update 2026-09-06:** Shield now has real on-demand scanning, described below; continuous protection and the Store gate are still open. Vault creation/locking, private atomic writes, failed-password handling, and output overwrite refusal now also have repeatable automated regressions.
+-- [~] Shield, **on-demand scanning implemented 2026-09-06, quarantine added 2026-09-11, continuous protection added 2026-09-11** — cancellable ClamAV file/folder scans, bounded diagnostics, explicit failure/inspection-limit handling, and a user-triggered definitions updater. A detected result parses each hit out of ClamAV's real output (`parse_infected_files`) and moves it to quarantine (`quarantine.py` — move/restore/list/permanent-delete, one-click restore per architecture.md, never a silent delete, ownership-preserving for a privileged caller) instead of just reporting it — shared by both the on-demand scan and continuous protection via `scan_and_quarantine`, one code path, not two. Continuous protection (`continuous_watch.py` + `darkos-protect.py`) watches `~/Downloads` and `~/Desktop` and auto-scans anything dropped in. Built against fanotify first, per this line's original wording — switched to inotify after `fanotify_init`/`fanotify_mark` reported success but never once delivered a real event in testing, confirmed against a real file write with a blocking read, while the identical test against inotify worked immediately. inotify also doesn't need CAP_SYS_ADMIN, so this runs as the desktop user, not a separate root daemon. Launches via `hyprland.conf`'s `exec-once` (checked `start-hyprland` first: this session is tty1-autologin straight into Hyprland, no display manager, no systemd --user session ever starts — a `--user` unit, this line's earlier guess at how it'd be launched, would have silently never run), logs to `~/.local/share/darkos/protect.log`, and alerts through `notify-send` → mako on a detection rather than only writing a log line nobody's watching (`libnotify` added to `packages.x86_64` for this). 27 regressions pass across `ci/test-shield.py` and `ci/test-continuous-protection.py`, including a real end-to-end run: real file drop, real inotify event, real ClamAV detection, real quarantine, with a genuinely clean file in the same batch correctly left alone. **Quarantine review/restore UI added 2026-09-11**: a new Quarantine tab in Security Center lists real entries with Restore and Delete-permanently actions wired to the real `quarantine.py` calls (5 more regressions in `ci/test-security-ui.py`, 32 total) — building it surfaced the same GTK3 stock-chrome gap `scale`/`levelbar`/`progressbar` already had, this time on `Gtk.ListBox`/`row`, fixed the same way, and a real overflow bug (an unellipsized path pushed the action buttons off the visible row) caught by actually rendering it, not just compiling it. Not yet covered: removable-media mount points (inotify doesn't auto-discover new mounts under a watched parent — needs a udev/poll loop calling `rescan()`, not written), rkhunter/AIDE baselines, the Store installation scan gate, and a protection on/off toggle (darkos-protect.py currently just runs unconditionally once launched — no enable/disable mechanism exists yet).
++- [~] Shield — cancellable on-demand ClamAV scans (2026-09-06), quarantine + continuous protection + review UI (2026-09-11). Ten original scan regressions plus 27 more added today, 37 total across `ci/test-shield.py`, `ci/test-continuous-protection.py`, `ci/test-security-ui.py` — all passing, including two real end-to-end runs (on-demand and continuous) with genuine ClamAV detection and genuine quarantine, not mocked.
++  - **Quarantine** (`quarantine.py`): move/restore/list/permanent-delete, one-click restore per architecture.md, never silent-delete, ownership-preserving for a privileged caller. Shared by on-demand and continuous protection via `shield.scan_and_quarantine` — one code path, not two.
++  - **Continuous protection** (`continuous_watch.py` + `darkos-protect.py`): watches `~/Downloads` and `~/Desktop`. Built against fanotify first, per this line's original wording — switched to inotify after `fanotify_init`/`fanotify_mark` reported success but never once delivered a real event in testing (confirmed with a blocking read against a real file write). inotify also needs no CAP_SYS_ADMIN, so this runs as the desktop user, not a root daemon. Launches via `hyprland.conf`'s `exec-once` (checked `start-hyprland` first: tty1-autologin straight into Hyprland, no systemd --user session ever starts — a `--user` unit would have silently never run). Logs to `~/.local/share/darkos/protect.log`, alerts through `notify-send` → mako on a detection (`libnotify` added to `packages.x86_64`).
++  - **On/off toggle**: a switch in Security Center's Shield tab, backed by `user_settings.py`'s `shield_protection_enabled` (same settings.json every other preference already uses). `darkos-protect.py` checks it every ~30s via a `_reconcile` step and starts/stops the real watcher accordingly — takes effect within that window, not instantly, stated as the real trade-off it is rather than built to look instant and not be.
++  - **Review/restore UI**: a Quarantine tab in Security Center, real entries, Restore/Delete-permanently wired to the real calls. Surfaced two more real bugs by actually rendering it: the same GTK3 stock-chrome gap on `Gtk.ListBox`/`row` that `scale`/`levelbar`/`progressbar` already had (fixed the same way), and an unellipsized path overflow that pushed the action buttons off the visible row (fixed, and now has a regression test specifically because it happened).
++  - **Not yet covered**: removable-media mount points (inotify doesn't auto-discover new mounts under a watched parent — needs a udev/poll loop calling `rescan()`), rkhunter/AIDE baselines, the Store installation scan gate.
+ - [ ] Network transparency dashboard (per-app, plain-language) — reuses PHANTOM's monitoring core. **Blocked on input, not effort:** PHANTOM's source isn't in this repo or this conversation — reusing its actual monitoring core means either Hamza sharing that code, or reimplementing something PHANTOM-*like* from scratch, which risks quietly diverging from what "reuse" was meant to mean here.
+ - [x] Backup / Recovery **code complete 2026-08-30** — `darkos-backup.py`. Plain file-based backup (Python `tarfile`, not Btrfs snapshots — this sandbox's filesystem is ext2/ext3 so a snapshot approach couldn't be verified here regardless, and the spec didn't call for one specifically). A manifest at `~/.local/share/darkos/backups/manifest.json` tracks what was backed up, when, and how big it was. **Runtime-verified end to end:** backed up a real test folder through the actual UI, confirmed the resulting `.tar.gz` has correct internal paths (`tar -tzf`), then restored it and diffed the restored file against the original — byte-identical. `tarfile.extractall(..., filter="data")` (PEP 706) same as File Explorer's archive handling, guarding against path-traversal from an archive of unknown origin.
+ - [x] Dashboard (Performance, Overlay); [x] Mission/Spaces — **both done 2026-08-30.** `darkos-dashboard.py`: live CPU% (computed from two `/proc/stat` samples a tick apart, the standard technique), memory, disk, and top-processes-by-memory, refreshing every 2 seconds. **Runtime-verified with an actual load test** — ran a real CPU-bound busy-loop in the background and confirmed the dashboard's CPU reading actually moved from 0% to 100% between ticks, and that the busy-loop's own process appeared in the live top-processes list. `darkos-mission.py`: real `hyprctl -j workspaces` / `hyprctl -j clients` calls, grouped by workspace, with real `hyprctl dispatch` actions to switch workspace or focus a window. **Correction from earlier in this same session:** this was first bucketed with Shield as "can't verify here" — that was too pessimistic. Shield's correctness is fundamentally unverifiable without a real scan engine; this is a data-display problem against hyprctl's documented, stable JSON schema, which is a fundamentally different and much more tractable category — same shape as Network Center's nmcli/bluetoothctl calls. Verified two separate things, both for real: (1) the graceful-failure path, which is genuinely real in this sandbox (`hyprctl is not installed`, confirmed via screenshot), and (2) the parsing/rendering logic, via a schema-accurate fake `hyprctl` script on `PATH` returning realistic workspace/client JSON (documented format, not invented) — confirmed correct grouping including an empty-workspace case, correct unicode title decoding, and confirmed the dispatch buttons don't crash the app when clicked. What's still unverified is purely cosmetic/compositor-specific (does it look right against real windows) — the logic itself has been checked both ways it can be.
+diff --git a/ci/test-continuous-protection.py b/ci/test-continuous-protection.py
+index ff3ace2..c72d898 100644
+--- a/ci/test-continuous-protection.py
++++ b/ci/test-continuous-protection.py
+@@ -137,5 +137,62 @@ class FullLoopTests(unittest.TestCase):
+             self.assertEqual(len(quarantine.list_quarantine()), 1)
+ 
+ 
++class ReconcileToggleTests(unittest.TestCase):
++    """darkos-protect.py's _reconcile: the settings.json toggle actually
++    starts/stops the real watcher, not just a flag nobody reads."""
++
++    def setUp(self) -> None:
++        self.home = tempfile.mkdtemp()
++        self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
++        self.home_patcher = patch.dict("os.environ", {"HOME": self.home})
++        self.home_patcher.start()
++        self.addCleanup(self.home_patcher.stop)
++
++        from darkos_shell import user_settings
++
++        self.user_settings = user_settings
++
++        spec = importlib.util.spec_from_file_location(
++            "darkos_protect_test_target", BIN / "darkos-protect.py"
++        )
++        assert spec is not None and spec.loader is not None
++        self.protect = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(self.protect)
++
++        self.watchdir = Path(tempfile.mkdtemp())
++        self.addCleanup(shutil.rmtree, self.watchdir, ignore_errors=True)
++        self.seen: list[Path] = []
++        self.watcher = ContinuousWatcher(
++            [self.watchdir], lambda p: self.seen.append(p)
++        )
++
++    def tearDown(self) -> None:
++        self.watcher.stop()
++
++    def test_off_by_setting_reconcile_never_starts_it(self) -> None:
++        self.user_settings.save_settings({"shield_protection_enabled": False})
++        running = self.protect._reconcile(self.watcher, running=False)
++        self.assertFalse(running)
++        (self.watchdir / "dropped.txt").write_bytes(b"x")
++        time.sleep(1.0)
++        self.assertEqual(self.seen, [])
++
++    def test_toggled_on_then_off_actually_starts_and_stops_the_watcher(self) -> None:
++        self.user_settings.save_settings({"shield_protection_enabled": True})
++        running = self.protect._reconcile(self.watcher, running=False)
++        self.assertTrue(running)
++        target = self.watchdir / "dropped.txt"
++        target.write_bytes(b"x")
++        self.assertTrue(_wait_until(lambda: self.seen == [target]))
++
++        self.seen.clear()
++        self.user_settings.save_settings({"shield_protection_enabled": False})
++        running = self.protect._reconcile(self.watcher, running=running)
++        self.assertFalse(running)
++        (self.watchdir / "dropped-after-off.txt").write_bytes(b"x")
++        time.sleep(1.0)
++        self.assertEqual(self.seen, [], "must not still be catching files once turned off")
++
++
+ if __name__ == "__main__":
+     unittest.main(verbosity=2)
+diff --git a/ci/test-security-ui.py b/ci/test-security-ui.py
+index e91c314..64f4560 100644
+--- a/ci/test-security-ui.py
++++ b/ci/test-security-ui.py
+@@ -105,5 +105,42 @@ class QuarantineTabTests(unittest.TestCase):
+         self.assertNotEqual(meta_label.get_ellipsize(), Pango.EllipsizeMode.NONE)
+ 
+ 
++class ProtectionToggleTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.home = tempfile.mkdtemp()
++        self.home_patcher = patch.dict("os.environ", {"HOME": self.home})
++        self.home_patcher.start()
++        self.addCleanup(self.home_patcher.stop)
++        self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
++
++        from darkos_shell import user_settings
++
++        self.user_settings = user_settings
++
++        spec = importlib.util.spec_from_file_location(
++            "darkos_security_test_target2", BIN / "darkos-security.py"
++        )
++        assert spec is not None and spec.loader is not None
++        self.mod = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(self.mod)
++
++        app = Gtk.Application(application_id="test.darkos.security.toggle.ci")
++        app.register()
++        self.win = self.mod.SecurityWindow(app)
++        self.addCleanup(self.win.destroy)
++
++    def test_switch_reflects_saved_setting_on_build(self) -> None:
++        self.assertTrue(self.win._protection_switch.get_active())
++
++    def test_toggling_off_writes_real_settings_file(self) -> None:
++        self.win._on_protection_toggled(self.win._protection_switch, False)
++        self.assertFalse(self.user_settings.load_settings()["shield_protection_enabled"])
++
++    def test_toggling_back_on_writes_true(self) -> None:
++        self.win._on_protection_toggled(self.win._protection_switch, False)
++        self.win._on_protection_toggled(self.win._protection_switch, True)
++        self.assertTrue(self.user_settings.load_settings()["shield_protection_enabled"])
++
++
+ if __name__ == "__main__":
+     unittest.main(verbosity=2)

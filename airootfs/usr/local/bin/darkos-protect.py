@@ -18,16 +18,19 @@ Scope, stated plainly rather than left implicit:
     this passive watcher can stand in for, since pacman's own cache isn't
     a user-writable directory this can watch the same way.
 
-Runs as the desktop user, not root -- inotify doesn't need CAP_SYS_ADMIN,
-so unlike a fanotify-based version would have needed, this doesn't require
-its own privileged systemd service. A per-user `systemd --user` unit is
-the natural fit; not written here since it depends on the unit-file
-conventions the rest of this repo's systemd units use, which is worth
-matching rather than guessing at in isolation.
+Runs as the desktop user, not root -- inotify doesn't need CAP_SYS_ADMIN.
+Launched via hyprland.conf's exec-once, the same mechanism every other
+session daemon here uses (waybar, mako, hypridle, darkos-shell.py itself)
+-- checked start-hyprland first rather than assuming systemd --user was
+available: this project's session is tty1-autologin straight into
+Hyprland, no display manager, no systemd --user session ever gets
+started. A --user unit would have silently never run.
 """
 
 from __future__ import annotations
 
+import logging
+import subprocess
 import sys
 import threading
 import time
@@ -39,6 +42,41 @@ from darkos_shell.continuous_watch import ContinuousWatcher, InotifyUnavailable
 from darkos_shell.shield import scan_and_quarantine
 
 WATCH_PATHS = [Path.home() / "Downloads", Path.home() / "Desktop"]
+LOG_PATH = Path.home() / ".local" / "share" / "darkos" / "protect.log"
+
+log = logging.getLogger("darkos-protect")
+
+
+def _setup_logging() -> None:
+    """A real log file, not just stdout -- exec-once doesn't redirect
+    stdout anywhere durable (same gap ci/hardware-audit.sh already
+    documented for darkos-shell.py itself), and this is a security-relevant
+    daemon: losing its output on every session restart isn't acceptable
+    the way it might be for a cosmetic one."""
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(LOG_PATH)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    log.addHandler(handler)
+    log.addHandler(logging.StreamHandler(sys.stdout))
+    log.setLevel(logging.INFO)
+
+
+def _notify(summary: str, body: str, urgency: str = "normal") -> None:
+    """Best-effort desktop notification via notify-send -> mako, already
+    part of this session's exec-once stack. A quarantine the user never
+    sees isn't much better than one that never happened -- this is what
+    actually closes that gap, not just the log file. Deliberately can't
+    fail the caller: no notification daemon reachable yet (e.g. very
+    early in session startup) is routine, not an error worth surfacing
+    as one."""
+    try:
+        subprocess.run(
+            ["notify-send", "--urgency", urgency, summary, body],
+            timeout=5,
+            capture_output=True,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        log.info("notify-send unavailable (%s) -- continuing without it", error)
 
 
 def _on_file_ready(path: Path) -> None:
@@ -46,31 +84,59 @@ def _on_file_ready(path: Path) -> None:
     result, actions = scan_and_quarantine(path, cancel)
     if result.outcome == "detected":
         for action in actions:
-            print(f"[darkos-protect] {action}", flush=True)
+            log.warning(action)
+        _notify(
+            "DarkOS Shield",
+            f"Quarantined {path.name} -- open Security Center to review or restore.",
+            urgency="critical",
+        )
     elif result.outcome == "error":
         # Errors here are routine (permission-denied on a file that
         # vanished between the close event and the scan starting, e.g.
         # a browser's temp download artifact) -- logged, not fatal to
-        # the watcher itself.
-        print(f"[darkos-protect] scan error on {path}: {result.detail}", flush=True)
+        # the watcher itself, and not worth a notification.
+        log.info("scan error on %s: %s", path, result.detail)
+
+
+def _reconcile(watcher: ContinuousWatcher, running: bool) -> bool:
+    """One settings-check-and-react step: start the watcher if protection
+    is enabled and it isn't running, stop it if disabled and it is,
+    otherwise just rescan(). Returns the new running state. Pulled out of
+    main()'s loop so this can actually be tested without waiting through
+    real 30-second sleeps for every transition."""
+    from darkos_shell.user_settings import load_settings
+
+    enabled = load_settings().get("shield_protection_enabled", True)
+    if enabled and not running:
+        try:
+            watcher.start()
+            log.info("protection turned on -- watching: %s", [str(p) for p in watcher._watch_paths])
+            return True
+        except InotifyUnavailable as error:
+            log.error("cannot start: %s", error)
+            return False
+    if not enabled and running:
+        watcher.stop()
+        log.info("protection turned off")
+        return False
+    if running:
+        watcher.rescan()  # picks up a Downloads/Desktop that didn't exist at start
+    return running
 
 
 def main() -> int:
+    _setup_logging()
     watcher = ContinuousWatcher(WATCH_PATHS, _on_file_ready)
-    try:
-        watcher.start()
-    except InotifyUnavailable as error:
-        print(f"[darkos-protect] cannot start: {error}", file=sys.stderr, flush=True)
-        return 1
-    print(f"[darkos-protect] watching: {[str(p) for p in WATCH_PATHS]}", flush=True)
+    running = _reconcile(watcher, running=False)
     try:
         while True:
             time.sleep(30)
-            watcher.rescan()  # cheap; picks up a Downloads/Desktop that didn't exist at start
+            running = _reconcile(watcher, running)
     except KeyboardInterrupt:
         pass
     finally:
-        watcher.stop()
+        if running:
+            watcher.stop()
     return 0
 
 
