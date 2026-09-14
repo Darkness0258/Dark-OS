@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import unittest
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -144,13 +145,23 @@ class ReconcileToggleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.home = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
-        self.home_patcher = patch.dict("os.environ", {"HOME": self.home})
-        self.home_patcher.start()
-        self.addCleanup(self.home_patcher.stop)
 
         from darkos_shell import user_settings
 
         self.user_settings = user_settings
+        # NOT env-var HOME patching: GLib.get_user_config_dir() (which
+        # settings_path() calls) caches its result for the process's
+        # whole lifetime after the first call, so a later os.environ
+        # change is silently ignored -- discovered by this exact test
+        # intermittently reading real, unrelated settings state instead
+        # of its own isolated temp dir. Patching settings_path itself
+        # sidesteps the cache entirely.
+        settings_file = Path(self.home) / "settings.json"
+        self.path_patcher = patch.object(
+            user_settings, "settings_path", return_value=str(settings_file)
+        )
+        self.path_patcher.start()
+        self.addCleanup(self.path_patcher.stop)
 
         spec = importlib.util.spec_from_file_location(
             "darkos_protect_test_target", BIN / "darkos-protect.py"
@@ -192,6 +203,75 @@ class ReconcileToggleTests(unittest.TestCase):
         (self.watchdir / "dropped-after-off.txt").write_bytes(b"x")
         time.sleep(1.0)
         self.assertEqual(self.seen, [], "must not still be catching files once turned off")
+
+
+class MountDiscoveryTests(unittest.TestCase):
+    """discover_mount_dirs and add_watch_path against real directories
+    under /run/media/$USER -- a temp username, cleaned up after, not the
+    real user's actual mount namespace."""
+
+    def setUp(self) -> None:
+        self.test_user = f"darkos-ci-{uuid.uuid4().hex[:8]}"
+        self.home = tempfile.mkdtemp()  # isolates settings.json --
+        # NOT via env-var HOME patching: GLib.get_user_config_dir() caches
+        # its result for the whole process after the first call, so a
+        # later os.environ change is silently ignored (see
+        # ReconcileToggleTests.setUp's longer note -- same fix here).
+        self.env_patcher = patch.dict("os.environ", {"USER": self.test_user})
+        self.env_patcher.start()
+        self.addCleanup(self.env_patcher.stop)
+        self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
+        self.run_media = Path("/run/media") / self.test_user
+        self.addCleanup(shutil.rmtree, self.run_media, ignore_errors=True)
+
+        from darkos_shell import continuous_watch, user_settings
+
+        self.discover_mount_dirs = continuous_watch.discover_mount_dirs
+        settings_file = Path(self.home) / "settings.json"
+        self.path_patcher = patch.object(
+            user_settings, "settings_path", return_value=str(settings_file)
+        )
+        self.path_patcher.start()
+        self.addCleanup(self.path_patcher.stop)
+
+    def test_empty_before_anything_mounted(self) -> None:
+        self.assertEqual(self.discover_mount_dirs(), [])
+
+    def test_finds_a_real_new_mount_directory(self) -> None:
+        self.run_media.mkdir(parents=True)
+        usb = self.run_media / "TEST_DRIVE"
+        usb.mkdir()
+        self.assertEqual(self.discover_mount_dirs(), [usb])
+
+    def test_returns_empty_not_an_error_when_parent_is_absent(self) -> None:
+        # e.g. udisks2 isn't installed -- a real, separate prerequisite
+        # this function doesn't provide, and shouldn't pretend to.
+        self.assertFalse(self.run_media.exists())
+        self.assertEqual(self.discover_mount_dirs(), [])
+
+    def test_reconcile_discovers_and_genuinely_watches_a_new_mount(self) -> None:
+        self.run_media.mkdir(parents=True)
+        watchdir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, watchdir, ignore_errors=True)
+        seen: list[Path] = []
+        watcher = ContinuousWatcher([watchdir], lambda p: seen.append(p))
+        self.addCleanup(watcher.stop)
+
+        spec = importlib.util.spec_from_file_location(
+            "darkos_protect_mount_test", BIN / "darkos-protect.py"
+        )
+        assert spec is not None and spec.loader is not None
+        protect = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(protect)
+
+        running = protect._reconcile(watcher, running=False)
+        usb = self.run_media / "TEST_DRIVE"
+        usb.mkdir()
+        protect._reconcile(watcher, running=running)
+
+        target = usb / "dropped.txt"
+        target.write_bytes(b"x")
+        self.assertTrue(_wait_until(lambda: seen == [target]))
 
 
 if __name__ == "__main__":

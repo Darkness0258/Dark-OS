@@ -67,6 +67,22 @@ class InotifyUnavailable(RuntimeError):
     """Raised when inotify_init1 fails."""
 
 
+def discover_mount_dirs() -> list[Path]:
+    """Currently-mounted removable media, checked under both the modern
+    udisks2 convention (/run/media/$USER/<label>) and the older one
+    (/media/$USER/<label>) -- real directories only, symlinks/junk
+    filtered by the is_dir() check callers already do via add_watch_path.
+    Returns [] rather than raising if neither parent exists (e.g. udisks2
+    isn't installed) -- that's a real, separate gap, not this function's
+    to raise an error over."""
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    found: list[Path] = []
+    for parent in (Path("/run/media") / user, Path("/media") / user):
+        if parent.is_dir():
+            found.extend(p for p in parent.iterdir() if p.is_dir())
+    return found
+
+
 class ContinuousWatcher:
     """Watches `watch_paths` (each marked individually, non-recursively --
     a subdirectory created after start() needs rescan() to pick up) and
@@ -102,6 +118,16 @@ class ContinuousWatcher:
             wd = _libc.inotify_add_watch(self._fd, str(path).encode(), IN_CLOSE_WRITE)
             if wd >= 0:
                 self._wd_to_dir[wd] = path
+
+    def add_watch_path(self, path: Path) -> None:
+        """Add one more directory to watch after start() -- e.g. a
+        removable-media mount just discovered by discover_mount_dirs().
+        Marks it immediately if the watcher's already running; if `path`
+        is already tracked, this is a no-op, not a duplicate mark."""
+        path = Path(path)
+        if path not in self._watch_paths:
+            self._watch_paths.append(path)
+        self.rescan()
 
     def stop(self) -> None:
         self._stop_event.set()

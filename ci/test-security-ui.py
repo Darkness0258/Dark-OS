@@ -33,6 +33,17 @@ except (ImportError, ValueError):
 @unittest.skipUnless(GTK_AVAILABLE, "GTK 3 not available in this environment")
 class QuarantineTabTests(unittest.TestCase):
     def setUp(self) -> None:
+        from darkos_shell import user_settings
+
+        settings_home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, settings_home, ignore_errors=True)
+        settings_file = Path(settings_home) / "settings.json"
+        self.settings_patcher = patch.object(
+            user_settings, "settings_path", return_value=str(settings_file)
+        )
+        self.settings_patcher.start()
+        self.addCleanup(self.settings_patcher.stop)
+
         spec = importlib.util.spec_from_file_location(
             "darkos_security_test_target", BIN / "darkos-security.py"
         )
@@ -108,14 +119,22 @@ class QuarantineTabTests(unittest.TestCase):
 class ProtectionToggleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.home = tempfile.mkdtemp()
-        self.home_patcher = patch.dict("os.environ", {"HOME": self.home})
-        self.home_patcher.start()
-        self.addCleanup(self.home_patcher.stop)
         self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
 
         from darkos_shell import user_settings
 
         self.user_settings = user_settings
+        # patch settings_path directly, not $HOME: GLib.get_user_config_dir()
+        # caches its result for the process's lifetime after the first
+        # call, so a later os.environ change is silently ignored -- see
+        # ci/test-continuous-protection.py's ReconcileToggleTests for the
+        # full story of how this was actually found.
+        settings_file = Path(self.home) / "settings.json"
+        self.path_patcher = patch.object(
+            user_settings, "settings_path", return_value=str(settings_file)
+        )
+        self.path_patcher.start()
+        self.addCleanup(self.path_patcher.stop)
 
         spec = importlib.util.spec_from_file_location(
             "darkos_security_test_target2", BIN / "darkos-security.py"

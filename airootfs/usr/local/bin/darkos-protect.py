@@ -6,17 +6,17 @@ dropped into them, closing the loop architecture.md describes: watch,
 scan, quarantine -- automatically, without a manual on-demand scan.
 
 Scope, stated plainly rather than left implicit:
-  - Covers ~/Downloads and ~/Desktop. Solid, verified (see
-    ci/test-continuous-protection.py), safe to rely on.
-  - Does NOT yet cover removable media. Watching new mounts needs
-    detecting them as they appear (a udev/polling loop) and marking each
-    mount's own directory -- inotify doesn't watch a parent and
-    automatically pick up new subdirectories on its own. Real gap, not
-    wired here; rescan() exists for exactly this once it is.
-  - Does NOT replace the Store gate (build-plan.md Shield item, still
-    open) -- that's an explicit scan-before-install hook, not something
-    this passive watcher can stand in for, since pacman's own cache isn't
-    a user-writable directory this can watch the same way.
+  - Covers ~/Downloads and ~/Desktop, plus removable media discovered
+    under /run/media/$USER and /media/$USER (checked every ~30s, same
+    cycle as the settings toggle -- see discover_mount_dirs()'s own note
+    that this returns nothing at all if udisks2 isn't installed, which is
+    a real, separate prerequisite this doesn't itself provide).
+  - Separate from the Store's install-time gate (`darkos-store-gated-install.py`
+    / `darkos-store-gated-aur-install.py`, both already built and tested,
+    see build-plan.md Phase 6) -- this watcher covers Downloads/Desktop/
+    media, that gate covers pacman/AUR installs specifically, since
+    pacman's own cache isn't a user-writable directory this can watch the
+    same way. Not a gap, just a different mechanism for a different path.
 
 Runs as the desktop user, not root -- inotify doesn't need CAP_SYS_ADMIN.
 Launched via hyprland.conf's exec-once, the same mechanism every other
@@ -38,7 +38,11 @@ from pathlib import Path
 
 sys.path.insert(0, "/usr/local/bin")
 
-from darkos_shell.continuous_watch import ContinuousWatcher, InotifyUnavailable
+from darkos_shell.continuous_watch import (
+    ContinuousWatcher,
+    InotifyUnavailable,
+    discover_mount_dirs,
+)
 from darkos_shell.shield import scan_and_quarantine
 
 WATCH_PATHS = [Path.home() / "Downloads", Path.home() / "Desktop"]
@@ -121,6 +125,8 @@ def _reconcile(watcher: ContinuousWatcher, running: bool) -> bool:
         return False
     if running:
         watcher.rescan()  # picks up a Downloads/Desktop that didn't exist at start
+        for mount_dir in discover_mount_dirs():
+            watcher.add_watch_path(mount_dir)  # no-op if already tracked
     return running
 
 

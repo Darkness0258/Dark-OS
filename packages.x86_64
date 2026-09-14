@@ -50,6 +50,8 @@ poppler-glib
 wofi
 xdg-desktop-portal-hyprland
 polkit-kde-agent
+udisks2
+gvfs
 qt5-wayland
 qt6-wayland
 calamares
