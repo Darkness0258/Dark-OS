@@ -17,6 +17,8 @@ bluez
 bluez-utils
 kdeconnect
 clamav
+rkhunter
+aide
 python-cryptography
 flatpak
 blueman

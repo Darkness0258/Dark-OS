@@ -1,0 +1,11 @@
+[Unit]
+Description=DarkOS system integrity check (rkhunter + AIDE)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/bin/darkos-integrity-check.py
+# rkhunter alone took ~90s checking a full system in testing -- AIDE's
+# first-run baseline over real /usr+/etc+/boot will run longer than that.
+# 30 minutes is a real ceiling, not a guess at "should be plenty."
+TimeoutStartSec=1800s

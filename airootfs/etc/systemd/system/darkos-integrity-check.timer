@@ -1,0 +1,12 @@
+[Unit]
+Description=Run DarkOS system integrity check daily
+
+[Timer]
+OnCalendar=daily
+# Spreads the load if this ever matters at fleet scale, and avoids every
+# check landing at exactly midnight on a single machine every day.
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target
