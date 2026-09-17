@@ -175,6 +175,8 @@ readonly runtime_symlinks=(
     etc/systemd/system/multi-user.target.wants/bluetooth.service
     etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service
     etc/systemd/system/multi-user.target.wants/ensure-network.service
+    etc/systemd/system/multi-user.target.wants/nftables.service
+    etc/systemd/system/multi-user.target.wants/darkos-netwatch.service
     etc/systemd/system/multi-user.target.wants/seatd.service
     etc/systemd/system/multi-user.target.wants/sshd.service
     etc/systemd/system/multi-user.target.wants/vmtoolsd.service
@@ -186,6 +188,8 @@ declare -Ar runtime_symlink_targets=(
     [etc/systemd/system/multi-user.target.wants/bluetooth.service]="/usr/lib/systemd/system/bluetooth.service"
     [etc/systemd/system/multi-user.target.wants/darkos-grub-repair.service]="../darkos-grub-repair.service"
     [etc/systemd/system/multi-user.target.wants/ensure-network.service]="../ensure-network.service"
+    [etc/systemd/system/multi-user.target.wants/nftables.service]="/usr/lib/systemd/system/nftables.service"
+    [etc/systemd/system/multi-user.target.wants/darkos-netwatch.service]="../darkos-netwatch.service"
     [etc/systemd/system/multi-user.target.wants/seatd.service]="/usr/lib/systemd/system/seatd.service"
     [etc/systemd/system/multi-user.target.wants/sshd.service]="/usr/lib/systemd/system/sshd.service"
     [etc/systemd/system/multi-user.target.wants/vmtoolsd.service]="/usr/lib/systemd/system/vmtoolsd.service"

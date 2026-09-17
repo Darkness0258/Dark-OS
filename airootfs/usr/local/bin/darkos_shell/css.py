@@ -36,7 +36,7 @@ CSS_STYLE = f"""
 
 .glass-panel {{
     background-color: alpha({COLOR_BG_ELEVATED}, 0.78);
-    border: 1px solid alpha({COLOR_TEXT}, 0.12);
+    border: 1px solid alpha({COLOR_TEXT}, 0.06);
     border-radius: {RADIUS_PANEL}px;
     box-shadow: 0 8px 24px alpha({COLOR_BG}, 0.55);
     padding: {SPACE_MD}px;
@@ -59,7 +59,7 @@ CSS_STYLE = f"""
     color: {COLOR_PRIMARY};
     font-family: "Space Grotesk", Inter, "Noto Sans", sans-serif;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.5px;
 }}
 

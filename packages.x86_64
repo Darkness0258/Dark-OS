@@ -19,6 +19,7 @@ kdeconnect
 clamav
 rkhunter
 aide
+nftables
 python-cryptography
 flatpak
 blueman

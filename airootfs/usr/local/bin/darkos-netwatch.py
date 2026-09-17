@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""DarkOS network activity sampler -- the "network broker" visibility layer.
+
+Meant to run as root via a systemd service (see darkos-netwatch.service),
+not from a user session. This is the one piece of the network broker that
+needs root: reading another process's open sockets via /proc/<pid>/fd
+only works cross-user with elevated privileges. Everything downstream
+(the Network Center UI tab) just reads the JSON this writes -- no
+privilege needed on that side, same handoff shape as
+darkos-integrity-check.py -> /var/log/darkos/integrity-check.log.
+
+What this does NOT do, on purpose, for this first pass: no enforcement
+(nothing gets blocked here -- that's a later, separate decision once
+attribution is proven trustworthy), no reverse DNS or GeoIP (both mean
+blocking network calls from inside the sample loop, or a downloaded
+database this doesn't have; showing the raw remote IP honestly beats a
+slow or wrong-looking lookup), no ML/scoring -- "first time this process
+has ever talked to this address" is the entire heuristic, and it's one
+a person can actually audit.
+
+/proc/net/tcp[6] and udp[6] parsing verified for real in this sandbox --
+a real TCP connection created here, checked against `ss -tnp` ground
+truth on the exact same live socket: process, pid, and both ports
+matched exactly (protocol, port numbers, and attribution all correct).
+
+IPv6 needed a different check -- this sandbox has no IPv6 stack at all
+(AF_INET6 unavailable), so there was no live socket to test against.
+Cross-checked the byte-order algorithm itself against psutil's real,
+widely-used implementation (_pslinux.py) instead: it does the exact same
+per-32-bit-word byte swap this does, WITH an explicit little-endian-host
+check that this deliberately doesn't replicate -- DarkOS is x86_64-only
+(see packages.x86_64), and x86_64 is little-endian, so the unconditional
+swap below is correct for every real machine this runs on, just not
+portable to a big-endian host DarkOS was never going to target anyway.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import re
+import signal
+import socket
+import sys
+import time
+from pathlib import Path
+
+HISTORY_PATH = Path("/var/lib/darkos/netwatch-history.json")
+SNAPSHOT_PATH = Path("/var/log/darkos/network-activity.json")
+SAMPLE_INTERVAL_SECONDS = 10
+HISTORY_MAX_AGE_DAYS = 90
+HISTORY_MAX_ENTRIES_PER_PROCESS = 200
+
+# TCP states worth showing as "talking to the network" -- ESTABLISHED and
+# SYN_SENT (mid-handshake outbound). LISTEN and the rest are the local
+# machine waiting, not the machine reaching out; not what this feature is for.
+TCP_STATE_ESTABLISHED = "01"
+TCP_STATE_SYN_SENT = "02"
+RELEVANT_TCP_STATES = {TCP_STATE_ESTABLISHED, TCP_STATE_SYN_SENT}
+
+SOCKET_INODE_RE = re.compile(r"socket:\[(\d+)\]")
+
+log = logging.getLogger("darkos-netwatch")
+
+_running = True
+
+
+def _handle_term(signum: int, frame: object) -> None:
+    global _running
+    _running = False
+
+
+def _parse_ipv4(hex_addr: str) -> str:
+    raw = bytes.fromhex(hex_addr)[::-1]
+    return socket.inet_ntoa(raw)
+
+
+def _parse_ipv6(hex_addr: str) -> str:
+    # 32 hex chars = 4 32-bit words; each word's bytes are reversed, but
+    # the 4 words stay in their original order. Get this backwards and
+    # you get a syntactically valid but wrong address -- see module docstring.
+    words = (hex_addr[i : i + 8] for i in range(0, 32, 8))
+    raw = b"".join(bytes.fromhex(w)[::-1] for w in words)
+    return socket.inet_ntop(socket.AF_INET6, raw)
+
+
+def _parse_addr_field(field: str, is_v6: bool) -> tuple[str, int]:
+    addr_hex, port_hex = field.split(":")
+    addr = _parse_ipv6(addr_hex) if is_v6 else _parse_ipv4(addr_hex)
+    return addr, int(port_hex, 16)
+
+
+def _read_proc_net_table(path: Path, protocol: str, is_v6: bool) -> list[dict]:
+    """One row per socket in /proc/net/{tcp,udp}[6]. Best-effort: a socket
+    that closes between listing and parsing just doesn't show up -- not an
+    error, the same race any point-in-time network tool has."""
+    rows: list[dict] = []
+    try:
+        lines = path.read_text().splitlines()[1:]
+    except FileNotFoundError:
+        return rows  # no IPv6 on this box, most likely -- not fatal
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 10:
+            continue
+        local_field, rem_field, state = parts[1], parts[2], parts[3]
+        inode = parts[9]
+        if protocol == "tcp" and state not in RELEVANT_TCP_STATES:
+            continue
+        try:
+            rem_addr, rem_port = _parse_addr_field(rem_field, is_v6)
+        except (ValueError, OSError):
+            continue
+        if rem_addr in ("0.0.0.0", "::") and rem_port == 0:
+            continue  # UDP socket that's bound but hasn't talked to anyone
+        try:
+            local_addr, local_port = _parse_addr_field(local_field, is_v6)
+        except (ValueError, OSError):
+            local_addr, local_port = "?", 0
+        rows.append(
+            {
+                "inode": inode,
+                "protocol": protocol,
+                "local": f"{local_addr}:{local_port}",
+                "remote_addr": rem_addr,
+                "remote_port": rem_port,
+            }
+        )
+    return rows
+
+
+def _build_inode_to_process_map() -> dict[str, dict]:
+    """Walk /proc/<pid>/fd for every process, not just DarkOS's own --
+    this is the actual reason this has to run as root. Skips whatever it
+    can't read rather than failing the whole sample: processes exit
+    mid-scan constantly, that's normal, not a bug to surface."""
+    mapping: dict[str, dict] = {}
+    for entry in os.scandir("/proc"):
+        if not entry.name.isdigit():
+            continue
+        pid = entry.name
+        fd_dir = f"/proc/{pid}/fd"
+        try:
+            fds = os.listdir(fd_dir)
+        except (PermissionError, FileNotFoundError, ProcessLookupError):
+            continue
+        inodes = []
+        for fd in fds:
+            try:
+                target = os.readlink(f"{fd_dir}/{fd}")
+            except OSError:
+                continue
+            match = SOCKET_INODE_RE.match(target)
+            if match:
+                inodes.append(match.group(1))
+        if not inodes:
+            continue
+        name = _read_process_name(pid)
+        for inode in inodes:
+            mapping[inode] = {"pid": int(pid), "process": name}
+    return mapping
+
+
+def _read_process_name(pid: str) -> str:
+    """Cmdline basename beats /proc/<pid>/comm (comm truncates at 15 chars
+    and just says "python3" for every python script DarkOS ships)."""
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+        args = [a for a in raw.split(b"\x00") if a]
+        if args:
+            first = args[0].decode("utf-8", "replace")
+            base = first.rsplit("/", 1)[-1]
+            # "python3 /usr/local/bin/darkos-network.py" -> "darkos-network.py",
+            # not the unhelpful "python3" every DarkOS app would otherwise share
+            if base.startswith("python") and len(args) > 1:
+                second = args[1].decode("utf-8", "replace")
+                base = second.rsplit("/", 1)[-1]
+            return base
+    except (FileNotFoundError, PermissionError, IndexError):
+        pass
+    try:
+        return Path(f"/proc/{pid}/comm").read_text().strip()
+    except (FileNotFoundError, PermissionError):
+        return "unknown"
+
+
+def _load_history() -> dict:
+    try:
+        return json.loads(HISTORY_PATH.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _prune_history(history: dict, now: float) -> dict:
+    cutoff = now - (HISTORY_MAX_AGE_DAYS * 86400)
+    pruned: dict = {}
+    for process, destinations in history.items():
+        kept = {
+            dest: rec
+            for dest, rec in destinations.items()
+            if rec.get("last_seen", 0) >= cutoff
+        }
+        if len(kept) > HISTORY_MAX_ENTRIES_PER_PROCESS:
+            # keep the most recently active ones, drop the stale tail
+            kept = dict(
+                sorted(kept.items(), key=lambda kv: kv[1].get("last_seen", 0), reverse=True)[
+                    :HISTORY_MAX_ENTRIES_PER_PROCESS
+                ]
+            )
+        if kept:
+            pruned[process] = kept
+    return pruned
+
+
+def _atomic_write_json(path: Path, data: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    os.replace(tmp, path)  # atomic on the same filesystem -- no half-written
+    # snapshot for the UI to ever read mid-write, even if this gets killed
+
+
+def sample_once(history: dict) -> tuple[list[dict], dict]:
+    now = time.time()
+    rows = (
+        _read_proc_net_table(Path("/proc/net/tcp"), "tcp", is_v6=False)
+        + _read_proc_net_table(Path("/proc/net/tcp6"), "tcp", is_v6=True)
+        + _read_proc_net_table(Path("/proc/net/udp"), "udp", is_v6=False)
+        + _read_proc_net_table(Path("/proc/net/udp6"), "udp", is_v6=True)
+    )
+    inode_map = _build_inode_to_process_map()
+
+    snapshot: list[dict] = []
+    for row in rows:
+        proc = inode_map.get(row["inode"])
+        process_name = proc["process"] if proc else "unknown"
+        pid = proc["pid"] if proc else None
+
+        dest_key = f"{row['remote_addr']}:{row['remote_port']}"
+        proc_history = history.setdefault(process_name, {})
+        seen_before = dest_key in proc_history
+        if seen_before:
+            proc_history[dest_key]["count"] += 1
+            proc_history[dest_key]["last_seen"] = now
+        else:
+            proc_history[dest_key] = {"first_seen": now, "last_seen": now, "count": 1}
+
+        snapshot.append(
+            {
+                "process": process_name,
+                "pid": pid,
+                "protocol": row["protocol"],
+                "remote": dest_key,
+                "first_time_ever": not seen_before,
+                "times_seen": proc_history[dest_key]["count"],
+            }
+        )
+
+    history = _prune_history(history, now)
+    return snapshot, history
+
+
+def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    signal.signal(signal.SIGTERM, _handle_term)
+    signal.signal(signal.SIGINT, _handle_term)
+
+    HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    history = _load_history()
+    log.info("darkos-netwatch starting, %d process(es) in history", len(history))
+
+    while _running:
+        try:
+            snapshot, history = sample_once(history)
+            _atomic_write_json(SNAPSHOT_PATH, {"sampled_at": time.time(), "connections": snapshot})
+            _atomic_write_json(HISTORY_PATH, history)
+        except Exception:  # noqa: BLE001 -- one bad sample must not kill the service
+            log.exception("sample failed, will retry next interval")
+        for _ in range(SAMPLE_INTERVAL_SECONDS):
+            if not _running:
+                break
+            time.sleep(1)
+
+    log.info("darkos-netwatch stopping")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,9 @@
+[Unit]
+Description=DarkOS network activity sampler (network broker visibility layer)
+After=local-fs.target nftables.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/darkos-netwatch.py
+Restart=on-failure
+RestartSec=5s
