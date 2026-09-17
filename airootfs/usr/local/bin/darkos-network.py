@@ -4,6 +4,7 @@
 Probes run outside GTK's main loop. KDE Connect owns discovery, certificates,
 pairing and transfers; this app uses its session D-Bus API and bounded CLI calls.
 """
+import json
 import os
 import re
 import shutil
@@ -23,6 +24,10 @@ from darkos_shell.app_kit import add_class, run_app  # noqa: E402
 APP_ID = "org.darkos.NetworkCenter"
 WM_CLASS = "darkos-network"
 CONNECT_SERVICE = "org.kde.kdeconnect"
+NETWATCH_SNAPSHOT_PATH = Path("/var/log/darkos/network-activity.json")
+# darkos-netwatch.py samples every 10s; no update in 60s means it's not
+# running, not that the network's just quiet -- worth telling the user apart.
+NETWATCH_STALE_SECONDS = 60
 CONNECT_PATH = "/modules/kdeconnect"
 DEVICE_INTERFACE = "org.kde.kdeconnect.device"
 DEVICE_ID = re.compile(r"[A-Za-z0-9_]{1,128}\Z")
@@ -214,6 +219,7 @@ class NetworkWindow(Gtk.ApplicationWindow):
         notebook.append_page(self._build_wifi_tab(), Gtk.Label(label="Wi-Fi"))
         notebook.append_page(self._build_bluetooth_tab(), Gtk.Label(label="Bluetooth"))
         notebook.append_page(self._build_connect_tab(), Gtk.Label(label="Connect"))
+        notebook.append_page(self._build_activity_tab(), Gtk.Label(label="Activity"))
         notebook.append_page(self._build_cloud_tab(), Gtk.Label(label="Cloud"))
         self.add(notebook)
 
@@ -451,6 +457,61 @@ class NetworkWindow(Gtk.ApplicationWindow):
 
     def _build_cloud_tab(self):
         return self._status_page("DarkOS Cloud", "Not signed in. Accounts, sync and cloud updates are planned for Phase 9.")
+
+    def _build_activity_tab(self):
+        self.activity_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self._refresh_activity()
+        GLib.timeout_add_seconds(5, self._refresh_activity)
+        scroll = Gtk.ScrolledWindow()
+        scroll.add(self.activity_container)
+        return scroll
+
+    def _refresh_activity(self, *_):
+        # Reads a file darkos-netwatch.service writes -- not a subprocess
+        # call, so no _run_async/thread needed here, unlike Wi-Fi/Bluetooth.
+        if self._closed:
+            return GLib.SOURCE_REMOVE
+        try:
+            data = json.loads(NETWATCH_SNAPSHOT_PATH.read_text())
+        except FileNotFoundError:
+            self._replace(self.activity_container, self._status_page(
+                "Network activity",
+                "darkos-netwatch.service hasn't written a snapshot yet — "
+                "it may not be running.",
+                self._refresh_activity,
+            ))
+            return GLib.SOURCE_CONTINUE
+        except (OSError, json.JSONDecodeError) as exc:
+            self._replace(self.activity_container, self._status_page(
+                "Network activity", f"Couldn't read the snapshot: {exc}", self._refresh_activity,
+            ))
+            return GLib.SOURCE_CONTINUE
+        self._show_activity(data)
+        return GLib.SOURCE_CONTINUE
+
+    def _show_activity(self, data):
+        age = time.time() - data.get("sampled_at", 0)
+        stale = f"Last updated {int(age)}s ago — darkos-netwatch.service may have stopped." if age > NETWATCH_STALE_SECONDS else ""
+        box = self._status_page("What's talking to the network", stale, self._refresh_activity)
+        connections = data.get("connections", [])
+        if not connections:
+            box.pack_start(Gtk.Label(label="No active connections right now.", xalign=0), False, False, 0)
+        else:
+            # First-time destinations surface first -- that's the point of this tab,
+            # not an alphabetical or chronological list nobody would scan top to bottom.
+            for conn in sorted(connections, key=lambda c: not c.get("first_time_ever")):
+                row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+                row.pack_start(Gtk.Label(label=conn.get("process", "unknown"), xalign=0), True, True, 0)
+                row.pack_start(Gtk.Label(label=conn.get("remote", "?")), False, False, 0)
+                if conn.get("first_time_ever"):
+                    flag = Gtk.Label(label="first time")
+                    add_class(flag, "flag-text")
+                else:
+                    flag = Gtk.Label(label=f"seen {conn.get('times_seen', 1)}×")
+                    add_class(flag, "body-muted")
+                row.pack_start(flag, False, False, 0)
+                box.pack_start(row, False, False, 2)
+        self._replace(self.activity_container, box)
 
 
 def build_window(app):

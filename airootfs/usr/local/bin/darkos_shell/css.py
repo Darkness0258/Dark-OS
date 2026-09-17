@@ -82,6 +82,11 @@ CSS_STYLE = f"""
     color: {COLOR_WARNING};
 }}
 
+.flag-text {{
+    color: {COLOR_WARNING};
+    font-weight: 600;
+}}
+
 .dock-bar {{
     background-color: alpha({COLOR_BG_ALT}, 0.82);
     border: 1px solid alpha({COLOR_PRIMARY}, 0.30);
