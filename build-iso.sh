@@ -181,6 +181,7 @@ readonly runtime_symlinks=(
     etc/systemd/system/multi-user.target.wants/sshd.service
     etc/systemd/system/multi-user.target.wants/vmtoolsd.service
     etc/systemd/system/timers.target.wants/darkos-integrity-check.timer
+    etc/systemd/system/timers.target.wants/darkos-snapshot.timer
 )
 
 declare -Ar runtime_symlink_targets=(
@@ -194,6 +195,7 @@ declare -Ar runtime_symlink_targets=(
     [etc/systemd/system/multi-user.target.wants/sshd.service]="/usr/lib/systemd/system/sshd.service"
     [etc/systemd/system/multi-user.target.wants/vmtoolsd.service]="/usr/lib/systemd/system/vmtoolsd.service"
     [etc/systemd/system/timers.target.wants/darkos-integrity-check.timer]="../darkos-integrity-check.timer"
+    [etc/systemd/system/timers.target.wants/darkos-snapshot.timer]="../darkos-snapshot.timer"
 )
 
 assert_source_symlinks() {

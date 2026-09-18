@@ -1,0 +1,28 @@
+[Unit]
+Description=DarkOS snapshot (BTRFS rollback for @ and @home)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/bin/darkos-snapshot.py --take
+
+# Sandboxing: deliberately NOT ProtectSystem=/ProtectHome= here, unlike
+# darkos-integrity-check.service and darkos-netwatch.service. Those two
+# have a narrow, known write footprint that ReadWritePaths= could
+# allowlist precisely. This one's entire job is writing into
+# /.snapshots and /home/.snapshots -- nested inside the very
+# subvolumes ProtectSystem=strict would lock down -- so allowlisting
+# around it would mean granting write to / and /home wholesale anyway,
+# which defeats the point. The directives below don't touch filesystem
+# write scope at all, so they're still real hardening without that
+# conflict.
+NoNewPrivileges=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=yes
