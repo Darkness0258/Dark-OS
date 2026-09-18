@@ -7,3 +7,29 @@ Type=simple
 ExecStart=/usr/bin/python3 /usr/local/bin/darkos-netwatch.py
 Restart=on-failure
 RestartSec=5s
+
+# Sandboxing, same reasoning as darkos-integrity-check.service. Read scope
+# untouched -- ProtectSystem/ProtectHome only block writes, and the whole
+# point of this service is reading every process's /proc/<pid>/fd, which
+# ProtectSystem doesn't govern at all (/proc is a separate virtual
+# filesystem). Write scope is exactly this script's own two paths.
+LogsDirectory=darkos
+StateDirectory=darkos
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=yes
+# Same call as the integrity check: no CapabilityBoundingSet restriction
+# yet. This needs CAP_SYS_PTRACE or CAP_DAC_READ_SEARCH (root has both by
+# default) to read other users' /proc/<pid>/fd at all -- narrow that
+# wrong and the whole service goes quietly blind to everything except
+# its own process, which defeats the point without ever throwing an
+# error to notice. Needs real testing, not a guess.

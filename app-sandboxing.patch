@@ -1,0 +1,72 @@
+diff --git a/airootfs/etc/systemd/system/darkos-integrity-check.service b/airootfs/etc/systemd/system/darkos-integrity-check.service
+index 97b5262..b5a91ef 100644
+--- a/airootfs/etc/systemd/system/darkos-integrity-check.service
++++ b/airootfs/etc/systemd/system/darkos-integrity-check.service
+@@ -9,3 +9,33 @@ ExecStart=/usr/bin/python3 /usr/local/bin/darkos-integrity-check.py
+ # first-run baseline over real /usr+/etc+/boot will run longer than that.
+ # 30 minutes is a real ceiling, not a guess at "should be plenty."
+ TimeoutStartSec=1800s
++
++# Sandboxing. Read scope is untouched -- ProtectSystem/ProtectHome only
++# block writes, and rkhunter+AIDE need to read nearly everything to do
++# their job at all. Write scope is real, traced ground truth, not a
++# guess at documented defaults: ran the actual rkhunter --cronjob --rwo
++# and a real `aide --init` against this repo's own aide.conf under
++# strace, logged every write-mode file open. AIDE wrote exactly
++# /var/lib/aide/aide.db.new, nothing else. rkhunter wrote
++# /var/lib/rkhunter/db/*, /var/lib/rkhunter/tmp/* (scratch files for its
++# checks), and /var/log/rkhunter.log -- LogsDirectory covers this
++# script's own log, the rest is listed explicitly since these are
++# upstream packages' paths, not this project's.
++LogsDirectory=darkos
++ReadWritePaths=/var/lib/aide /var/lib/rkhunter /var/log/rkhunter.log
++NoNewPrivileges=yes
++ProtectSystem=strict
++ProtectHome=yes
++ProtectHostname=yes
++ProtectClock=yes
++ProtectKernelLogs=yes
++ProtectKernelModules=yes
++ProtectKernelTunables=yes
++RestrictSUIDSGID=yes
++RestrictRealtime=yes
++SystemCallArchitectures=native
++MemoryDenyWriteExecute=yes
++# Deliberately NOT restricting CapabilityBoundingSet here -- narrowing it
++# correctly needs real testing this sandbox can't safely do (get it
++# wrong and rkhunter's actual rootkit checks silently stop working,
++# which is worse than not sandboxing at all). Flagged, not guessed at.
+diff --git a/airootfs/etc/systemd/system/darkos-netwatch.service b/airootfs/etc/systemd/system/darkos-netwatch.service
+index f16e199..baf6b6d 100644
+--- a/airootfs/etc/systemd/system/darkos-netwatch.service
++++ b/airootfs/etc/systemd/system/darkos-netwatch.service
+@@ -7,3 +7,29 @@ Type=simple
+ ExecStart=/usr/bin/python3 /usr/local/bin/darkos-netwatch.py
+ Restart=on-failure
+ RestartSec=5s
++
++# Sandboxing, same reasoning as darkos-integrity-check.service. Read scope
++# untouched -- ProtectSystem/ProtectHome only block writes, and the whole
++# point of this service is reading every process's /proc/<pid>/fd, which
++# ProtectSystem doesn't govern at all (/proc is a separate virtual
++# filesystem). Write scope is exactly this script's own two paths.
++LogsDirectory=darkos
++StateDirectory=darkos
++NoNewPrivileges=yes
++ProtectSystem=strict
++ProtectHome=yes
++ProtectHostname=yes
++ProtectClock=yes
++ProtectKernelLogs=yes
++ProtectKernelModules=yes
++ProtectKernelTunables=yes
++RestrictSUIDSGID=yes
++RestrictRealtime=yes
++SystemCallArchitectures=native
++MemoryDenyWriteExecute=yes
++# Same call as the integrity check: no CapabilityBoundingSet restriction
++# yet. This needs CAP_SYS_PTRACE or CAP_DAC_READ_SEARCH (root has both by
++# default) to read other users' /proc/<pid>/fd at all -- narrow that
++# wrong and the whole service goes quietly blind to everything except
++# its own process, which defeats the point without ever throwing an
++# error to notice. Needs real testing, not a guess.

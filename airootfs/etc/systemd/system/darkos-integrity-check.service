@@ -9,3 +9,33 @@ ExecStart=/usr/bin/python3 /usr/local/bin/darkos-integrity-check.py
 # first-run baseline over real /usr+/etc+/boot will run longer than that.
 # 30 minutes is a real ceiling, not a guess at "should be plenty."
 TimeoutStartSec=1800s
+
+# Sandboxing. Read scope is untouched -- ProtectSystem/ProtectHome only
+# block writes, and rkhunter+AIDE need to read nearly everything to do
+# their job at all. Write scope is real, traced ground truth, not a
+# guess at documented defaults: ran the actual rkhunter --cronjob --rwo
+# and a real `aide --init` against this repo's own aide.conf under
+# strace, logged every write-mode file open. AIDE wrote exactly
+# /var/lib/aide/aide.db.new, nothing else. rkhunter wrote
+# /var/lib/rkhunter/db/*, /var/lib/rkhunter/tmp/* (scratch files for its
+# checks), and /var/log/rkhunter.log -- LogsDirectory covers this
+# script's own log, the rest is listed explicitly since these are
+# upstream packages' paths, not this project's.
+LogsDirectory=darkos
+ReadWritePaths=/var/lib/aide /var/lib/rkhunter /var/log/rkhunter.log
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=yes
+# Deliberately NOT restricting CapabilityBoundingSet here -- narrowing it
+# correctly needs real testing this sandbox can't safely do (get it
+# wrong and rkhunter's actual rootkit checks silently stop working,
+# which is worse than not sandboxing at all). Flagged, not guessed at.
