@@ -2,7 +2,7 @@
 Type=Application
 Name=Calculator
 Comment=DarkOS calculator
-TryExec=/usr/local/bin/darkos-calculator.py
+TryExec=/usr/local/bin/darkos-sandbox-launch.py
 Exec=/usr/local/bin/darkos-sandbox-launch.py calculator -- /usr/local/bin/darkos-calculator.py
 Icon=accessories-calculator
 Categories=Utility;Calculator;

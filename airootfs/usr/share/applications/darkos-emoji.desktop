@@ -2,7 +2,7 @@
 Type=Application
 Name=Emoji Picker
 Comment=Search and copy emoji
-TryExec=/usr/local/bin/darkos-emoji.py
+TryExec=/usr/local/bin/darkos-sandbox-launch.py
 Exec=/usr/local/bin/darkos-sandbox-launch.py emoji -- /usr/local/bin/darkos-emoji.py
 Icon=face-smile
 Categories=Utility;

@@ -578,6 +578,7 @@ scripts=(
     usr/local/bin/generate-wallpaper.py
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
+    usr/local/bin/darkos-sandbox-launch.py
     "${native_app_scripts[@]}"
 )
 readonly library_modules=(

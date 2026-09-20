@@ -2,7 +2,7 @@
 Type=Application
 Name=Clock
 Comment=DarkOS clock, world clocks, alarms, timer and stopwatch
-TryExec=/usr/local/bin/darkos-clock.py
+TryExec=/usr/local/bin/darkos-sandbox-launch.py
 Exec=/usr/local/bin/darkos-sandbox-launch.py clock -- /usr/local/bin/darkos-clock.py
 Icon=clock
 Categories=Utility;Clock;
