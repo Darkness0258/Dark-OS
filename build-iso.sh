@@ -102,6 +102,7 @@ readonly runtime_scripts=(
     usr/local/bin/generate-wallpaper.py
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
+    usr/local/bin/darkos-sandbox-launch.py
     root/.automated_script.sh
     "${native_app_scripts[@]}"
 )
