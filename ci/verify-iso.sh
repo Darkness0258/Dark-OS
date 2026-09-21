@@ -224,10 +224,8 @@ payload=(
     usr/local/bin/generate-wallpaper.py
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
+    usr/local/bin/darkos-sandbox-launch.py
     "${native_app_scripts[@]}"
-    usr/local/bin/darkos_shell/app_kit.py
-    usr/local/bin/darkos_shell/user_settings.py
-    "${native_desktop_entries[@]}"
     etc/xdg/mimeapps.list
     usr/share/backgrounds/darkos/darkos-wallpaper.png
     usr/share/icons/darkos/darkos.png
