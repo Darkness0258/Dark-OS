@@ -1,0 +1,32 @@
+diff --git a/airootfs/etc/xdg/hypr/hyprland.conf b/airootfs/etc/xdg/hypr/hyprland.conf
+index 076d1b7..fe99eeb 100644
+--- a/airootfs/etc/xdg/hypr/hyprland.conf
++++ b/airootfs/etc/xdg/hypr/hyprland.conf
+@@ -56,7 +56,13 @@ decoration {
+     blur {
+         enabled = true
+         size = 8
+-        passes = 3
++        # Was 3. Each pass is a full-screen shader operation Hyprland runs
++        # for every blurred surface -- on a 940MX (2GB, Maxwell-era, no
++        # dedicated compositor headroom) that's a real, documented cost,
++        # not a guess. 2 is the common middle ground for weaker GPUs in
++        # Hyprland's own community configs. Matches ui-rules.md's own
++        # stated policy: degrade blur/particles first, never frame pacing.
++        passes = 2
+     }
+     shadow {
+         enabled = true
+diff --git a/airootfs/etc/xdg/hypr/hyprlock.conf b/airootfs/etc/xdg/hypr/hyprlock.conf
+index 60e695d..ec5a2aa 100644
+--- a/airootfs/etc/xdg/hypr/hyprlock.conf
++++ b/airootfs/etc/xdg/hypr/hyprlock.conf
+@@ -29,7 +29,7 @@ background {
+     monitor =
+     path = screenshot
+     color = rgba(000000ff)
+-    blur_passes = 3
++    blur_passes = 2
+     blur_size = 8
+     noise = 0.008
+     contrast = 1.05
