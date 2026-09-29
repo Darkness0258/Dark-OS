@@ -2,8 +2,8 @@
 Type=Application
 Name=Reader
 Comment=DarkOS PDF reader
-TryExec=/usr/local/bin/darkos-sandbox-launch.py
-Exec=/usr/local/bin/darkos-sandbox-launch.py reader -- /usr/local/bin/darkos-reader.py %f
+TryExec=/usr/local/bin/darkos-reader.py
+Exec=/usr/local/bin/darkos-reader.py %f
 Icon=accessories-text-editor
 Categories=Office;Viewer;
 StartupNotify=true

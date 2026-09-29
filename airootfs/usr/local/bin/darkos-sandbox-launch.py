@@ -4,6 +4,20 @@
 Usage (from a .desktop file's Exec= line):
     darkos-sandbox-launch.py <profile-name> -- <real-binary> [args...]
 
+STATUS (2026-09-29): not currently wired to any .desktop file. The five
+apps this was piloted on (Calculator, Reader, Gallery, Clock, Emoji) came
+back from real testing not opening at all, and tracing it against what
+bwrap actually does explains why: the original args bound /etc/fonts but
+not /etc itself, so /etc/passwd didn't exist inside the sandbox -- and
+GLib's user-config-dir lookup (called at import time by every app via
+tokens.py's user_settings.load_settings()) needs that file. Binding /etc
+broadly below fixes the mechanism, but it's still unconfirmed on a real
+Wayland session (see VERIFICATION note further down, unchanged from the
+original pilot) -- so the .desktop files launch these five directly for
+now rather than trusting an unverified fix on top of an already-unverified
+one. Re-enable per app by pointing that app's Exec=/TryExec= back through
+this launcher once it's been watched open for real.
+
 Reused mechanism, not a new one: bubblewrap is the same sandboxing tool
 Flatpak already uses for every Flatpak-installed app in this project's
 Store. This just applies it to DarkOS's own native apps too, via a
@@ -43,6 +57,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 DARKOS_SHELL_PKG = Path("/usr/local/bin/darkos_shell")
@@ -105,7 +120,14 @@ def build_bwrap_args(profile: dict) -> list[str]:
         "--ro-bind", "/usr", "/usr",
         "--ro-bind", "/lib", "/lib",
         "--symlink", "usr/lib64", "/lib64",
-        "--ro-bind", "/etc/fonts", "/etc/fonts",
+        # Full /etc, not just /etc/fonts -- this was the actual bug. GLib's
+        # user-config-dir lookup (hit at import time by every app, via
+        # tokens.py -> user_settings.load_settings()) and GTK's file-chooser
+        # sidebar both need /etc/passwd to resolve the current user; binding
+        # only /etc/fonts left /etc/passwd (and /etc/machine-id, nsswitch.conf,
+        # etc.) simply absent inside the sandbox, which is consistent with
+        # these five apps not opening at all rather than opening broken.
+        "--ro-bind", "/etc", "/etc",
         # Own binary + the shared app_kit/css/tokens helpers every DarkOS
         # app imports (see darkos-network.py, darkos-calculator.py, etc.
         # all doing `from darkos_shell.app_kit import ...`) -- without
@@ -139,8 +161,22 @@ def build_bwrap_args(profile: dict) -> list[str]:
         home = os.environ.get("HOME", str(Path.home()))
         bind_flag = "--bind" if home_access == "rw" else "--ro-bind"
         args += [bind_flag, home, home]
-    # home_access == "none": no HOME bind at all -- the sandboxed app
-    # simply can't see it.
+    else:
+        # home_access == "none": the real $HOME is never bound -- the
+        # sandboxed app genuinely can't see it. But GLib/fontconfig still
+        # want *some* writable $HOME for their own cache/config (fontconfig
+        # in particular can fail hard with no writable cache dir anywhere),
+        # so give them a private, empty tmpfs standing in for it instead of
+        # leaving $HOME dangling on a path that doesn't exist in this
+        # mount namespace. Nothing written here ever reaches the real disk.
+        scratch_home = os.path.join(tempfile.gettempdir(), f"darkos-sandbox-home-{os.getpid()}")
+        args += [
+            "--tmpfs", scratch_home,
+            "--setenv", "HOME", scratch_home,
+            "--setenv", "XDG_CACHE_HOME", scratch_home + "/.cache",
+            "--setenv", "XDG_CONFIG_HOME", scratch_home + "/.config",
+            "--setenv", "XDG_DATA_HOME", scratch_home + "/.local/share",
+        ]
     for extra_path in profile.get("extra_rw_binds", []):
         Path(extra_path).mkdir(parents=True, exist_ok=True)  # bwrap needs it to exist first
         args += ["--bind", extra_path, extra_path]
