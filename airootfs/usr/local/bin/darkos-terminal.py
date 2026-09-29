@@ -22,6 +22,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Vte  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.css import apply_css  # noqa: E402
+from darkos_shell.app_kit import build_titlebar  # noqa: E402
 
 APP_ID = "org.darkos.Terminal"
 WM_CLASS = "darkos-terminal"
@@ -239,6 +240,7 @@ def main():
     def on_activate(_app):
         apply_css()
         win = TerminalWindow(_app, command=command, cwd=cwd)
+        win.set_titlebar(build_titlebar(win, win.get_title()))
         win.show_all()
 
     app.connect("activate", on_activate)

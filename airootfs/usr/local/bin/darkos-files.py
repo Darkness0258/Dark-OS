@@ -30,6 +30,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.css import apply_css  # noqa: E402
+from darkos_shell.app_kit import build_titlebar  # noqa: E402
 
 APP_ID = "org.darkos.Files"
 WM_CLASS = "darkos-files"
@@ -755,6 +756,7 @@ def main():
     def on_activate(_app):
         apply_css()
         win = FileExplorerWindow(_app, start_path=start_path)
+        win.set_titlebar(build_titlebar(win, win.get_title()))
         win.show_all()
 
     app.connect("activate", on_activate)

@@ -131,6 +131,26 @@ CSS_STYLE = f"""
     padding: 0;
 }}
 
+.dock-clock {{
+    color: {COLOR_PRIMARY};
+    font-family: "Space Grotesk", Inter, "Noto Sans", sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 0 {SPACE_SM}px;
+}}
+
+.dock-running-dot {{
+    background-color: alpha({COLOR_TEXT}, 0.28);
+    border-radius: 999px;
+    min-width: 4px;
+    min-height: 4px;
+}}
+
+.dock-running-dot.running {{
+    background-color: {COLOR_PRIMARY};
+    box-shadow: 0 0 4px alpha({COLOR_PRIMARY}, 0.75);
+}}
+
 .media-art {{
     background-color: alpha({COLOR_BG}, 0.60);
     border: 1px solid alpha({COLOR_BORDER}, 0.30);
@@ -345,6 +365,40 @@ separator {{
 
 .app-window {{
     background-color: {COLOR_BG_ALT};
+}}
+
+.app-titlebar {{
+    background-color: alpha({COLOR_BG_ELEVATED}, 0.95);
+    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.08);
+    min-height: 36px;
+    padding: 0 {SPACE_XS}px 0 {SPACE_MD}px;
+}}
+
+.app-titlebar-title {{
+    color: {COLOR_TEXT};
+    font-weight: 600;
+}}
+
+.app-titlebar-btn {{
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    border-radius: {RADIUS_CONTROL}px;
+    box-shadow: none;
+    color: {COLOR_TEXT_MUTED};
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+}}
+
+.app-titlebar-btn:hover {{
+    background-color: alpha({COLOR_TEXT}, 0.10);
+    color: {COLOR_TEXT};
+}}
+
+.app-titlebar-btn-close:hover {{
+    background-color: {COLOR_DANGER};
+    color: {COLOR_BG};
 }}
 
 .toolbar {{
