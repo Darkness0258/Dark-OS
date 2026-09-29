@@ -68,6 +68,7 @@ file_permissions=(
   ["/usr/local/bin/darkos-notes.py"]="0:0:755"
   ["/usr/local/bin/darkos-reader.py"]="0:0:755"
   ["/usr/local/bin/darkos-sandbox-launch.py"]="0:0:755"
+  ["/usr/local/bin/darkos-window-fx.py"]="0:0:755"
   ["/usr/local/bin/darkos-security.py"]="0:0:755"
   ["/usr/local/bin/darkos-settings.py"]="0:0:755"
   ["/usr/local/bin/darkos-shell.py"]="0:0:755"

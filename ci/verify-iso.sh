@@ -227,6 +227,7 @@ payload=(
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
     usr/local/bin/darkos-sandbox-launch.py
+    usr/local/bin/darkos-window-fx.py
     "${native_app_scripts[@]}"
     "${native_desktop_entries[@]}"
     etc/xdg/mimeapps.list
@@ -580,6 +581,7 @@ scripts=(
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
     usr/local/bin/darkos-sandbox-launch.py
+    usr/local/bin/darkos-window-fx.py
     "${native_app_scripts[@]}"
 )
 readonly library_modules=(
