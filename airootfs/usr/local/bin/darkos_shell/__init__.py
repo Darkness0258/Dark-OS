@@ -42,6 +42,7 @@ from darkos_shell.system_sampler import SystemSampler
 from darkos_shell.css import apply_css
 from darkos_shell.actions import ActionDispatcher
 from darkos_shell.tokens import (
+    AI_ASSISTANT_ENABLED,
     CAIRO_ACCENT,
     CAIRO_DANGER,
     CAIRO_MUTED,
@@ -67,6 +68,20 @@ from darkos_shell.tokens import (
     SPACE_XL,
     SPACE_XS,
 )
+
+
+def _notify(summary, body, urgency="normal"):
+    """Best-effort desktop toast via notify-send -> mako (same pattern as
+    darkos-protect.py's _notify). Used for one-line status messages that
+    used to force the Command Center open just to show a sentence."""
+    import subprocess
+    try:
+        subprocess.run(
+            ["notify-send", "--urgency", urgency, summary, body],
+            timeout=5, capture_output=True,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
 
 class DarkOSApplication(Gtk.Application):
@@ -172,26 +187,33 @@ class DarkOSApplication(Gtk.Application):
         apply_css()
         self.dock = DarkOSDockWindow(self)
         self.rail = DarkOSIconRail(self)
-        self.hud = DarkOSHUDOverlay()
+        # AI Core HUD is pure AI-assistant chrome (radar dial, nothing
+        # else lives in that window) -- skip it entirely while
+        # AI_ASSISTANT_ENABLED is False instead of creating and
+        # immediately hiding a window that exists only to animate.
+        self.hud = DarkOSHUDOverlay() if AI_ASSISTANT_ENABLED else None
         self.left = DarkOSLeftPanels(self)
         self.right = DarkOSRightPanels(self)
-        for window in (self.dock, self.rail, self.hud, self.left, self.right):
+        windows = [w for w in (self.dock, self.rail, self.hud, self.left, self.right) if w is not None]
+        for window in windows:
             self.add_window(window)
         # Command Center (HUD + info panels) starts closed — SUPER+H or
         # --toggle-command-center opens it. Dock + rail are the always-on
         # base layer. See ui-rules.md § Layout (2026-08-23 decision).
         for window in (self.hud, self.left, self.right):
-            window.hide()
+            if window is not None:
+                window.hide()
 
         # Start activity detection → layout adaptation
         detector = self.activity_detector
         detector.add_listener(self._on_activity_changed)
         detector.start()
 
-        # Start voice trigger (push-to-talk by default)
-        trigger = self.trigger
-        trigger.add_listener(self._on_voice_activated)
-        trigger.start()
+        # Voice trigger (push-to-talk) only runs with the AI assistant.
+        if AI_ASSISTANT_ENABLED:
+            trigger = self.trigger
+            trigger.add_listener(self._on_voice_activated)
+            trigger.start()
 
     # ── Activity detection → layout ─────────────────────────────────────
 
@@ -307,14 +329,12 @@ class DarkOSApplication(Gtk.Application):
             self._toggle_window(self.left)
             self._toggle_window(self.right)
         if args.toggle_command_center:
-            # HUD visibility is the source of truth for "open". Safe to rely
-            # on now that _on_activity_changed only touches left/right while
-            # the HUD is already visible (guarded there, not here) -- before
-            # that guard, activity changes could show/hide left/right while
-            # Command Center was closed, which is what made it look like it
-            # was opening/closing on its own.
-            opening = not self.hud.is_visible()
-            for window in (self.hud, self.left, self.right):
+            # HUD visibility is the source of truth for "open" when it
+            # exists; with the AI assistant off there's no HUD window at
+            # all, so fall back to the left panel (weather/system) instead.
+            command_center = [w for w in (self.hud, self.left, self.right) if w is not None]
+            opening = not command_center[0].is_visible() if command_center else False
+            for window in command_center:
                 if opening:
                     window.show_all()
                 else:
@@ -325,20 +345,23 @@ class DarkOSApplication(Gtk.Application):
             self._toggle_window(self.left)
         if args.toggle_rail:
             self._toggle_window(self.rail)
-        if args.toggle_ai:
-            if not self.left.is_visible():
-                self.left.show_all()
-            self.left.entry.grab_focus()
-        if args.ptt_start:
-            if self.trigger.on_push_to_talk_start():
-                self._set_orb_state("listening")
-            else:
-                self._set_orb_state("error")
-                self._ai_error("No working microphone recorder was found.")
-        if args.ptt_stop:
-            if not self.trigger.on_push_to_talk_stop():
-                self._set_orb_state("error")
-                self._ai_error("No speech was captured.")
+        if args.toggle_ai or args.ptt_start or args.ptt_stop:
+            if not AI_ASSISTANT_ENABLED:
+                _notify("DarkOS", "The AI assistant is temporarily disabled.")
+            elif args.toggle_ai:
+                if not self.left.is_visible():
+                    self.left.show_all()
+                self.left.entry.grab_focus()
+            elif args.ptt_start:
+                if self.trigger.on_push_to_talk_start():
+                    self._set_orb_state("listening")
+                else:
+                    self._set_orb_state("error")
+                    self._ai_error("No working microphone recorder was found.")
+            elif args.ptt_stop:
+                if not self.trigger.on_push_to_talk_stop():
+                    self._set_orb_state("error")
+                    self._ai_error("No speech was captured.")
         if args.lock:
             launch(["loginctl", "lock-session"])
         return 0
@@ -384,8 +407,12 @@ class DarkOSApplication(Gtk.Application):
             "gallery": ["/usr/local/bin/darkos-gallery.py"],
             "music": ["mpv", "--player-operation-mode=pseudo-gui"],
             "gaming": ["/usr/local/bin/darkos-gaming.py"],
+            "search": ["/usr/local/bin/the-void.sh"],
         }
         if action == "ai":
+            if not AI_ASSISTANT_ENABLED:
+                _notify("DarkOS", "The AI assistant is temporarily disabled.")
+                return
             if not self.left.is_visible():
                 self.left.show_all()
             self.left.entry.grab_focus()
@@ -394,11 +421,7 @@ class DarkOSApplication(Gtk.Application):
             launch(commands[action])
             return
         phase = {"gallery": "4", "music": "7", "gaming": "7"}.get(action, "later")
-        if not self.left.is_visible():
-            self.left.show_all()
-        self.left.show_stub(
-            f"Not opened: {action.title()} is a Phase {phase} surface and is not built yet."
-        )
+        _notify("DarkOS", f"{action.title()} is a Phase {phase} surface and isn't built yet.")
 
     # ── Toggle state ───────────────────────────────────────────────────
 
