@@ -17,6 +17,7 @@ from darkos_shell.canvases import (
 )
 from darkos_shell.css import CSS_STYLE
 from darkos_shell.tokens import (
+    AI_ASSISTANT_ENABLED,
     CAIRO_ACCENT,
     CAIRO_DANGER,
     CAIRO_MUTED,
@@ -40,6 +41,28 @@ from darkos_shell.tokens import (
     SPACE_XL,
 )
 from darkos_shell.system_sampler import SystemSampler
+import datetime
+import json
+import subprocess
+
+
+def _running_window_classes():
+    """Best-effort set of lowercased window classes currently open, via
+    `hyprctl clients -j`. Used only for the dock's running-app dots --
+    never lets a parse/exec failure propagate, since a cosmetic indicator
+    is never worth crashing the shell over."""
+    try:
+        output = subprocess.run(
+            ["hyprctl", "clients", "-j"],
+            capture_output=True, text=True, timeout=2,
+        ).stdout
+        clients = json.loads(output)
+        return {
+            (client.get("class") or client.get("initialClass") or "").lower()
+            for client in clients
+        }
+    except Exception:
+        return set()
 
 
 def add_class(widget, class_name):
@@ -139,7 +162,8 @@ def command_output(command, timeout=1.5):
 
 
 class DarkOSDockWindow(Gtk.Window):
-    """Floating bottom dock with AI Orb enlarged at center."""
+    """Floating bottom dock. Center slot is the AI Orb when
+    AI_ASSISTANT_ENABLED, otherwise a live clock (see tokens.py)."""
 
     def __init__(self, application):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
@@ -163,19 +187,24 @@ class DarkOSDockWindow(Gtk.Window):
         add_class(dock, "dock-bar")
         dock.set_halign(Gtk.Align.CENTER)
 
+        # wm_class here matches each app's own WM_CLASS constant (and the
+        # hyprland.conf windowrule matchers) so the running-dot below each
+        # icon can be driven by real `hyprctl clients -j` data.
         left_apps = (
-            ("files", "folder-symbolic", "Files", ["/usr/local/bin/darkos-files.py"]),
-            ("terminal", "utilities-terminal-symbolic", "Terminal", ["/usr/local/bin/the-void.sh"]),
-            ("browser", "web-browser-symbolic", "Browser", ["firefox"]),
+            ("files", "folder-symbolic", "Files", ["/usr/local/bin/darkos-files.py"], "darkos-files"),
+            ("terminal", "utilities-terminal-symbolic", "Terminal", ["/usr/local/bin/the-void.sh"], "darkos-terminal"),
+            ("browser", "web-browser-symbolic", "Browser", ["firefox"], "firefox"),
         )
         right_apps = (
-            ("notes", "accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/darkos-notes.py"]),
-            ("store", "system-software-install-symbolic", "Store", ["/usr/local/bin/darkos-store.py"]),
-            ("settings", "preferences-system-symbolic", "Settings", ["/usr/local/bin/darkos-settings.py"]),
+            ("notes", "accessories-text-editor-symbolic", "Notes", ["/usr/local/bin/darkos-notes.py"], "darkos-notes"),
+            ("store", "system-software-install-symbolic", "Store", ["/usr/local/bin/darkos-store.py"], "darkos-store"),
+            ("settings", "preferences-system-symbolic", "Settings", ["/usr/local/bin/darkos-settings.py"], "darkos-settings"),
         )
         self._dock_icons = {}
+        self._dock_dots = {}
+        self._dock_wm_classes = {}
 
-        def make_dock_slot(key, icon, name, command):
+        def make_dock_slot(key, icon, name, command, wm_class):
             slot = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             slot.set_halign(Gtk.Align.CENTER)
             btn = make_icon_button(
@@ -184,29 +213,59 @@ class DarkOSDockWindow(Gtk.Window):
                 "dock-icon-button", 40,
             )
             self._dock_icons[key] = btn
+            self._dock_wm_classes[key] = wm_class
             slot.pack_start(btn, False, False, 0)
+            dot = Gtk.Box()
+            add_class(dot, "dock-running-dot")
+            dot.set_halign(Gtk.Align.CENTER)
+            self._dock_dots[key] = dot
+            slot.pack_start(dot, False, False, 1)
             label = make_label(name, "dock-label")
             label.set_xalign(0.5)
             slot.pack_start(label, False, False, 2)
             return slot
 
-        for key, icon, name, command in left_apps:
-            dock.pack_start(make_dock_slot(key, icon, name, command), False, False, 2)
+        for key, icon, name, command, wm_class in left_apps:
+            dock.pack_start(make_dock_slot(key, icon, name, command, wm_class), False, False, 2)
 
-        orb_button = Gtk.Button()
-        add_class(orb_button, "orb-button")
-        orb_button.set_tooltip_text("Cycle DarkOS AI preview state")
-        orb_button.get_accessible().set_name("DarkOS AI preview state")
-        self.ai_orb = AIOrbCanvas(size=56)
-        orb_button.add(self.ai_orb)
-        orb_button.connect("clicked", self.on_orb_click)
-        dock.pack_start(orb_button, False, False, SPACE_SM)
+        if AI_ASSISTANT_ENABLED:
+            orb_button = Gtk.Button()
+            add_class(orb_button, "orb-button")
+            orb_button.set_tooltip_text("Cycle DarkOS AI preview state")
+            orb_button.get_accessible().set_name("DarkOS AI preview state")
+            self.ai_orb = AIOrbCanvas(size=56)
+            orb_button.add(self.ai_orb)
+            orb_button.connect("clicked", self.on_orb_click)
+            dock.pack_start(orb_button, False, False, SPACE_SM)
+        else:
+            self.ai_orb = None
+            self.clock_label = make_label("--:--", "dock-clock")
+            dock.pack_start(self.clock_label, False, False, SPACE_MD)
+            self._tick_clock()
+            GLib.timeout_add_seconds(1, self._tick_clock)
 
-        for key, icon, name, command in right_apps:
-            dock.pack_start(make_dock_slot(key, icon, name, command), False, False, 2)
+        for key, icon, name, command, wm_class in right_apps:
+            dock.pack_start(make_dock_slot(key, icon, name, command, wm_class), False, False, 2)
 
         self.add(dock)
         self.show_all()
+        self._refresh_running_indicators()
+        GLib.timeout_add_seconds(2, self._refresh_running_indicators)
+
+    def _tick_clock(self):
+        self.clock_label.set_text(datetime.datetime.now().strftime("%H:%M"))
+        return True
+
+    def _refresh_running_indicators(self):
+        running = _running_window_classes()
+        for key, dot in self._dock_dots.items():
+            wm_class = self._dock_wm_classes.get(key, "")
+            ctx = dot.get_style_context()
+            if wm_class and any(wm_class in cls or cls in wm_class for cls in running if cls):
+                ctx.add_class("running")
+            else:
+                ctx.remove_class("running")
+        return True
 
     def on_orb_click(self, _button):
         states = ("sleeping", "listening", "thinking", "speaking", "error")
@@ -215,7 +274,6 @@ class DarkOSDockWindow(Gtk.Window):
         self.ai_orb.set_state(state)
         self.application.set_orb_state(state)
         if state == "error":
-            from gi.repository import GLib
             GLib.timeout_add(900, self.finish_error_pulse)
 
     def set_activity_profile(self, highlight: str | None):
@@ -227,7 +285,7 @@ class DarkOSDockWindow(Gtk.Window):
                 ctx.add_class("dock-highlight")
 
     def finish_error_pulse(self):
-        if self.ai_orb.state == "error":
+        if self.ai_orb is not None and self.ai_orb.state == "error":
             self.ai_orb.set_state("sleeping")
             self.orb_cycle_index = 0
         return False
@@ -427,6 +485,8 @@ class DarkOSIconRail(Gtk.Window):
         add_class(rail, "rail")
         rail.set_valign(Gtk.Align.CENTER)
         actions = (
+            ("system-search-symbolic", "Search", "search")
+            if not AI_ASSISTANT_ENABLED else
             ("system-run-symbolic", "AI", "ai"),
             ("folder-symbolic", "Files", "files"),
             ("utilities-terminal-symbolic", "Terminal", "terminal"),
@@ -481,7 +541,8 @@ class DarkOSLeftPanels(Gtk.Window):
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
         root.set_size_request(330, -1)
-        root.pack_start(self.build_chat_panel(), False, False, 0)
+        if AI_ASSISTANT_ENABLED:
+            root.pack_start(self.build_chat_panel(), False, False, 0)
         root.pack_start(self.build_weather_panel(), False, False, 0)
         root.pack_start(self.build_system_panel(), False, False, 0)
         self.add(root)
