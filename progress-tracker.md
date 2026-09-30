@@ -140,3 +140,25 @@ fixes have been run against a real Wayland session, because none is
 available in any environment this has run in yet. Treat all of it the way
 `darkos-sandbox-launch.py`'s own docstring already treats bwrap: correct
 by reading and reasoning carefully, not confirmed by watching it happen.
+
+## 2026-09-29 (later same day) — VM boot hang, before any of the above ever got exercised
+
+Booted the ISO from the previous entry's commits for real (driven directly
+against the VM: screenshots, injected input, TTY-switch attempts, ping/SSH,
+VMware Tools check). Result: hangs completely at the "CONTROL EVERYTHING"
+splash. Not just Hyprland stuck -- TTY switching unresponsive too, no
+network ever comes up. First boot: minutes. After a hard reset: same hang
+in ~20s.
+
+This is upstream of literally everything in the previous entry -- it never
+reaches getty/.bash_profile/start-hyprland, so none of the AI-flag,
+titlebar, sandbox, or perf-profile work has been exercised by a real boot
+yet, positive or negative.
+
+Found `nvidia-open-dkms` unconditionally in `packages.x86_64`, no real
+NVIDIA GPU in the test VM, no mkinitcpio/cmdline config forcing early load
+-- DKMS-builds-against-running-kernel-at-first-boot is the leading
+hypothesis (fits the minutes-then-seconds pattern), not a confirmed cause.
+Removed it (commit `0d8b5f9`). If the next boot still hangs, next real step
+is a boot log that doesn't need the hung VM to cooperate (host-side mount
+or serial console), not more input injection into an already-stuck guest.
