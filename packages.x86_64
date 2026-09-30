@@ -74,7 +74,13 @@ vulkan-radeon
 vulkan-intel
 vulkan-nouveau
 nvidia-utils
-nvidia-open-dkms
+# nvidia-open-dkms intentionally NOT here -- see commit message. DKMS builds
+# its kernel module against whatever kernel is actually running, which on a
+# live ISO can mean a build (or build attempt) happening at first boot on
+# the target machine itself, not at ISO build time. On a VM with no real
+# NVIDIA GPU for it to ever bind to, that's pure risk for zero benefit.
+# nvidia-utils (userspace libs/EGL+Vulkan ICDs, no kernel module, no DKMS)
+# stays -- it's inert without a matching kernel driver loaded.
 open-vm-tools
 parted
 btrfs-progs
