@@ -65,6 +65,7 @@ RADIUS_DIALOG = 24
 # (see surfaces.py's _HUDCanvas); not yet threaded through every animated
 # surface in the shell — a real incremental follow-up, not a silent gap.
 REDUCE_MOTION = bool(_settings.get("reduce_motion"))
+HIGH_CONTRAST = bool(_settings.get("high_contrast"))
 
 # ── AI assistant (Iras) ─────────────────────────────────────────────
 # Pulled out of the shell for now at Hamza's request (2026-09-29): the

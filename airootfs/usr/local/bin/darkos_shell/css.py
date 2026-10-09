@@ -554,14 +554,47 @@ calendar.view {{
 }}
 """
 
+HIGH_CONTRAST_CSS = """
+* {
+    color: #ffffff;
+}
+.app-window, .glass-panel, .dock-bar, .rail, .sidebar, .toolbar,
+.app-titlebar, .hud-stage {
+    background-color: #000000;
+    border: 2px solid #ffffff;
+    box-shadow: none;
+}
+.app-titlebar-title, .section-title, .eyebrow, .body-muted, .dock-label,
+.path-crumb, .status-text {
+    color: #ffffff;
+}
+entry, textview, list, treeview, .sidebar-row {
+    background-color: #000000;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+}
+button, .icon-button, .action-button, .toggle-button, .dock-icon-button {
+    background-color: #000000;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+}
+"""
+
 
 def apply_css() -> None:
     """Load DarkOS GTK CSS into the default screen's style provider."""
     import gi
     gi.require_version("Gtk", "3.0")
     from gi.repository import Gtk, Gdk
+    css = CSS_STYLE
+    try:
+        from darkos_shell.user_settings import load_settings
+        if load_settings().get("high_contrast"):
+            css += HIGH_CONTRAST_CSS
+    except Exception:
+        pass
     provider = Gtk.CssProvider()
-    provider.load_from_data(CSS_STYLE.encode())
+    provider.load_from_data(css.encode())
     Gtk.StyleContext.add_provider_for_screen(
         Gdk.Screen.get_default(),
         provider,

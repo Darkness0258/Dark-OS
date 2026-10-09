@@ -52,6 +52,7 @@ kitty
 vte3
 poppler-glib
 wofi
+grim
 xdg-desktop-portal-hyprland
 polkit-kde-agent
 udisks2

@@ -30,15 +30,39 @@ time than it saved. This file only carries forward from here.
   (sourced from the end of `hyprland.conf`) — disables blur/shadow/
   animations on a detected VM, no-ops on bare metal. Regenerated fresh
   every login, never hand-edited.
-- **New:** `darkos-window-fx.py` — Alt+Tab switcher (`wofi` + `hyprctl
-  clients -j`) and Windows-style half-screen Snap (`$mainMod CTRL,
-  left/right`). Deliberately does NOT implement a maximize/restore snap
-  direction via hyprctl — GTK's own `win.maximize()`, already wired to
-  every titlebar's maximize button, covers that through the standard
-  xdg-shell protocol instead of a guessed-at dispatcher.
+- **Window effects:** `darkos-window-fx.py` now owns Alt+Tab (GTK cards +
+  grim thumbnails, wofi fallback), Super+E universal search (apps/files/
+  settings), Super+Tab workspace overview, snap layouts (halves, quadrants,
+  maximize, Super+Ctrl+Down picker), and Hyprland cursor-zoom magnifier.
+  Titlebar maximize hover opens a snap-layout popover. High-contrast lives
+  in Settings → Accessibility and `css.py`. Not VM-verified this session.
 - **Dock:** center slot is the AI orb when the flag is on, a live clock
   when it's off. Running-app indicator dots added under dock icons
   (`hyprctl clients -j`, matched against each app's real `WM_CLASS`).
+
+## 2026-10-09 — Phase B window chrome + accessibility, Phase C snap/overview
+
+Roadmap file was 2026-09-30; the tree was already past that snapshot (Alt+Tab
+wofi list, half-screen snap, Settings a11y flags with no backend). Phase A
+(VM boot/lag) cannot run on this Windows host. Implemented what could be
+proven with pure-function tests:
+
+- Visual Alt+Tab (`--switcher`): GTK card strip, Windows-style focusHistory
+  rotate, grim thumbnails when the window is on the active workspace, wofi
+  fallback. Bound to Alt+Tab.
+- Universal search (`--search`): `.desktop` apps, recently-used + shallow
+  home files, Settings tabs. Super+E. `DARKOS_SETTINGS_TAB` deep-links
+  Settings.
+- Magnifier: real `hyprctl keyword cursor:zoom_factor` (misc fallback).
+  Super+= / Super+- / Super+0. Settings toggle + `--a11y-apply` on login.
+- High contrast: `high_contrast` in settings.json, extra CSS in `apply_css()`.
+  Speech/captions/sticky keys/eye control still preference-only.
+- Snap layouts: quadrants + maximize + Super+Ctrl+Down picker. Maximize
+  button hover popover in `app_kit.py`. Super+Tab workspace overview.
+- `grim` added to `packages.x86_64`. Tests: `python ci/test-window-fx.py`.
+
+Not done: drag-to-edge snap daemon, speech/captions/sticky-keys compositor
+backends, VM boot of this ISO.
 
 ## 2026-09-29 — Lag, no close button, 5 apps not opening: found root causes for all three, fixed what's fixable without a real session
 

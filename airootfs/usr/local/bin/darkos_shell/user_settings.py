@@ -21,6 +21,7 @@ DEFAULTS = {
     "a11y_speech": False,
     "a11y_captions": False,
     "a11y_magnifier": False,
+    "high_contrast": False,
     "a11y_sticky_keys": False,
     "a11y_eye_control": False,
     "shield_protection_enabled": True,

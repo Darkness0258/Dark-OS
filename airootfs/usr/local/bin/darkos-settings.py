@@ -251,7 +251,15 @@ class SettingsWindow(Gtk.ApplicationWindow):
             self.stack.add_named(page, cid)
         body.pack_start(self.stack, True, True, 0)
 
-        self.sidebar.select_row(self.sidebar.get_row_at_index(0))
+        wanted = os.environ.get("DARKOS_SETTINGS_TAB", "")
+        selected = False
+        for index, (cid, _label, _icon) in enumerate(CATEGORIES):
+            if cid == wanted:
+                self.sidebar.select_row(self.sidebar.get_row_at_index(index))
+                selected = True
+                break
+        if not selected:
+            self.sidebar.select_row(self.sidebar.get_row_at_index(0))
 
     def _wrap_page(self, content):
         scroller = Gtk.ScrolledWindow()
@@ -274,6 +282,20 @@ class SettingsWindow(Gtk.ApplicationWindow):
     def _save(self, key, value):
         self.settings[key] = value
         save_settings(self.settings)
+        if key == "a11y_magnifier":
+            try:
+                subprocess.Popen([
+                    "python", "/usr/local/bin/darkos-window-fx.py",
+                    "--zoom", "on" if value else "reset",
+                ])
+            except OSError:
+                pass
+        if key == "high_contrast":
+            try:
+                from darkos_shell.css import apply_css
+                apply_css()
+            except Exception:
+                pass
 
     # -- System --------------------------------------------------------------
     def _build_system_tab(self):
@@ -771,10 +793,11 @@ class SettingsWindow(Gtk.ApplicationWindow):
         notebook = Gtk.Notebook()
         add_class(notebook, "terminal-tabs")
         pages = [
+            ("High contrast", "high_contrast", "Stronger white-on-black borders and text. Applies immediately in this window; other DarkOS apps pick it up the next time they open."),
+            ("Magnifier", "a11y_magnifier", "Zoom the screen around the cursor using Hyprland cursor zoom. Super+= zooms in, Super+- zooms out, Super+0 resets."),
             ("Speech", "a11y_speech", "Announce UI elements and read text aloud. Needs a speech engine (espeak/festival) wired in — this saves the preference now."),
             ("Captions", "a11y_captions", "Show live captions for system audio. Needs a speech-to-text backend — this saves the preference now."),
-            ("Magnifier", "a11y_magnifier", "Zoom the screen around the cursor. Needs compositor-level zoom support wired in."),
-            ("Keyboard", "a11y_sticky_keys", "Sticky keys — press modifier keys one at a time instead of holding them."),
+            ("Keyboard", "a11y_sticky_keys", "Sticky keys — press modifier keys one at a time instead of holding them. Preference is saved; compositor support is not wired yet."),
             ("Eye Control", "a11y_eye_control", "Control the cursor with eye tracking. Hardware-dependent (needs an eye tracker) — listed in the project backlog as not yet planned for real."),
         ]
         for label, key, description in pages:
