@@ -12,7 +12,15 @@ without GTK or a compositor; GTK/wofi are presentation only.
 
     --search
         Universal launcher (SUPER+E): apps (.desktop), recent/home files,
-        and Settings tabs in one list.
+        Settings tabs and system actions (lock, log out, screenshot, zoom,
+        power profile, connect phone) in one list.
+
+    --snip | --snip-screen [--delay SECONDS]
+        Screenshot a selected region (slurp) or the whole screen (grim).
+        Saved to ~/Pictures/Screenshots, copied to the clipboard (wl-copy)
+        and announced with a notification. SUPER+SHIFT+S / Print.
+        --delay waits first; the search box passes it so its own closing
+        animation is not in the picture.
 
     --snap {left,right,top,bottom,top-left,top-right,bottom-left,bottom-right,maximize}
         Pixel-exact snap using hyprctl monitors/activewindow, same method
@@ -33,12 +41,14 @@ without GTK or a compositor; GTK/wofi are presentation only.
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 
 
@@ -75,9 +85,49 @@ SETTINGS_CATALOG = (
     ("themes", "Themes", "Accent color, appearance"),
     ("wallpaper", "Wallpaper", "Desktop background"),
     ("motion", "Motion", "Reduce motion, animations"),
-    ("designer", "Designer", "Corner radius"),
+    ("designer", "Designer", "Corner radius, dock position, dock size"),
     ("permissions", "Permissions", "App permissions"),
     ("accessibility", "Accessibility", "Magnifier, high contrast, captions, sticky keys"),
+)
+
+# Compositor fade-out animations (hyprland.conf: windowsOut 6, fade 7, i.e.
+# up to ~0.7 s) would otherwise be captured. Key binds capture at once; the
+# search box asks for SNIP_SEARCH_DELAY because its own window is still
+# closing, and a region capture always waits SNIP_PICK_SETTLE after the pick
+# so slurp's selection overlay has faded. Chosen from those animation
+# settings, not measured on Hyprland.
+SNIP_PICK_SETTLE_SECONDS = 0.5
+SNIP_SEARCH_DELAY = "1"
+
+# System actions the search box can run: (key, name, search keywords, argv).
+# Only things that are NOT already an app or a Settings tab -- Terminal, Files
+# and Settings are found through their .desktop entries -- so a query never
+# lists the same thing twice.
+ACTION_CATALOG = (
+    ("lock", "Lock screen", "lock session screen",
+     ["loginctl", "lock-session"]),
+    ("logout", "Log out", "logout sign out wlogout",
+     ["wlogout"]),
+    ("screenshot-region", "Screenshot region", "snip crop screenshot region capture",
+     ["python", "/usr/local/bin/darkos-window-fx.py", "--snip", "--delay", SNIP_SEARCH_DELAY]),
+    ("screenshot-screen", "Screenshot screen", "screenshot display monitor capture print",
+     ["python", "/usr/local/bin/darkos-window-fx.py", "--snip-screen", "--delay", SNIP_SEARCH_DELAY]),
+    ("overview", "Workspace overview", "workspaces overview",
+     ["python", "/usr/local/bin/darkos-window-fx.py", "--overview"]),
+    ("zoom-in", "Zoom in", "magnifier zoom",
+     ["python", "/usr/local/bin/darkos-window-fx.py", "--zoom", "in"]),
+    ("zoom-out", "Zoom out", "magnifier zoom",
+     ["python", "/usr/local/bin/darkos-window-fx.py", "--zoom", "out"]),
+    ("zoom-reset", "Reset zoom", "magnifier reset",
+     ["python", "/usr/local/bin/darkos-window-fx.py", "--zoom", "reset"]),
+    ("connect", "Connect phone", "kde connect phone android continuity",
+     ["kdeconnect-app"]),
+    ("power-performance", "Power: Performance", "power profile performance",
+     ["powerprofilesctl", "set", "performance"]),
+    ("power-balanced", "Power: Balanced", "power profile balanced",
+     ["powerprofilesctl", "set", "balanced"]),
+    ("power-saver", "Power: Power saver", "power profile saver battery",
+     ["powerprofilesctl", "set", "power-saver"]),
 )
 
 SKIP_FILE_DIRS = {
@@ -410,6 +460,31 @@ def settings_results(query):
     return results
 
 
+def action_results(query):
+    """System actions matching a query.
+
+    Only offered once something is typed: with an empty query every item ties
+    at score 1 and the alphabetical tie-break (kind "action" sorts first)
+    would push all of these ahead of the user's apps.
+    """
+    if not (query or "").strip():
+        return []
+    results = []
+    for key, name, keywords, argv in ACTION_CATALOG:
+        score = match_score(query, name, keywords)
+        if score:
+            results.append({
+                "kind": "action",
+                "name": name,
+                "action": key,
+                "argv": list(argv),
+                "comment": "",
+                "score": score,
+            })
+    results.sort(key=lambda item: (-item["score"], item["name"]))
+    return results
+
+
 def file_results(query, home=None, recent_paths=None, extra_paths=None):
     home = home if home is not None else os.path.expanduser("~")
     results = []
@@ -448,7 +523,7 @@ def file_results(query, home=None, recent_paths=None, extra_paths=None):
     return results[:20]
 
 
-def search_items(query, apps, files, settings):
+def search_items(query, apps, files, settings, actions=()):
     ranked = []
     for app in apps:
         score = match_score(query, app.get("name"), app.get("comment"), " ".join(app.get("exec") or []))
@@ -458,6 +533,7 @@ def search_items(query, apps, files, settings):
             ranked.append(item)
     ranked.extend(files)
     ranked.extend(settings)
+    ranked.extend(actions)
     ranked.sort(key=lambda item: (-item.get("score", 0), item.get("kind", ""), item.get("name", "").lower()))
     return ranked[:30]
 
@@ -526,6 +602,12 @@ def activate_result(item):
         env = os.environ.copy()
         env["DARKOS_SETTINGS_TAB"] = item.get("tab") or "system"
         _launch_argv(["python", "/usr/local/bin/darkos-settings.py"], env=env)
+        return 0
+    if kind == "action":
+        argv = item.get("argv")
+        if not argv:
+            return 1
+        _launch_argv(list(argv))
         return 0
     if kind == "window":
         address = item.get("address")
@@ -738,7 +820,7 @@ def _collect_search(query):
         pass
     files = file_results(query, recent_paths=recent)
     settings = settings_results(query)
-    return search_items(query, apps, files, settings)
+    return search_items(query, apps, files, settings, action_results(query))
 
 
 def _search_wofi():
@@ -1009,6 +1091,112 @@ def run_a11y_apply(settings=None):
     return apply_zoom(ZOOM_MIN)
 
 
+# -- Screenshots ------------------------------------------------------------
+
+def screenshot_path(now=None, home=None):
+    home = home if home is not None else os.path.expanduser("~")
+    now = now or datetime.datetime.now()
+    return os.path.join(
+        home, "Pictures", "Screenshots", now.strftime("DarkOS-%Y-%m-%d_%H-%M-%S.png")
+    )
+
+
+def grim_argv(path, geometry=None):
+    argv = ["grim"]
+    if geometry:
+        argv += ["-g", geometry]
+    argv.append(path)
+    return argv
+
+
+def parse_slurp_geometry(text):
+    """Validate slurp's "X,Y WxH" output; return it, or "" if it isn't that.
+
+    Whatever comes back is handed to `grim -g`, so only a strictly numeric
+    rectangle with a positive size is accepted.
+    """
+    match = re.fullmatch(r"\s*(-?\d+),(-?\d+) (\d+)x(\d+)\s*", text or "")
+    if not match:
+        return ""
+    x, y, width, height = match.groups()
+    if int(width) <= 0 or int(height) <= 0:
+        return ""
+    return f"{x},{y} {width}x{height}"
+
+
+def _notify(summary, body=""):
+    try:
+        subprocess.run(
+            ["notify-send", "--app-name=DarkOS", "--icon=camera-photo", summary, body],
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def _copy_image_to_clipboard(path):
+    # No capture_output: wl-copy forks to keep serving the clipboard, and a
+    # captured pipe would keep run() waiting on that background process.
+    try:
+        with open(path, "rb") as handle:
+            subprocess.run(["wl-copy", "--type", "image/png"], stdin=handle, timeout=5)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def run_snip(region, settle=0.0, pick_settle=SNIP_PICK_SETTLE_SECONDS, home=None,
+             now=None, run=None, sleep=time.sleep, notify=None, copy=None):
+    """Capture a region (slurp) or the whole screen (grim).
+
+    Saves to ~/Pictures/Screenshots, copies to the clipboard, notifies.
+    Dependencies are injectable so CI can drive it without a compositor.
+    Cancelling the selection (Esc) is not an error.
+    """
+    run = run or subprocess.run
+    notify = notify or _notify
+    copy = copy or _copy_image_to_clipboard
+    if settle > 0:
+        sleep(settle)  # let the search box that launched us finish closing
+    geometry = None
+    if region:
+        try:
+            picked = run(["slurp"], capture_output=True, text=True)
+        except OSError:
+            notify("Screenshot unavailable", "slurp is not installed.")
+            return 1
+        if picked.returncode != 0:
+            return 0
+        geometry = parse_slurp_geometry(picked.stdout)
+        if not geometry:
+            return 1
+        if pick_settle > 0:
+            sleep(pick_settle)  # slurp's selection overlay fades out first
+    path = screenshot_path(now=now, home=home)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        shot = run(grim_argv(path, geometry), capture_output=True, text=True)
+    except OSError as error:
+        notify("Screenshot failed", str(error))
+        return 1
+    if shot.returncode != 0:
+        notify("Screenshot failed", (shot.stderr or "").strip() or "grim reported an error")
+        return 1
+    copied = copy(path)
+    notify("Screenshot saved and copied" if copied else "Screenshot saved", path)
+    return 0
+
+
+def _delay_arg(argv):
+    """The value after --delay in seconds, clamped to 0..5; 0 if absent/garbled."""
+    if "--delay" not in argv:
+        return 0.0
+    try:
+        return max(0.0, min(5.0, float(argv[argv.index("--delay") + 1])))
+    except (ValueError, IndexError):
+        return 0.0
+
+
 def main():
     argv = sys.argv[1:]
     if "--switcher" in argv:
@@ -1021,6 +1209,10 @@ def main():
         return run_snap_picker()
     if "--a11y-apply" in argv:
         return run_a11y_apply()
+    if "--snip-screen" in argv:
+        return run_snip(region=False, settle=_delay_arg(argv))
+    if "--snip" in argv:
+        return run_snip(region=True, settle=_delay_arg(argv))
     if "--zoom" in argv:
         idx = argv.index("--zoom")
         action = argv[idx + 1] if idx + 1 < len(argv) else ""
@@ -1035,7 +1227,9 @@ def main():
     print(
         f"usage: {sys.argv[0]} --switcher | --search | --overview | "
         f"--snap-picker | --snap {{{','.join(SNAP_SIDES)}}} | "
-        f"--zoom {{in,out,reset,on,off,toggle}} | --a11y-apply",
+        f"--zoom {{in,out,reset,on,off,toggle}} | --snip [--delay N] | "
+        f"--snip-screen [--delay N] | "
+        f"--a11y-apply",
         file=sys.stderr,
     )
     return 2
