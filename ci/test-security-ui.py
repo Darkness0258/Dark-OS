@@ -23,11 +23,33 @@ try:
     import gi
 
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk
+    from gi.repository import Gio, Gtk
 
     GTK_AVAILABLE = True
 except (ImportError, ValueError):
     GTK_AVAILABLE = False
+
+_SHARED_APP = None
+
+
+def shared_app():
+    """One registered Gtk.Application for the whole test process.
+
+    With a real session bus (xvfb-run + dbus-run-session) only the first
+    Gtk.Application registered in a process can become primary; every later
+    one fails with GLib-GIO-CRITICAL "attempt_primary: local_error == NULL"
+    and register() returns False, whatever its id or flags. Creating a fresh
+    app per test therefore broke the 2nd and later tests as soon as a bus
+    existed. Windows are still built and destroyed per test.
+    """
+    global _SHARED_APP
+    if _SHARED_APP is None:
+        _SHARED_APP = Gtk.Application(
+            application_id="test.darkos.security.ci",
+            flags=Gio.ApplicationFlags.NON_UNIQUE,
+        )
+        assert _SHARED_APP.register(None), "Gtk.Application failed to register"
+    return _SHARED_APP
 
 
 @unittest.skipUnless(GTK_AVAILABLE, "GTK 3 not available in this environment")
@@ -62,8 +84,7 @@ class QuarantineTabTests(unittest.TestCase):
         self.workdir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.workdir, ignore_errors=True)
 
-        app = Gtk.Application(application_id="test.darkos.security.ci")
-        app.register()
+        app = shared_app()
         self.win = self.mod.SecurityWindow(app)
         self.addCleanup(self.win.destroy)
 
@@ -143,8 +164,7 @@ class ProtectionToggleTests(unittest.TestCase):
         self.mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.mod)
 
-        app = Gtk.Application(application_id="test.darkos.security.toggle.ci")
-        app.register()
+        app = shared_app()
         self.win = self.mod.SecurityWindow(app)
         self.addCleanup(self.win.destroy)
 
