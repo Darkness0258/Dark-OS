@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -71,6 +72,7 @@ class ActivityDetector:
         self._listeners = []
         self._poll_interval = 3.0  # seconds between AT-SPI checks
         self._running = False
+        self._detecting = False  # a background detection is in flight
 
     def start(self):
         """Begin polling for foreground window changes."""
@@ -94,18 +96,42 @@ class ActivityDetector:
     # ── Detection ──────────────────────────────────────────────────────
 
     def _poll(self):
+        """Start one detection and schedule the next poll.
+
+        Detection shells out (hyprctl, then a helper Python process as a last
+        resort). It used to run right here on the GTK main thread, which
+        froze the whole shell -- dock, clock, hover, clicks -- for up to ~3 s
+        on every poll while the desktop was empty. It now runs on a worker
+        thread and only the result is applied on the main loop.
+        """
         if not self._running:
             return
-        try:
-            profile = self._detect_activity()
-            if profile != self._current_profile:
-                old = self._current_profile
-                self._current_profile = profile
-                self._notify_listeners(profile)
-        except Exception:
-            pass  # AT-SPI may not be available on first boot
+        if not self._detecting:
+            self._detecting = True
+            threading.Thread(
+                target=self._detect_in_background,
+                name="darkos-activity-detector",
+                daemon=True,
+            ).start()
         from gi.repository import GLib
         GLib.timeout_add_seconds(int(self._poll_interval), self._poll)
+
+    def _detect_in_background(self):
+        """Worker-thread half of a poll: may block, must not touch GTK."""
+        from gi.repository import GLib
+        try:
+            profile = self._detect_activity()
+        except Exception:
+            profile = None  # AT-SPI may not be available on first boot
+        GLib.idle_add(self._apply_detected, profile)
+
+    def _apply_detected(self, profile):
+        """Main-thread half of a poll: publish the result to listeners."""
+        self._detecting = False
+        if self._running and profile is not None and profile != self._current_profile:
+            self._current_profile = profile
+            self._notify_listeners(profile)
+        return False
 
     def _detect_activity(self) -> str:
         """Return the best-matching activity profile name."""
@@ -141,6 +167,7 @@ class ActivityDetector:
     def _get_active_window_title() -> str:
         """Best-effort active window title from Hyprland or AT-SPI."""
         env = ActivityDetector._hypr_env()
+        hypr_answered = False
 
         # Primary: hyprctl activewindow (fast, direct)
         try:
@@ -152,6 +179,7 @@ class ActivityDetector:
                 env=env,
             )
             if result.returncode == 0:
+                hypr_answered = True
                 data = json.loads(result.stdout)
                 title = data.get("title", "") or data.get("class", "") or ""
                 if title:
@@ -169,6 +197,7 @@ class ActivityDetector:
                 env=env,
             )
             if result.returncode == 0:
+                hypr_answered = True
                 clients = json.loads(result.stdout)
                 # Filter to visible, mapped, non-pinned windows
                 visible = [
@@ -182,6 +211,13 @@ class ActivityDetector:
                     return best.get("title", "") or best.get("class", "") or ""
         except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
             pass
+
+        if hypr_answered:
+            # Hyprland is running and simply has nothing focused (an empty
+            # desktop). The AT-SPI helper below is for non-Hyprland sessions;
+            # reaching it here spawned a fresh Python interpreter every poll
+            # just to learn there is no window.
+            return ""
 
         # Fallback 2: AT-SPI — walk into frame children for the window title
         try:
