@@ -95,6 +95,18 @@ CSS_STYLE = f"""
     padding: {SPACE_XS}px {SPACE_MD}px;
 }}
 
+.dock-bar.vertical {{
+    padding: {SPACE_MD}px {SPACE_XS}px;
+}}
+
+/* The GTK theme gives every button a 24px min-height, so without this a
+   "compact" dock could never get shorter than the default one. */
+.dock-bar.compact .dock-icon-button {{
+    min-width: 0;
+    min-height: 0;
+    padding: {SPACE_XS}px;
+}}
+
 .icon-button, .dock-icon-button, .orb-button {{
     background-color: transparent;
     background-image: none;

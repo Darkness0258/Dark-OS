@@ -40,6 +40,7 @@ from darkos_shell.surfaces import (
 from darkos_shell.canvases import AIOrbCanvas, RingGauge, WaveformCanvas
 from darkos_shell.system_sampler import SystemSampler
 from darkos_shell.css import apply_css
+from darkos_shell.user_settings import load_settings, settings_path
 from darkos_shell.actions import ActionDispatcher
 from darkos_shell.tokens import (
     AI_ASSISTANT_ENABLED,
@@ -115,6 +116,37 @@ class DarkOSApplication(Gtk.Application):
         self._orb_state = "sleeping"
         self._actions = None
         self._ai_response_label = None
+        self._settings_monitor = None
+        self._settings_reload_id = 0
+
+    # ── Live settings reload ───────────────────────────────────────────
+
+    def _watch_settings(self):
+        """Re-lay out the dock when Settings changes dock_position/dock_size.
+
+        Everything else in settings.json (accent, radius, ...) still applies
+        on the next shell restart; only the dock is applied live.
+        """
+        try:
+            gfile = Gio.File.new_for_path(settings_path())
+            self._settings_monitor = gfile.monitor_file(Gio.FileMonitorFlags.NONE, None)
+        except GLib.Error as error:
+            print(f"DarkOS: not watching settings.json: {error.message}", flush=True)
+            return
+        self._settings_monitor.connect("changed", self._on_settings_changed)
+
+    def _on_settings_changed(self, _monitor, _file, _other_file, _event):
+        # One save raises several events (create / rename / changes-done);
+        # coalesce them into a single reload.
+        if self._settings_reload_id == 0:
+            self._settings_reload_id = GLib.timeout_add(150, self._reload_dock_settings)
+
+    def _reload_dock_settings(self):
+        self._settings_reload_id = 0
+        if self.dock is not None:
+            settings = load_settings()
+            self.dock.apply_layout(settings["dock_position"], settings["dock_size"])
+        return False
 
     # ── Static queries ─────────────────────────────────────────────────
 
@@ -214,6 +246,8 @@ class DarkOSApplication(Gtk.Application):
             trigger = self.trigger
             trigger.add_listener(self._on_voice_activated)
             trigger.start()
+
+        self._watch_settings()
 
     # ── Activity detection → layout ─────────────────────────────────────
 

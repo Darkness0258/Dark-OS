@@ -39,8 +39,11 @@ from darkos_shell.tokens import (
     SPACE_SM,
     SPACE_XS,
     SPACE_XL,
+    dock_exclusive_zone,
+    dock_layout,
 )
 from darkos_shell.system_sampler import SystemSampler
+from darkos_shell.user_settings import load_settings
 import datetime
 import json
 import subprocess
@@ -162,8 +165,17 @@ def command_output(command, timeout=1.5):
 
 
 class DarkOSDockWindow(Gtk.Window):
-    """Floating bottom dock. Center slot is the AI Orb when
-    AI_ASSISTANT_ENABLED, otherwise a live clock (see tokens.py)."""
+    """Floating dock on any screen edge, in one of three sizes (the
+    dock_position / dock_size settings; apply_layout() re-lays it out live).
+    Center slot is the AI Orb when AI_ASSISTANT_ENABLED, otherwise a live
+    clock (see tokens.py)."""
+
+    _EDGES = {
+        "bottom": GtkLayerShell.Edge.BOTTOM,
+        "top": GtkLayerShell.Edge.TOP,
+        "left": GtkLayerShell.Edge.LEFT,
+        "right": GtkLayerShell.Edge.RIGHT,
+    }
 
     def __init__(self, application):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
@@ -173,19 +185,19 @@ class DarkOSDockWindow(Gtk.Window):
         self.set_decorated(False)
         self.set_app_paintable(True)
         add_class(self, "darkos-window")
+        settings = load_settings()
+        self._layout = None
+        self._exclusive_zone = None
+        # Only creates the layer surface; anchors, margin and exclusive zone
+        # come from apply_layout() at the end of __init__.
         configure_layer_window(
-            self,
-            "darkos-dock",
-            GtkLayerShell.Layer.TOP,
-            (GtkLayerShell.Edge.BOTTOM,),
-            {GtkLayerShell.Edge.BOTTOM: 14},
-            exclusive_zone=108,
-            keyboard=True,
+            self, "darkos-dock", GtkLayerShell.Layer.TOP, (), {}, keyboard=True,
         )
 
         dock = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_XS)
         add_class(dock, "dock-bar")
         dock.set_halign(Gtk.Align.CENTER)
+        self._dock_box = dock
 
         # wm_class here matches each app's own WM_CLASS constant (and the
         # hyprland.conf windowrule matchers) so the running-dot below each
@@ -201,6 +213,8 @@ class DarkOSDockWindow(Gtk.Window):
             ("settings", "preferences-system-symbolic", "Settings", ["/usr/local/bin/darkos-settings.py"], "darkos-settings"),
         )
         self._dock_icons = {}
+        self._dock_images = {}
+        self._dock_labels = {}
         self._dock_dots = {}
         self._dock_wm_classes = {}
 
@@ -213,6 +227,7 @@ class DarkOSDockWindow(Gtk.Window):
                 "dock-icon-button", 40,
             )
             self._dock_icons[key] = btn
+            self._dock_images[key] = btn.get_child()
             self._dock_wm_classes[key] = wm_class
             slot.pack_start(btn, False, False, 0)
             dot = Gtk.Box()
@@ -222,6 +237,7 @@ class DarkOSDockWindow(Gtk.Window):
             slot.pack_start(dot, False, False, 1)
             label = make_label(name, "dock-label")
             label.set_xalign(0.5)
+            self._dock_labels[key] = label
             slot.pack_start(label, False, False, 2)
             return slot
 
@@ -240,6 +256,7 @@ class DarkOSDockWindow(Gtk.Window):
         else:
             self.ai_orb = None
             self.clock_label = make_label("--:--", "dock-clock")
+            self.clock_label.set_justify(Gtk.Justification.CENTER)
             dock.pack_start(self.clock_label, False, False, SPACE_MD)
             self._tick_clock()
             GLib.timeout_add_seconds(1, self._tick_clock)
@@ -248,12 +265,77 @@ class DarkOSDockWindow(Gtk.Window):
             dock.pack_start(make_dock_slot(key, icon, name, command, wm_class), False, False, 2)
 
         self.add(dock)
+        self.connect(
+            "size-allocate",
+            lambda _widget, allocation: self._update_exclusive_zone(allocation),
+        )
         self.show_all()
+        self.apply_layout(settings["dock_position"], settings["dock_size"])
         self._refresh_running_indicators()
         GLib.timeout_add_seconds(2, self._refresh_running_indicators)
 
+    def apply_layout(self, position, size):
+        """Move/resize the dock live. Returns True if anything changed.
+
+        Unknown values fall back to the defaults (tokens.dock_layout), so a
+        bad settings file can't strand the dock off-screen. Re-anchors the
+        layer surface, flips the box orientation, resizes the icons and
+        shows/hides the text labels.
+        """
+        layout = dock_layout(position, size)
+        if layout == self._layout:
+            return False
+        self._layout = layout
+
+        edge = self._EDGES[layout.position]
+        for candidate in self._EDGES.values():
+            GtkLayerShell.set_anchor(self, candidate, candidate == edge)
+            GtkLayerShell.set_margin(
+                self, candidate, layout.edge_margin if candidate == edge else 0
+            )
+
+        self._dock_box.set_orientation(
+            Gtk.Orientation.VERTICAL if layout.vertical else Gtk.Orientation.HORIZONTAL
+        )
+        context = self._dock_box.get_style_context()
+        for name, active in (("vertical", layout.vertical), ("compact", layout.size == "compact")):
+            if active:
+                context.add_class(name)
+            else:
+                context.remove_class(name)
+        for key, button in self._dock_icons.items():
+            button.set_size_request(layout.button_px, layout.button_px)
+            self._dock_images[key].set_pixel_size(layout.button_px // 2)
+            self._dock_labels[key].set_visible(layout.show_labels)
+
+        # A toplevel only grows by itself; resize(1, 1) lets it shrink back
+        # to its natural size when the dock gets smaller or changes axis.
+        self.resize(1, 1)
+        self._exclusive_zone = None
+        self._update_exclusive_zone()
+        if hasattr(self, "clock_label"):  # absent when the AI orb is the center slot
+            self._tick_clock()
+        return True
+
+    def _update_exclusive_zone(self, allocation=None):
+        """Reserve screen space equal to the dock's measured thickness."""
+        layout = self._layout
+        if layout is None:
+            return
+        allocation = allocation or self.get_allocation()
+        thickness = allocation.width if layout.vertical else allocation.height
+        if thickness <= 1:  # not allocated yet; size-allocate will call again
+            return
+        zone = dock_exclusive_zone(layout, thickness)
+        if zone != self._exclusive_zone:
+            self._exclusive_zone = zone
+            GtkLayerShell.set_exclusive_zone(self, zone)
+
     def _tick_clock(self):
-        self.clock_label.set_text(datetime.datetime.now().strftime("%H:%M"))
+        # A vertical dock stacks hours over minutes so it stays slim.
+        stacked = bool(self._layout and self._layout.vertical)
+        fmt = "%H\n%M" if stacked else "%H:%M"
+        self.clock_label.set_text(datetime.datetime.now().strftime(fmt))
         return True
 
     def _refresh_running_indicators(self):

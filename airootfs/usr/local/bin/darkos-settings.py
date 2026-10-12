@@ -31,7 +31,7 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.app_kit import add_class, run_app  # noqa: E402
-from darkos_shell.user_settings import load_settings, save_settings  # noqa: E402
+from darkos_shell.user_settings import CHOICES, load_settings, save_settings  # noqa: E402
 
 APP_ID = "org.darkos.Settings"
 WM_CLASS = "darkos-settings"
@@ -767,7 +767,36 @@ class SettingsWindow(Gtk.ApplicationWindow):
                   "rounding (hyprland.conf) is separate and unaffected.",
             xalign=0, wrap=True,
         ), False, False, 8)
+        box.pack_start(self._choice_row("dock_position", "Dock position"), False, False, 8)
+        box.pack_start(self._choice_row("dock_size", "Dock size"), False, False, 0)
+        box.pack_start(Gtk.Label(
+            label="The dock moves and resizes immediately; no restart needed.",
+            xalign=0, wrap=True,
+        ), False, False, 8)
         return box
+
+    def _choice_row(self, key, title):
+        """Radio buttons for a fixed-choice setting (see user_settings.CHOICES)."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.pack_start(section_label(title), False, False, 0)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        current = self.settings.get(key)
+        group = None
+        for value in CHOICES[key]:
+            btn = Gtk.RadioButton.new_with_label_from_widget(group, value.capitalize())
+            if group is None:
+                group = btn
+            btn.set_active(value == current)
+            btn.connect("toggled", self._make_choice_setter(key, value))
+            row.pack_start(btn, False, False, 0)
+        box.pack_start(row, False, False, 0)
+        return box
+
+    def _make_choice_setter(self, key, value):
+        def _set(btn):
+            if btn.get_active():
+                self._save(key, value)
+        return _set
 
     # -- Permissions -------------------------------------------------------------
     def _build_permissions_tab(self):

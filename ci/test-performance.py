@@ -17,6 +17,7 @@ kit = types.ModuleType("darkos_shell.app_kit")
 kit.add_class = kit.run_app = Mock()
 preferences = types.ModuleType("darkos_shell.user_settings")
 preferences.load_settings = preferences.save_settings = Mock()
+preferences.CHOICES = {}  # darkos-settings.py reads it for the Designer tab; unused by these tests
 spec = importlib.util.spec_from_file_location("darkos_settings_tested", Path(__file__).resolve().parents[1] / "airootfs/usr/local/bin/darkos-settings.py")
 settings = importlib.util.module_from_spec(spec)
 with patch.dict(sys.modules, {"gi": gi, "gi.repository": repository, "darkos_shell.app_kit": kit, "darkos_shell.user_settings": preferences, spec.name: settings}):

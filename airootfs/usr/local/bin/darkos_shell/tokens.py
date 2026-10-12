@@ -8,7 +8,9 @@ Accent color, corner radius, and reduce-motion are user-configurable via
 Settings (darkos-settings.py) — see user_settings.py. They're read once at
 import time, so a change takes effect on the next shell restart.
 """
-from darkos_shell.user_settings import load_settings
+from collections import namedtuple
+
+from darkos_shell.user_settings import CHOICES, load_settings
 
 _settings = load_settings()
 
@@ -66,6 +68,56 @@ RADIUS_DIALOG = 24
 # surface in the shell — a real incremental follow-up, not a silent gap.
 REDUCE_MOTION = bool(_settings.get("reduce_motion"))
 HIGH_CONTRAST = bool(_settings.get("high_contrast"))
+
+# ── Dock ─────────────────────────────────────────────────────────────
+# Position and size are user settings (Settings > Designer). The geometry
+# below is pure so it can be tested without GTK or a compositor; the dock
+# window (surfaces.py) applies it live. DOCK_CLEARANCE is the spare space
+# reserved past the dock itself: the old fixed 108px zone was a 14px edge
+# margin + the dock's ~75px thickness + 19px, so the default look keeps
+# reserving what it always did.
+DOCK_POSITIONS = CHOICES["dock_position"]
+DOCK_SIZES = CHOICES["dock_size"]
+DOCK_BUTTON_PX = {"compact": 32, "default": 40, "large": 52}
+DOCK_EDGE_MARGIN = 14
+DOCK_CLEARANCE = 19
+
+DockLayout = namedtuple(
+    "DockLayout", "position size vertical button_px show_labels edge_margin"
+)
+
+
+def dock_layout(position, size):
+    """Resolve a (position, size) pair to concrete dock geometry.
+
+    Unknown values fall back to bottom/default, so a hand-edited or stale
+    settings file can never produce an unusable dock. Labels are dropped on
+    the compact size and on vertical docks (a left/right dock would
+    otherwise be as wide as its longest label); every icon keeps its
+    tooltip and accessible name either way.
+    """
+    if position not in DOCK_POSITIONS:
+        position = "bottom"
+    if size not in DOCK_SIZES:
+        size = "default"
+    vertical = position in ("left", "right")
+    return DockLayout(
+        position=position,
+        size=size,
+        vertical=vertical,
+        button_px=DOCK_BUTTON_PX[size],
+        show_labels=(size != "compact" and not vertical),
+        edge_margin=DOCK_EDGE_MARGIN,
+    )
+
+
+def dock_exclusive_zone(layout, thickness):
+    """Pixels the compositor should keep clear along the dock's edge, given
+    the dock's *measured* thickness (height when horizontal, width when
+    vertical). Measured, not hard-coded, because font metrics differ per
+    machine and a fixed number would overlap or leave gaps."""
+    return layout.edge_margin + int(thickness) + DOCK_CLEARANCE
+
 
 # ── AI assistant (Iras) ─────────────────────────────────────────────
 # Pulled out of the shell for now at Hamza's request (2026-09-29): the
