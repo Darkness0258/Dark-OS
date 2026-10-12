@@ -29,14 +29,38 @@ The `out/` directory holds ~14 VM helper scripts for Phase 2 iteration: hot-relo
 
 ## Validation
 
-There are no unit tests. Correctness is enforced through:
+Correctness is enforced through:
 
+- `ci/test-*.py` -- unit and integration tests. CI's "Run Linux backend and
+  native app regressions" step lists the ones it runs; GTK ones need
+  `xvfb-run -a dbus-run-session -- python ci/test-<name>.py`. Add a test with
+  every change, and prove it can fail (run it against the old code).
 - `bash -n` for shell scripts, `python -m py_compile` for Python.
+- `bash ci/headless/run-all.sh` -- the real shell on a headless sway compositor
+  (dock layout, main-loop stalls, screenshots). Needs sway; see its README.
+  It is not Hyprland, so it does not replace the checks below.
 - Full `sudo bash build-iso.sh` for packaging, permission, symlink, and Calamares changes.
 - `bash ci/verify-iso.sh` for post-build artifact checks.
 - QEMU boot for installer, bootloader, login, and shell-surface changes.
 
 When in doubt, run the full build and boot the ISO in QEMU.
+
+### Rules learned the hard way
+
+- **Never block the GTK main thread.** No `subprocess.run`, network, or AT-SPI
+  call inside a GLib timeout/idle callback: do the work in a thread and hand
+  the result back with `GLib.idle_add`. `ActivityDetector` once froze the whole
+  shell for seconds at a time this way. `ci/headless/stall_check.py` measures it.
+- **One `Gtk.Application` registered per process in tests.** On a session bus
+  only the first can become primary; later ones fail with a GLib-GIO CRITICAL.
+  Share one across tests.
+- **Settings are read once at import**, except `dock_position`/`dock_size`,
+  which the running shell applies live by watching `settings.json`.
+  `save_settings` writes atomically (temp file + rename) because of that
+  watcher; keep it that way. A new value with a fixed set of choices goes in
+  `user_settings.CHOICES` so bad values fall back instead of reaching GTK.
+- **Only claim what was verified.** Say where it was verified (headless
+  sway, xvfb, unit test, VM) and what was not.
 
 ## Windows Developer Host
 

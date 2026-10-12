@@ -32,13 +32,95 @@ time than it saved. This file only carries forward from here.
   every login, never hand-edited.
 - **Window effects:** `darkos-window-fx.py` now owns Alt+Tab (GTK cards +
   grim thumbnails, wofi fallback), Super+E universal search (apps/files/
-  settings), Super+Tab workspace overview, snap layouts (halves, quadrants,
+  settings + system actions such as lock/log out/screenshot/zoom/power
+  profile/connect phone), Super+Tab workspace overview, snap layouts (halves, quadrants,
   maximize, Super+Ctrl+Down picker), and Hyprland cursor-zoom magnifier.
   Titlebar maximize hover opens a snap-layout popover. High-contrast lives
   in Settings → Accessibility and `css.py`. Not VM-verified this session.
 - **Dock:** center slot is the AI orb when the flag is on, a live clock
   when it's off. Running-app indicator dots added under dock icons
   (`hyprctl clients -j`, matched against each app's real `WM_CLASS`).
+  Position (bottom/top/left/right) and size (compact/default/large) are
+  settings (Settings → Designer) applied live: the shell watches
+  `settings.json`. The default is pixel-identical to before: a full-screen
+  diff against the previous commit on the headless compositor, clock text
+  masked, found no differing pixel.
+- **Verifying without a VM:** `bash ci/headless/run-all.sh` runs the real shell
+  on a headless wlroots compositor (sway) and checks the dock matrix, main-
+  loop stalls and screenshots. See `ci/headless/README.md` for what that
+  does and does not prove (it is not Hyprland).
+
+## 2026-10-12 — Verifying for real without a VM: a shell-wide freeze, the dock, search actions
+
+Environment: a Linux container with GTK3, gtk-layer-shell, a headless wlroots
+compositor (sway) and grim. **Not** Hyprland, no real GPU, no `mkarchiso`/
+`pacman`. So "verified" below means verified there, and each item says which.
+
+**Tests that had never run, now run.** `test-native-apps-linux.py` starts all
+21 native apps under real GTK3 (21/21); `test-continuous-protection.py` and
+`test-security-ui.py` pass. The last one had a real test bug (one
+`Gtk.Application` per test collides on a session bus: only the first can
+register); fixed with a single shared app. Whole suite: 19 files run; all pass.
+
+**Found and fixed: the shell froze itself.** `ActivityDetector._poll` ran on
+the GTK main thread every 3 s and shelled out synchronously: `hyprctl`, then
+`hyprctl clients`, then (on an empty desktop, i.e. right after boot) a fresh
+Python interpreter walking AT-SPI. Measured with a 20 ms main-loop heartbeat
+on an emulated empty Hyprland desktop: **45% of the run blocked, 3 s stalls,
+before; 0% after.** Fix: detection on a worker thread (result applied on the
+main loop) and no AT-SPI helper when `hyprctl` actually answered.
+Caveat: the 3 s is this container's number (no accessibility bus, so the
+helper hits its timeout); on the VM expect shorter but still periodic freezes.
+It is a real defect and a plausible cause of the reported lag, but **not yet
+confirmed against the lag on the VM.** `ci/test-activity-detector.py` fails on
+the old code (7 of 15 tests) and passes on the new.
+
+**Dock position + size (new).** `dock_position` / `dock_size` in
+`settings.json` (validated; bad values fall back), Settings → Designer radio
+buttons, applied live by a debounced file watcher; `save_settings` is now
+atomic so the watcher never reads a torn file. Compact really shrinks (the
+GTK theme's 24 px button min-height needed a CSS override); a vertical dock
+stacks the clock hours-over-minutes to stay slim. Verified on headless sway:
+all 4 positions x 3 sizes, exact exclusive-zone reservation as seen by a tiled
+window, invalid-value fallback, Settings-click -> shell moves
+(`ci/headless/dock_matrix.py`, 32/32). **Not verified on Hyprland**, which
+should treat layer-shell exclusive zones the same way but is untested.
+
+**Search that does things + screenshots.** Finished the uncommitted draft,
+with changes: dropped `pip` (never implemented) and the Open Terminal/Files/
+Settings entries (duplicates of the apps), actions only appear once something
+is typed (else they sort ahead of every app), and the catalog test now fails
+if an action points at a flag `main()` doesn't accept. New `--snip` (region,
+`slurp`) / `--snip-screen` (`grim`): saved to `~/Pictures/Screenshots`,
+copied with `wl-copy`, notification. Super+Shift+S and Print. `slurp` and
+`wl-clipboard` added to `packages.x86_64` (both confirmed in Arch `extra`).
+Verified against real `grim`/`wl-copy` with the interactive picker shimmed:
+files, clipboard bytes, pixel-exact region crop, Esc cancel, hostile selector
+output rejected, delay timing. The image ships Hyprland animations
+(`windowsOut 6`, `fade 7`, up to ~0.7 s), which would put a closing overlay
+in the shot, so key binds capture at once, the search box passes `--delay 1`,
+and a region capture waits 0.5 s after the pick for slurp's overlay to fade.
+Those times come from the config, **not measured on Hyprland.** Also **not
+verified:** real `slurp`, the `mako` notification, the two key binds.
+
+**CI.** Now runs `test-window-fx.py` (it was never wired in),
+`test-activity-detector.py` and `test-dock-layout.py`. `test-performance.py`
+needed its `user_settings` stub taught about `CHOICES`. Deliberately not
+wired: `test-security-ui.py` / `test-continuous-protection.py` (the CI
+container installs `clamav`, so the latter's scan test would not skip there
+and I cannot verify it). New CI lines are untested on Arch.
+
+Not done / still open:
+- Phase A for real: boot the ISO and Hyprland in the VM (the `nvidia-open-dkms`
+  removal is still un-retested), Calamares bootloader step, the 5 sandboxed
+  apps, Iras flag, security layers on hardware. Nothing here substitutes.
+- Drag-to-edge snap, picture-in-picture, screenshot annotation
+  (`swappy`/`satty` aren't packaged), speech/captions/sticky-keys backends.
+- `DarkOSDockWindow._refresh_running_indicators` still runs `hyprctl clients
+  -j` synchronously every 2 s. Short with a healthy Hyprland, same bug class.
+- `continuous_watch.py`, `darkos_cloud.py`, `quarantine.py` are not in the
+  `build-iso.sh` / `verify-iso.sh` module lists, so no syntax/byte-identity gate.
+- `ci/test-build-bootstrap.sh` needs Arch's `vercmp`; not run here.
 
 ## 2026-10-09 — Phase B window chrome + accessibility, Phase C snap/overview
 
