@@ -76,7 +76,7 @@ For any change touching `build-iso.sh`, `ci/verify-iso.sh`, `ci/build-calamares.
 
 ## Project Structure
 
-DarkOS is an ArchISO profile for an AI-first Arch Linux respin. The live ISO payload lives under `airootfs/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`. Generated ISOs go to `out/`, which also holds ~14 live-testing helper scripts (hot-reload, audit, lock probes, waybar reload, smoke tests) used during Phase 2 development inside a running VM.
+DarkOS is an ArchISO profile for an Arch Linux respin (the AI assistant was removed 2026-10-17). The live ISO payload lives under `airootfs/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`. Generated ISOs go to `out/`, which also holds ~14 live-testing helper scripts (hot-reload, audit, lock probes, waybar reload, smoke tests) used during Phase 2 development inside a running VM.
 
 Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in `airootfs/usr/share/applications/` (`darkos-installer`, `the-void`, `darkos-tool-groups`), Hyprland/Waybar config in `airootfs/etc/xdg/`, Calamares modules in `airootfs/etc/calamares/`, and systemd enablement in `airootfs/etc/systemd/system/`.
 
@@ -84,7 +84,7 @@ Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in 
 
 - **Base:** Arch Linux respun with `archiso` — inherits pacman + AUR.
 - **Security tools:** BlackArch repository layered onto the Arch base via `pacman.conf`.
-- **Compositor/shell:** Hyprland (Wayland). Its `hyprctl` IPC socket is the assistant's control surface.
+- **Compositor/shell:** Hyprland (Wayland). Its `hyprctl` IPC socket is used by the dock, window-fx and settings helpers.
 - **Installer:** Calamares (graphical).
 - **Login / lock / boot:** greetd + ReGreet under Cage for installed login; `hyprlock` + `hypridle` for session locking; Plymouth for early-boot splash.
 - **Shell UI:** GTK3 + gtk-layer-shell Python process creating Wayland layer-shell surfaces.
@@ -93,7 +93,7 @@ Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in 
 **Non-negotiable boundaries:**
 
 - System control goes through D-Bus / `hyprctl` / AT-SPI / standard CLI tools — never raw input injection. Wayland's security model blocks synthetic input.
-- The visual shell never blocks on the AI backend — if the assistant is offline, the HUD degrades gracefully.
+- The shell never runs a blocking subprocess on the GTK main thread (the dock polls `hyprctl` on a worker thread) and does not poll while its panels are hidden.
 - BlackArch tools are opt-in tool *groups* at install/setup time, not force-installed as one 2,900-package blob.
 - Hosted apps are never modified or forked. Visual consistency comes from Hyprland's compositor-level decorations, not app-level changes.
 - "Settings" is one app with many tabs, not 20 separate apps.
@@ -104,17 +104,14 @@ Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in 
 
 The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) owned by a single `Gtk.Application` instance. A fresh instance is created on the first `activate()` call; subsequent calls return immediately — this is why command-line flags like `--toggle-hud` work on an already-running process. The application owns shared toggle state (`wifi`, `bluetooth`, `dark_mode`, `night_light`, `focus`, `airplane`) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
 
-Five independent layer-shell windows are anchored separately to compositor edges:
+Four independent layer-shell windows are anchored separately to compositor edges:
 
-- `darkos-dock` — floating bottom dock (Files, Terminal, Browser, AI Orb, Notes, Store, Settings, Logout via wlogout). Exclusive zone 82px.
-- `darkos-hud` — top-center AI Core radar/dial overlay with activity-linked motion.
-- `darkos-rail` — left-side vertical icon rail (10 actions: AI, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming).
-- `darkos-left` — left-of-center panels (AI chat with waveform, weather stub, system overview with live CPU/GPU/RAM/Disk gauges). Refreshes every 2s via `SystemSampler` reading `/proc/stat`, `/proc/meminfo`, `/sys/class/drm`, and `/proc/net/dev`.
+- `darkos-dock` — floating bottom dock (Files, Terminal, Browser, live clock, Notes, Store, Settings, Logout via wlogout). Exclusive zone 82px.
+- `darkos-rail` — left-side vertical icon rail (10 actions: Search, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming).
+- `darkos-left` — left-of-center panels (weather stub, system overview with live CPU/GPU/RAM/Disk gauges). Refreshes every 2s via `SystemSampler` reading `/proc/stat`, `/proc/meminfo`, `/sys/class/drm`, and `/proc/net/dev`.
 - `darkos-right` — right-of-center panels (notifications, connectivity toggles, media widget reading `playerctl`, calendar).
 
-The AI Orb cycles through five states (`sleeping`, `listening`, `thinking`, `speaking`, `error`) that also drive the HUD radar animation. All AI requests are stubbed with "Not executed: connect an AI backend" — no backend exists yet. The visual shell never blocks on the AI backend.
-
-`set_installer_mode(on)` hides all five surfaces and records their visibility; `set_installer_mode(off)` restores them. This is the mechanism `darkos-installer` uses to suspend the shell while Calamares runs.
+`set_installer_mode(on)` hides all four surfaces and records their visibility; `set_installer_mode(off)` restores them. This is the mechanism `darkos-installer` uses to suspend the shell while Calamares runs.
 
 ### Installer flow
 
@@ -221,4 +218,4 @@ Visual design tokens live in `ui-tokens.md`, layout/motion rules in `ui-rules.md
 
 ## Phased Roadmap
 
-Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 (core shell chrome: top bar, AI Core HUD, dock, rail, side panels, lock screen, login, boot animation) is complete and VM-verified. Phase 3 (AI assistant: STT/TTS/brain, OS control, AT-SPI, push-to-talk, snapshots, Command Center) is core-wired and runtime-verified via SSH + VMware. Phases 4-8 cover daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.
+Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 (core shell chrome: top bar, dock, rail, side panels, lock screen, login, boot animation) is complete and VM-verified. Phase 3 (AI assistant: STT/TTS/brain, OS control, AT-SPI, push-to-talk, snapshots, Command Center) is core-wired and runtime-verified via SSH + VMware. Phases 4-8 cover daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.

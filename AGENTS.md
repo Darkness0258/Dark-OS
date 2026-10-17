@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-DarkOS is an ArchISO profile for an AI-first Arch Linux respin. Root-level project docs describe product direction and design: `README.md`, `architecture.md`, `build-plan.md`, `project-overview.md`, `ui-rules.md`, and `ui-tokens.md`.
+DarkOS is an ArchISO profile for an Arch Linux respin (the AI assistant was removed 2026-10-17). Root-level project docs describe product direction and design: `README.md`, `architecture.md`, `build-plan.md`, `project-overview.md`, `ui-rules.md`, and `ui-tokens.md`.
 
 The live ISO payload lives under `airootfs/`. Runtime scripts belong in `airootfs/usr/local/bin/`, desktop launchers in `airootfs/usr/share/applications/`, Hyprland and Waybar config in `airootfs/etc/xdg/`, Calamares installer modules in `airootfs/etc/calamares/`, and systemd enablement under `airootfs/etc/systemd/system/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`; generated ISOs and split release artifacts go to `out/`.
 

@@ -87,7 +87,6 @@ readonly runtime_scripts=(
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-tty1-login
     usr/local/bin/darkos-tool-groups
-    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
@@ -95,11 +94,11 @@ readonly runtime_scripts=(
     usr/local/bin/the-void.sh
     usr/local/bin/start-hyprland
     usr/local/bin/darkos-firstboot-tools
+    usr/local/bin/darkos-perf-apply
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
     usr/local/bin/ensure-network
     usr/local/bin/livecd-sound
-    usr/local/bin/generate-wallpaper.py
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
     usr/local/bin/darkos-sandbox-launch.py
@@ -112,13 +111,13 @@ readonly bash_scripts=(
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-tty1-login
     usr/local/bin/darkos-tool-groups
-    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
     usr/local/bin/the-void.sh
     usr/local/bin/start-hyprland
     usr/local/bin/darkos-firstboot-tools
+    usr/local/bin/darkos-perf-apply
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
     usr/local/bin/ensure-network
@@ -129,15 +128,10 @@ readonly python_scripts=(
     "${native_app_scripts[@]}"
     usr/local/bin/darkos-shell.py
     usr/local/bin/darkos-window-fx.py
-    usr/local/bin/generate-wallpaper.py
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
     usr/local/bin/darkos_shell/__init__.py
-    usr/local/bin/darkos_shell/ai_brain.py
-    usr/local/bin/darkos_shell/activity_detector.py
-    usr/local/bin/darkos_shell/actions.py
     usr/local/bin/darkos_shell/app_kit.py
-    usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
     usr/local/bin/darkos_shell/shield.py
@@ -152,11 +146,7 @@ readonly python_scripts=(
 readonly cmp_scripts=(
     "${native_app_scripts[@]}"
     usr/local/bin/darkos_shell/__init__.py
-    usr/local/bin/darkos_shell/ai_brain.py
-    usr/local/bin/darkos_shell/activity_detector.py
-    usr/local/bin/darkos_shell/actions.py
     usr/local/bin/darkos_shell/app_kit.py
-    usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
     usr/local/bin/darkos_shell/shield.py
@@ -257,7 +247,6 @@ assert_profile_permissions() (
         ["/etc/gshadow"]="0:0:600"
         ["/etc/shadow"]="0:0:600"
         ["/etc/sudoers.d"]="0:0:750"
-        ["/etc/sudoers.d/darkos-ai-snapshot"]="0:0:440"
         ["/etc/sudoers.d/darkos"]="0:0:440"
         ["/root"]="0:0:750"
         ["/root/.automated_script.sh"]="0:0:755"
@@ -334,8 +323,6 @@ done
 for relative in "${python_scripts[@]}"; do
     python -m py_compile "${project_dir}/airootfs/${relative}"
 done
-printf 'Running Phase 3 assistant regression suite...\n'
-python "${project_dir}/ci/test-phase3-linux.py"
 
 stage_profile="$(mktemp -d /tmp/darkos-archiso-profile.XXXXXX)"
 work_dir="$(mktemp -d /tmp/darkos-archiso-work.XXXXXX)"
@@ -467,13 +454,6 @@ printf 'Building the pinned Calamares package and local pacman repository...\n'
 bash "${project_dir}/ci/build-calamares.sh" "${repo_dir}"
 [[ -s "${repo_dir}/darkos-local.db.tar.gz" ]] || {
     printf 'Calamares build did not create the local pacman repository database.\n' >&2
-    exit 1
-}
-
-printf 'Building the first-party DarkOS Calamares API-key module...\n'
-bash "${project_dir}/ci/build-darkos-calamares-module.sh" "${repo_dir}" "${project_dir}"
-[[ -s "${repo_dir}/darkos-local.db.tar.gz" ]] || {
-    printf 'DarkOS Calamares module build did not update the local pacman repository database.\n' >&2
     exit 1
 }
 

@@ -35,8 +35,20 @@ without GTK or a compositor; GTK/wofi are presentation only.
     --zoom {in,out,reset,on,off,toggle}
         Hyprland cursor zoom (the real magnifier). SUPER+= / - / 0.
 
+    --snip-annotate
+        Region screenshot that opens in swappy (draw/arrows/text/blur) before
+        it is saved and copied. SUPER+SHIFT+A.
+
+    --pip
+        Toggle picture-in-picture for the active window: floating, pinned to
+        every workspace, 480-wide 16:9, parked bottom-right. SUPER+SHIFT+P.
+
+    --screen-reader {on,off}
+        Start / stop the Orca screen reader (uses the eSpeak NG voice).
+
     --a11y-apply
-        Session-start: read settings.json and apply saved magnifier state.
+        Session-start: read settings.json and apply saved magnifier and
+        screen-reader state.
 """
 
 from __future__ import annotations
@@ -83,7 +95,6 @@ SETTINGS_CATALOG = (
     ("fonts", "Fonts", "GTK font"),
     ("icons", "Icons", "Icon theme"),
     ("themes", "Themes", "Accent color, appearance"),
-    ("wallpaper", "Wallpaper", "Desktop background"),
     ("motion", "Motion", "Reduce motion, animations"),
     ("designer", "Designer", "Corner radius, dock position, dock size"),
     ("permissions", "Permissions", "App permissions"),
@@ -1084,11 +1095,96 @@ def load_user_settings(path=None):
         return {}
 
 
-def run_a11y_apply(settings=None):
+def run_a11y_apply(settings=None, screen_reader=None):
     settings = load_user_settings() if settings is None else settings
+    if settings.get("a11y_speech"):
+        (screen_reader or run_screen_reader)("on")
     if settings.get("a11y_magnifier"):
         return apply_zoom(ZOOM_ON)
     return apply_zoom(ZOOM_MIN)
+
+
+# -- Screen reader (Orca) ---------------------------------------------------
+
+def run_screen_reader(action, run=None, popen=None, which=None):
+    """Start (on) or stop (off) Orca. Returns 0 on success, 1 if unavailable.
+
+    Orca is the screen reader; it speaks through speech-dispatcher, which
+    uses the eSpeak NG voice that ships on the ISO. Dependencies are
+    injectable so CI can drive this without Orca installed.
+    """
+    import shutil
+    run = run or subprocess.run
+    popen = popen or subprocess.Popen
+    which = which or shutil.which
+    if not which("orca"):
+        _notify("Screen reader unavailable", "Orca is not installed.")
+        return 1
+    running = run(["pgrep", "-x", "orca"], capture_output=True).returncode == 0
+    if action == "on":
+        if not running:
+            popen(["orca"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                  start_new_session=True)
+        return 0
+    if running:
+        run(["orca", "--quit"], capture_output=True, timeout=5)
+    return 0
+
+
+# -- Picture-in-picture -------------------------------------------------------
+
+PIP_WIDTH = 480
+PIP_MARGIN = 24
+
+
+def pip_rect(monitor, width=PIP_WIDTH, margin=PIP_MARGIN):
+    """Bottom-right 16:9 box inside the monitor's logical rectangle.
+
+    Shrinks (keeping 16:9) on screens too small for the default width.
+    """
+    rect = monitor_logical_rect(monitor)
+    width = max(160, min(width, rect["w"] - 2 * margin))
+    height = round(width * 9 / 16)
+    return {
+        "x": rect["x"] + rect["w"] - width - margin,
+        "y": rect["y"] + rect["h"] - height - margin,
+        "w": width,
+        "h": height,
+    }
+
+
+def run_pip(active=None, monitors=None, dispatch=None):
+    """Toggle picture-in-picture on the active window.
+
+    Off -> floating + pinned + resized + parked bottom-right.
+    On  -> unpin and (if we floated it) tile it again. A window that was
+    already floating before PiP stays floating, since a pinned floating
+    window is indistinguishable from a normal pinned one; we only undo pin.
+    """
+    dispatch = dispatch or _dispatch
+    active = active if active is not None else _hyprctl_json("activewindow")
+    if not active or not active.get("address"):
+        _notify("Picture-in-picture", "No active window.")
+        return 1
+    target = f"address:{active['address']}"
+    if active.get("pinned"):
+        dispatch("pin", target)
+        if active.get("floating"):
+            dispatch("togglefloating", target)
+        return 0
+    monitors = monitors if monitors is not None else _hyprctl_json("monitors")
+    focused = next((m for m in (monitors or []) if m.get("focused")), None) \
+        or next(iter(monitors or []), None)
+    if not focused:
+        _notify("Picture-in-picture", "Could not read the monitor layout.")
+        return 1
+    box = pip_rect(focused)
+    if not active.get("floating"):
+        dispatch("togglefloating", target)
+    dispatch("resizewindowpixel", "exact", str(box["w"]), str(box["h"]) + "," + target)
+    dispatch("movewindowpixel", "exact", str(box["x"]), str(box["y"]) + "," + target)
+    dispatch("pin", target)
+    return 0
 
 
 # -- Screenshots ------------------------------------------------------------
@@ -1146,7 +1242,8 @@ def _copy_image_to_clipboard(path):
 
 
 def run_snip(region, settle=0.0, pick_settle=SNIP_PICK_SETTLE_SECONDS, home=None,
-             now=None, run=None, sleep=time.sleep, notify=None, copy=None):
+             now=None, run=None, sleep=time.sleep, notify=None, copy=None,
+             annotate=False):
     """Capture a region (slurp) or the whole screen (grim).
 
     Saves to ~/Pictures/Screenshots, copies to the clipboard, notifies.
@@ -1182,6 +1279,13 @@ def run_snip(region, settle=0.0, pick_settle=SNIP_PICK_SETTLE_SECONDS, home=None
     if shot.returncode != 0:
         notify("Screenshot failed", (shot.stderr or "").strip() or "grim reported an error")
         return 1
+    if annotate:
+        # swappy edits in place and writes the result back on Save; closing
+        # it without saving leaves the plain screenshot, which is still kept.
+        try:
+            run(["swappy", "-f", path, "-o", path])
+        except OSError:
+            notify("Annotation unavailable", "swappy is not installed; saved without markup.")
     copied = copy(path)
     notify("Screenshot saved and copied" if copied else "Screenshot saved", path)
     return 0
@@ -1209,6 +1313,17 @@ def main():
         return run_snap_picker()
     if "--a11y-apply" in argv:
         return run_a11y_apply()
+    if "--snip-annotate" in argv:
+        return run_snip(region=True, settle=_delay_arg(argv), annotate=True)
+    if "--pip" in argv:
+        return run_pip()
+    if "--screen-reader" in argv:
+        idx = argv.index("--screen-reader")
+        action = argv[idx + 1] if idx + 1 < len(argv) else ""
+        if action not in ("on", "off"):
+            print(f"usage: {sys.argv[0]} --screen-reader {{on,off}}", file=sys.stderr)
+            return 2
+        return run_screen_reader(action)
     if "--snip-screen" in argv:
         return run_snip(region=False, settle=_delay_arg(argv))
     if "--snip" in argv:
@@ -1228,8 +1343,8 @@ def main():
         f"usage: {sys.argv[0]} --switcher | --search | --overview | "
         f"--snap-picker | --snap {{{','.join(SNAP_SIDES)}}} | "
         f"--zoom {{in,out,reset,on,off,toggle}} | --snip [--delay N] | "
-        f"--snip-screen [--delay N] | "
-        f"--a11y-apply",
+        f"--snip-screen [--delay N] | --snip-annotate | --pip | "
+        f"--screen-reader {{on,off}} | --a11y-apply",
         file=sys.stderr,
     )
     return 2

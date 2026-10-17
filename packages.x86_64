@@ -62,7 +62,6 @@ gvfs
 qt5-wayland
 qt6-wayland
 calamares
-darkos-calamares-apikeys
 ckbcomp
 chaotic-keyring
 chaotic-mirrorlist
@@ -107,7 +106,6 @@ espeak-ng
 gtk3
 adwaita-icon-theme
 gtk-layer-shell
-swaybg
 mako
 libnotify
 brightnessctl
@@ -138,3 +136,8 @@ waydroid
 neovim
 openssh
 dhcpcd
+hyprsunset
+swappy
+orca
+speech-dispatcher
+pacman-contrib

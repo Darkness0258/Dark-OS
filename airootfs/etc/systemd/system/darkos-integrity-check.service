@@ -1,8 +1,12 @@
 [Unit]
 Description=DarkOS system integrity check (rkhunter + AIDE)
 After=local-fs.target
+ConditionPathExists=!/run/archiso
 
 [Service]
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
 Type=oneshot
 ExecStart=/usr/bin/python3 /usr/local/bin/darkos-integrity-check.py
 # rkhunter alone took ~90s checking a full system in testing -- AIDE's

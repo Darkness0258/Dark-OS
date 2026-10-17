@@ -47,6 +47,7 @@ POWER_PROFILE_SET_TIMEOUT = 45
 CATEGORIES = [
     ("system", "System", "computer-symbolic"),
     ("performance", "Performance", "utilities-system-monitor-symbolic"),
+    ("updates", "Updates", "software-update-available-symbolic"),
     ("config", "Config", "text-x-generic-symbolic"),
     ("devices", "Devices", "drive-harddisk-symbolic"),
     ("users", "Users", "system-users-symbolic"),
@@ -56,12 +57,24 @@ CATEGORIES = [
     ("fonts", "Fonts", "font-x-generic-symbolic"),
     ("icons", "Icons", "preferences-desktop-icons-symbolic"),
     ("themes", "Themes", "preferences-desktop-theme-symbolic"),
-    ("wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic"),
     ("motion", "Motion", "preferences-desktop-accessibility-symbolic"),
     ("designer", "Designer", "applications-graphics-symbolic"),
     ("permissions", "Permissions", "security-high-symbolic"),
     ("accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic"),
 ]
+
+
+def parse_checkupdates(output):
+    """Parse `checkupdates` output ("name old -> new" per line).
+
+    Returns [(name, old, new), ...]; lines that do not match are ignored.
+    """
+    updates = []
+    for line in (output or "").splitlines():
+        parts = line.split()
+        if len(parts) == 4 and parts[2] == "->":
+            updates.append((parts[0], parts[1], parts[3]))
+    return updates
 
 
 @dataclass(frozen=True)
@@ -231,6 +244,7 @@ class SettingsWindow(Gtk.ApplicationWindow):
         builders = {
             "system": self._build_system_tab,
             "performance": self._build_performance_tab,
+            "updates": self._build_updates_tab,
             "config": self._build_config_tab,
             "devices": self._build_devices_tab,
             "users": self._build_users_tab,
@@ -240,7 +254,6 @@ class SettingsWindow(Gtk.ApplicationWindow):
             "fonts": self._build_fonts_tab,
             "icons": self._build_icons_tab,
             "themes": self._build_themes_tab,
-            "wallpaper": self._build_wallpaper_tab,
             "motion": self._build_motion_tab,
             "designer": self._build_designer_tab,
             "permissions": self._build_permissions_tab,
@@ -290,6 +303,14 @@ class SettingsWindow(Gtk.ApplicationWindow):
                 ])
             except OSError:
                 pass
+        if key == "a11y_speech":
+            try:
+                subprocess.Popen([
+                    "python", "/usr/local/bin/darkos-window-fx.py",
+                    "--screen-reader", "on" if value else "off",
+                ])
+            except OSError:
+                pass
         if key == "high_contrast":
             try:
                 from darkos_shell.css import apply_css
@@ -336,9 +357,164 @@ class SettingsWindow(Gtk.ApplicationWindow):
             box.pack_start(kv_row(k, v), False, False, 0)
         return box
 
+    # -- Updates ---------------------------------------------------------------
+    def _build_updates_tab(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.pack_start(section_label("System updates"), False, False, 0)
+        live = os.path.exists("/run/archiso")
+        intro = (
+            "This is the live ISO: updates are not kept after a reboot. Install DarkOS first."
+            if live else
+            "Checks the Arch repositories for newer packages. Installing runs a full "
+            "system upgrade (pacman -Syu) after you authenticate."
+        )
+        box.pack_start(Gtk.Label(label=intro, xalign=0, wrap=True), False, False, 0)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.updates_check_button = Gtk.Button(label="Check for updates")
+        add_class(self.updates_check_button, "action-button")
+        self.updates_check_button.connect("clicked", self._check_updates)
+        self.updates_install_button = Gtk.Button(label="Install updates")
+        add_class(self.updates_install_button, "action-button")
+        self.updates_install_button.set_sensitive(False)
+        self.updates_install_button.connect("clicked", self._install_updates)
+        if live:
+            self.updates_check_button.set_sensitive(False)
+        row.pack_start(self.updates_check_button, False, False, 0)
+        row.pack_start(self.updates_install_button, False, False, 0)
+        box.pack_start(row, False, False, 0)
+        self.updates_status = Gtk.Label(label="Not checked yet.", xalign=0, wrap=True)
+        box.pack_start(self.updates_status, False, False, 0)
+        self.updates_view = Gtk.TextView()
+        self.updates_view.set_editable(False)
+        self.updates_view.set_monospace(True)
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_min_content_height(220)
+        scroller.add(self.updates_view)
+        box.pack_start(scroller, True, True, 0)
+        return box
+
+    def _set_updates_text(self, text):
+        self.updates_view.get_buffer().set_text(text)
+
+    def _run_in_thread(self, argv, done, timeout):
+        def worker():
+            try:
+                result = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+                payload = (result.returncode, result.stdout, result.stderr)
+            except FileNotFoundError:
+                payload = (127, "", f"{argv[0]} is not installed.")
+            except subprocess.TimeoutExpired:
+                payload = (124, "", "Timed out.")
+            GLib.idle_add(done, payload)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _check_updates(self, _button=None):
+        self.updates_check_button.set_sensitive(False)
+        self.updates_status.set_text("Checking...")
+        self._run_in_thread(["checkupdates"], self._on_updates_checked, 120)
+
+    def _on_updates_checked(self, payload):
+        if self._closed:
+            return False
+        code, out, err = payload
+        self.updates_check_button.set_sensitive(True)
+        # checkupdates: 0 = updates available, 2 = none, anything else = error.
+        if code == 2:
+            self.updates_status.set_text("Everything is up to date.")
+            self._set_updates_text("")
+            self.updates_install_button.set_sensitive(False)
+        elif code == 0:
+            updates = parse_checkupdates(out)
+            self.updates_status.set_text(f"{len(updates)} package update(s) available.")
+            self._set_updates_text("\n".join(f"{n}  {o} -> {v}" for n, o, v in updates))
+            self.updates_install_button.set_sensitive(bool(updates))
+        else:
+            self.updates_status.set_text("Could not check for updates.")
+            self._set_updates_text((err or out or "No details.").strip())
+            self.updates_install_button.set_sensitive(False)
+        return False
+
+    def _install_updates(self, _button=None):
+        self.updates_install_button.set_sensitive(False)
+        self.updates_check_button.set_sensitive(False)
+        self.updates_status.set_text("Installing... authenticate if asked. Do not power off.")
+        self._run_in_thread(["pkexec", "pacman", "-Syu", "--noconfirm"],
+                            self._on_updates_installed, 3600)
+
+    def _on_updates_installed(self, payload):
+        if self._closed:
+            return False
+        code, out, err = payload
+        self.updates_check_button.set_sensitive(True)
+        self.updates_status.set_text(
+            "Updates installed. Reboot to use a new kernel." if code == 0
+            else f"Update failed (exit {code})."
+        )
+        self._set_updates_text(((out or "") + "\n" + (err or "")).strip()[-6000:])
+        return False
+
     # -- Performance -----------------------------------------------------------
+    EFFECT_CHOICES = (
+        ("auto", "Automatic (Lite in a virtual machine, Full otherwise)"),
+        ("lite", "Lite: no blur, shadows, animation or transparency"),
+        ("full", "Full: blur, shadows, animation, rounded and translucent windows"),
+    )
+    RENDERER_CHOICES = (
+        ("auto", "Automatic (software in a virtual machine, GPU otherwise)"),
+        ("software", "Software (llvmpipe): most compatible, slowest"),
+        ("hardware", "GPU: fastest, but needs working 3D (VMware: enable 3D graphics)"),
+    )
+
+    def _build_effects_section(self, box):
+        box.pack_start(section_label("Desktop effects"), False, False, 0)
+        box.pack_start(Gtk.Label(
+            label="If the desktop feels slow, choose Lite. Effects apply immediately.",
+            xalign=0, wrap=True,
+        ), False, False, 0)
+        self.effects_combo = Gtk.ComboBoxText()
+        for value, label in self.EFFECT_CHOICES:
+            self.effects_combo.append(value, label)
+        self.effects_combo.set_active_id(self.settings.get("effects", "auto"))
+        box.pack_start(self.effects_combo, False, False, 0)
+        box.pack_start(section_label("Graphics renderer"), False, False, 0)
+        self.renderer_combo = Gtk.ComboBoxText()
+        for value, label in self.RENDERER_CHOICES:
+            self.renderer_combo.append(value, label)
+        self.renderer_combo.set_active_id(self.settings.get("renderer", "auto"))
+        box.pack_start(self.renderer_combo, False, False, 0)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        apply_button = Gtk.Button(label="Apply")
+        add_class(apply_button, "action-button")
+        apply_button.connect("clicked", self._apply_effects)
+        row.pack_start(apply_button, False, False, 0)
+        box.pack_start(row, False, False, 0)
+        self.effects_feedback = Gtk.Label(
+            label="The renderer change takes effect the next time you log in.",
+            xalign=0, wrap=True,
+        )
+        box.pack_start(self.effects_feedback, False, False, 0)
+
+    def _apply_effects(self, _button=None):
+        effects = self.effects_combo.get_active_id() or "auto"
+        renderer = self.renderer_combo.get_active_id() or "auto"
+        renderer_changed = renderer != self.settings.get("renderer", "auto")
+        self.settings["effects"] = effects
+        self.settings["renderer"] = renderer
+        if not save_settings(self.settings):
+            self.effects_feedback.set_text("Could not save settings.")
+            return
+        try:
+            subprocess.Popen(["/usr/local/bin/darkos-perf-apply"])
+            message = "Effects applied."
+        except OSError as error:
+            message = f"Saved, but could not apply effects now ({error.strerror})."
+        if renderer_changed:
+            message += " Log out and back in to switch the renderer."
+        self.effects_feedback.set_text(message)
+
     def _build_performance_tab(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self._build_effects_section(box)
         box.pack_start(section_label("Power profile"), False, False, 0)
         self.power_profile_current = Gtk.Label(label="Checking current power profile…", xalign=0, wrap=True)
         box.pack_start(self.power_profile_current, False, False, 0)
@@ -687,7 +863,7 @@ class SettingsWindow(Gtk.ApplicationWindow):
         color_btn.set_rgba(rgba)
         color_btn.connect("color-set", self._on_accent_changed)
         row.pack_start(color_btn, False, False, 0)
-        row.pack_start(Gtk.Label(label="Applies to the HUD, dock, and highlights on next shell restart"), False, False, 0)
+        row.pack_start(Gtk.Label(label="Applies to the dock, panels and highlights on next shell restart"), False, False, 0)
         box.pack_start(row, False, False, 0)
         return box
 
@@ -698,53 +874,12 @@ class SettingsWindow(Gtk.ApplicationWindow):
         )
         self._save("accent_color", hex_color)
 
-    # -- Wallpaper -----------------------------------------------------------
-    def _build_wallpaper_tab(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        box.pack_start(section_label("Wallpaper"), False, False, 0)
-        self.wallpaper_preview = Gtk.Image()
-        current = self.settings.get("wallpaper_path")
-        if current and os.path.isfile(current):
-            self._set_wallpaper_preview(current)
-        box.pack_start(self.wallpaper_preview, False, False, 0)
-
-        chooser_btn = Gtk.Button(label="Choose Image…")
-        add_class(chooser_btn, "icon-button")
-        chooser_btn.connect("clicked", self._choose_wallpaper)
-        box.pack_start(chooser_btn, False, False, 0)
-        return box
-
-    def _set_wallpaper_preview(self, path):
-        try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 320, 180, True)
-            self.wallpaper_preview.set_from_pixbuf(pixbuf)
-        except GLib.Error:
-            self.wallpaper_preview.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
-
-    def _choose_wallpaper(self, *_):
-        chooser = Gtk.FileChooserDialog(title="Choose wallpaper", transient_for=self, action=Gtk.FileChooserAction.OPEN)
-        chooser.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Select", Gtk.ResponseType.OK)
-        img_filter = Gtk.FileFilter()
-        img_filter.set_name("Images")
-        for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
-            img_filter.add_pattern(pattern)
-        chooser.add_filter(img_filter)
-        if chooser.run() == Gtk.ResponseType.OK:
-            path = chooser.get_filename()
-            self._set_wallpaper_preview(path)
-            self._save("wallpaper_path", path)
-            try:
-                subprocess.Popen(["hyprctl", "hyprpaper", "wallpaper", f",{path}"])
-            except OSError:
-                pass  # hyprpaper not running here (no compositor) — real on the target system
-        chooser.destroy()
-
     # -- Motion ----------------------------------------------------------------
     def _build_motion_tab(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.pack_start(section_label("Motion"), False, False, 0)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        row.pack_start(Gtk.Label(label="Reduce motion (slows/stops decorative animation, e.g. the HUD ring)"), True, True, 0)
+        row.pack_start(Gtk.Label(label="Reduce motion (stops decorative animation)"), True, True, 0)
         switch = Gtk.Switch()
         switch.set_active(bool(self.settings.get("reduce_motion")))
         switch.connect("state-set", lambda _s, state: self._save("reduce_motion", state))
@@ -824,7 +959,7 @@ class SettingsWindow(Gtk.ApplicationWindow):
         pages = [
             ("High contrast", "high_contrast", "Stronger white-on-black borders and text. Applies immediately in this window; other DarkOS apps pick it up the next time they open."),
             ("Magnifier", "a11y_magnifier", "Zoom the screen around the cursor using Hyprland cursor zoom. Super+= zooms in, Super+- zooms out, Super+0 resets."),
-            ("Speech", "a11y_speech", "Announce UI elements and read text aloud. Needs a speech engine (espeak/festival) wired in — this saves the preference now."),
+            ("Speech", "a11y_speech", "Screen reader: Orca reads the interface aloud with the eSpeak NG voice. Starts now and again at every login."),
             ("Captions", "a11y_captions", "Show live captions for system audio. Needs a speech-to-text backend — this saves the preference now."),
             ("Keyboard", "a11y_sticky_keys", "Sticky keys — press modifier keys one at a time instead of holding them. Preference is saved; compositor support is not wired yet."),
             ("Eye Control", "a11y_eye_control", "Control the cursor with eye tracking. Hardware-dependent (needs an eye tracker) — listed in the project backlog as not yet planned for real."),

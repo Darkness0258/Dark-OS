@@ -1,0 +1,24 @@
+# DarkOS notifications (mako). Glass-style card, no blur/shadow so it stays
+# cheap on software rendering.
+font=Inter 11
+background-color=#0d0f12ee
+text-color=#f2f5f7
+border-color=#00e5ff88
+border-size=1
+border-radius=12
+padding=12
+margin=12
+width=360
+default-timeout=6000
+max-visible=4
+anchor=top-right
+layer=overlay
+
+[urgency=high]
+border-color=#ff3b3bcc
+default-timeout=0
+
+# Focus mode (Control Center > Focus): hide popups. Notifications are kept
+# and can be read when Focus is switched off.
+[mode=do-not-disturb]
+invisible=1

@@ -155,7 +155,6 @@ payload=(
     etc/pacman.d/chaotic-mirrorlist
     etc/passwd
     etc/shadow
-    etc/sudoers.d/darkos-ai-snapshot
     etc/plymouth/plymouthd.conf
     etc/xdg/hypr/hypridle.conf
     etc/xdg/hypr/hyprland.conf
@@ -197,19 +196,15 @@ payload=(
     "${phase7_executables[@]}"
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
-    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-firstboot-tools
+    usr/local/bin/darkos-perf-apply
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
     usr/local/bin/darkos-shell.py
     usr/local/bin/darkos_shell/__init__.py
-    usr/local/bin/darkos_shell/ai_brain.py
-    usr/local/bin/darkos_shell/activity_detector.py
-    usr/local/bin/darkos_shell/actions.py
     usr/local/bin/darkos_shell/app_kit.py
-    usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
     usr/local/bin/darkos_shell/shield.py
@@ -223,7 +218,6 @@ payload=(
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
-    usr/local/bin/generate-wallpaper.py
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
     usr/local/bin/darkos-sandbox-launch.py
@@ -231,7 +225,6 @@ payload=(
     "${native_app_scripts[@]}"
     "${native_desktop_entries[@]}"
     etc/xdg/mimeapps.list
-    usr/share/backgrounds/darkos/darkos-wallpaper.png
     usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
@@ -242,8 +235,6 @@ payload=(
     var/lib/AccountsService/users/greeter
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
-    usr/lib/calamares/modules/darkosapikeys/libcalamares_viewmodule_darkosapikeys.so
-    usr/lib/calamares/modules/darkosapikeys/module.desc
 )
 unsquashfs -no-progress -d "$extracted" "$squashfs" "${payload[@]}" >/dev/null
 
@@ -267,7 +258,6 @@ required_files=(
     etc/pacman.d/chaotic-mirrorlist
     etc/passwd
     etc/shadow
-    etc/sudoers.d/darkos-ai-snapshot
     etc/plymouth/plymouthd.conf
     etc/xdg/hypr/hypridle.conf
     etc/xdg/hypr/hyprland.conf
@@ -294,15 +284,12 @@ required_files=(
     usr/bin/vmtoolsd
     "${phase5_executables[@]}"
     "${phase5_activation_files[@]}"
-    usr/local/bin/darkos-ai-snapshot
-    usr/local/bin/generate-wallpaper.py
     "${native_app_scripts[@]}"
     usr/local/bin/darkos_shell/app_kit.py
     usr/local/bin/darkos_shell/shield.py
     usr/local/bin/darkos_shell/user_settings.py
     "${native_desktop_entries[@]}"
     etc/xdg/mimeapps.list
-    usr/share/backgrounds/darkos/darkos-wallpaper.png
     usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
@@ -313,8 +300,6 @@ required_files=(
     var/lib/AccountsService/users/greeter
     usr/share/pacman/keyrings/blackarch.gpg
     usr/share/pacman/keyrings/chaotic.gpg
-    usr/lib/calamares/modules/darkosapikeys/libcalamares_viewmodule_darkosapikeys.so
-    usr/lib/calamares/modules/darkosapikeys/module.desc
 )
 for relative in "${required_files[@]}"; do
     if [[ ! -s "$extracted/$relative" ]]; then
@@ -426,8 +411,8 @@ if greetd["default_session"].get("user") != "greeter":
     raise SystemExit("greetd does not run ReGreet as the greeter account")
 
 regreet = tomllib.loads((root / "etc/greetd/regreet.toml").read_text(encoding="utf-8"))
-if regreet.get("background", {}).get("path") != "/usr/share/backgrounds/darkos/darkos-wallpaper.png":
-    raise SystemExit("ReGreet does not use the DarkOS wallpaper")
+if "background" in regreet:
+    raise SystemExit("ReGreet must use the plain solid background (no wallpaper image)")
 
 greeter_avatar = (root / "var/lib/AccountsService/users/greeter").read_text(encoding="utf-8")
 if "Icon=/usr/share/icons/darkos/darkos.png" not in greeter_avatar:
@@ -443,11 +428,9 @@ cmp -s \
 
 hyprland_config="$extracted/etc/xdg/hypr/hyprland.conf"
 # shellcheck disable=SC2016 # $mainMod is literal Hyprland configuration.
-for setting in 'exec-once = hypridle' 'exec-once = nm-applet --indicator' \
-    'exec-once = blueman-applet' 'bind = $mainMod, L, exec, loginctl lock-session' \
-    'bind = $mainMod, SPACE, exec, python /usr/local/bin/darkos-shell.py --ptt-start' \
-    'bindr = $mainMod, SPACE, exec, python /usr/local/bin/darkos-shell.py --ptt-stop' \
-    'match:namespace ^(waybar|darkos-(dock|hud|rail|left|right))$' \
+for setting in 'exec-once = hypridle' 'nm-applet --indicator' \
+    'blueman-applet' 'bind = $mainMod, L, exec, loginctl lock-session' \
+    'match:namespace ^(waybar|darkos-(dock|rail|left|right))$' \
     'blur on' 'ignore_alpha 0.08'; do
     grep -Fq "$setting" "$hyprland_config" || {
         printf 'Hyprland shell configuration is missing: %s\n' "$setting" >&2
@@ -508,17 +491,6 @@ grep -Fq 'exec /usr/bin/start-hyprland "$@"' \
     printf 'Live /etc/gshadow does not have mode 0600\n' >&2
     exit 1
 }
-snapshot_sudoers="$extracted/etc/sudoers.d/darkos-ai-snapshot"
-[[ "$(stat -c '%a' "$snapshot_sudoers")" == 440 ]] || {
-    printf 'AI snapshot sudoers policy does not have mode 0440\n' >&2
-    exit 1
-}
-grep -Fxq '%wheel ALL=(root) NOPASSWD: /usr/local/bin/darkos-ai-snapshot ""' \
-    "$snapshot_sudoers" || {
-    printf 'AI snapshot sudoers policy is broader than the no-argument helper\n' >&2
-    exit 1
-}
-
 # The live account databases are layered into the image before package
 # installation. Verify package-created system identities were merged and that
 # every passwd/group entry still has its corresponding shadow record.
@@ -564,9 +536,9 @@ scripts=(
     root/.automated_script.sh
     usr/local/bin/Installation_guide
     usr/local/bin/choose-mirror
-    usr/local/bin/darkos-ai-snapshot
     usr/local/bin/darkos-diagnose.sh
     usr/local/bin/darkos-firstboot-tools
+    usr/local/bin/darkos-perf-apply
     usr/local/bin/darkos-grub-install.sh
     usr/local/bin/darkos-installer
     usr/local/bin/darkos-lock
@@ -577,7 +549,6 @@ scripts=(
     usr/local/bin/start-hyprland
     usr/local/bin/the-void.sh
     usr/local/bin/livecd-sound
-    usr/local/bin/generate-wallpaper.py
     usr/local/bin/darkos-store-gated-install.py
     usr/local/bin/darkos-store-gated-aur-install.py
     usr/local/bin/darkos-sandbox-launch.py
@@ -586,11 +557,7 @@ scripts=(
 )
 readonly library_modules=(
     usr/local/bin/darkos_shell/__init__.py
-    usr/local/bin/darkos_shell/ai_brain.py
-    usr/local/bin/darkos_shell/activity_detector.py
-    usr/local/bin/darkos_shell/actions.py
     usr/local/bin/darkos_shell/app_kit.py
-    usr/local/bin/darkos_shell/assistant_trigger.py
     usr/local/bin/darkos_shell/canvases.py
     usr/local/bin/darkos_shell/css.py
     usr/local/bin/darkos_shell/shield.py
@@ -764,10 +731,6 @@ grep -Fq -- '- shellprocess@bootloader-install' "$settings" || {
     printf 'Calamares does not run the permission-safe bootloader job\n' >&2
     exit 1
 }
-grep -Fq -- '- darkosapikeys' "$settings" || {
-    printf 'Calamares does not register the darkosapikeys module\n' >&2
-    exit 1
-}
 if grep -Eq '^[[:space:]]+- bootloader[[:space:]]*$' "$settings"; then
     printf 'Calamares still invokes the exit-126-prone direct bootloader job\n' >&2
     exit 1
@@ -892,8 +855,7 @@ grep -Fq 'overlays = (self.dock, self.rail, self.left, self.right)' \
     exit 1
 }
 for component in 'class DarkOSIconRail' 'class DarkOSLeftPanels' \
-    'class DarkOSRightPanels' 'class RingGauge' \
-    'class AIOrbCanvas'; do
+    'class DarkOSRightPanels' 'class RingGauge'; do
     grep -Fq "$component" "$shell_pkg/"*.py "$shell_source" || {
         printf 'DarkOS shell component is missing: %s\n' "$component" >&2
         exit 1
@@ -907,47 +869,12 @@ if grep -Fq -- '-gtk-icon-size:' "$shell_pkg/"*.py "$shell_source"; then
     printf 'DarkOS shell uses the invalid GTK3 CSS property -gtk-icon-size\n' >&2
     exit 1
 fi
-grep -Fq '("sleeping", "listening", "thinking", "speaking", "error")' \
-    "$shell_pkg/__init__.py" "$shell_source" || {
-    printf 'AI Orb does not expose all five required click states\n' >&2
-    exit 1
-}
-# HUD identity is baked into the wallpaper image; verify the asset shipped.
-wallpaper="$extracted/usr/share/backgrounds/darkos/darkos-wallpaper.png"
-if [[ ! -s "$wallpaper" ]]; then
-    printf 'DarkOS wallpaper is missing or empty\n' >&2
-    exit 1
-fi
-if ! grep -q $'\x89PNG' "$wallpaper"; then
-    printf 'DarkOS wallpaper is not a valid PNG\n' >&2
-    exit 1
-fi
 grep -Fq 'self.toggle_state = {' "$shell_pkg/__init__.py" "$shell_source" || {
     printf 'Shell shared toggle state is not owned by DarkOSApplication\n' >&2
     exit 1
 }
 grep -Fq '"playerctl", "metadata", "--format"' "$shell_pkg/surfaces.py" "$shell_source" || {
     printf 'Media panel does not read live playerctl metadata\n' >&2
-    exit 1
-}
-grep -Fq 'process_chat' "$shell_pkg/__init__.py" "$shell_source" || {
-    printf 'AI chat is not wired to the brain\n' >&2
-    exit 1
-}
-grep -Fq 'process_chat' "$shell_pkg/surfaces.py" "$shell_source" || {
-    printf 'Chat entry does not call process_chat\n' >&2
-    exit 1
-}
-grep -Fq 'ActionDispatcher' "$shell_pkg/__init__.py" "$shell_source" || {
-    printf 'Action dispatcher not wired in\n' >&2
-    exit 1
-}
-grep -Fq '"openrouter/free"' "$shell_pkg/ai_brain.py" || {
-    printf 'AI brain does not use the supported OpenRouter free router by default\n' >&2
-    exit 1
-}
-grep -Fq '_ALLOWED_ACTIONS = frozenset' "$shell_pkg/ai_brain.py" || {
-    printf 'AI action dispatch has no explicit allowlist\n' >&2
     exit 1
 }
 

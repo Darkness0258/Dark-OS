@@ -3,10 +3,10 @@
 </p>
 
 <h1 align="center">DarkOS</h1>
-<p align="center"><strong>Control Everything.</strong> An original, AI-first Linux OS.</p>
+<p align="center"><strong>Control Everything.</strong> An original, security-minded Linux OS.</p>
 
 <p align="center">
-  <em>Arch respin + BlackArch security tools + Hyprland compositor + cinematic glassmorphism shell + voice-controlled AI assistant</em>
+  <em>Arch respin + BlackArch security tools + Hyprland compositor + cinematic glassmorphism shell</em>
 </p>
 
 ---
@@ -23,7 +23,7 @@ checks are not a claim of full daily-driver or hardware acceptance.
 - **BlackArch layered in** — 2,900+ security tools available as opt-in groups at install time
 - **Hyprland compositor** — Wayland-native, GPU-accelerated, tiling + floating, spring animations, blur and rounded corners
 - **Cinematic glassmorphism shell** — pure black backgrounds, glass panels with compositor-rendered blur, electric cyan `#00e5ff` primary, neon blue `#2d7bff` secondary
-- **Voice-controlled AI assistant** — STT/TTS/brain, OS control via D-Bus + `hyprctl`, generic in-app control via AT-SPI, push-to-talk (SUPER+SPACE), activity-aware dock highlighting
+- **Fast by default** — a Lite effects profile (no blur, shadows or transparency) is the default in virtual machines; Full effects are one setting away (Settings → Performance)
 - **Native and hosted app tiers** — 21 native GTK applications are implemented toward the ~27-app catalog, including Settings, Files, Terminal, Gaming Hub, and basic Mail. The hosted tier includes Firefox, mpv, Geary, GNOME Camera (`snapshot`), Kooha, Wine, Steam, Lutris, and Waydroid. Gaming Hub checks local availability before enabling its launch actions.
 - **Calamares graphical installer**
 - **Windows compatibility** via Wine / Bottles / Proton / QEMU/KVM
@@ -34,7 +34,7 @@ checks are not a claim of full daily-driver or hardware acceptance.
   <img src="preview.webp" alt="DarkOS desktop preview" width="720">
 </p>
 
-*Top bar, AI Core HUD, floating glass panels, left icon rail, and dock — running on Hyprland.*
+*Top bar, floating glass panels, left icon rail, and dock — running on Hyprland.*
 
 ## Quick Start
 
@@ -114,44 +114,16 @@ has SHA-256 `CEB95BACC1AC69C783A89CB411239CBDD7AB278FEF3C83A8A09206E0CE032B25`.
 - `/boot/grub/install.log` ends with `repair complete; validated config and marker written`.
 - The installed system's `/etc/mkinitcpio.conf` is modified at first boot by `darkos-grub-install.sh` to include the `plymouth` hook, then `mkinitcpio -P` builds the initramfs with the DarkOS splash.
 
-## Phase 3 Verification
-
-Phase 3 was validated end-to-end over SSH against a live VMware Workstation UEFI
-boot of `out/darkos-2026.08.23-x86_64.iso` (2.95 GB, SHA256 `969d2556...`):
-
-1. **AI Chat Round-Trip**: Typed "what is 2+2" → OpenRouter `openrouter/free` model
-   returned "2+2 equals 4." — real LLM response, not a stub.
-2. **Explain-This**: AT-SPI extracted active window title ("The Void") — text extraction
-   pipeline works for AI-powered explanation.
-3. **D-Bus/hyprctl Control**: `pamixer --get-volume` confirmed 40→35 after
-   `set_volume(35)`; `hyprctl dispatch workspace 2` returned `ok` with
-   auto-discovered `HYPRLAND_INSTANCE_SIGNATURE`.
-4. **Voice Pipeline Mechanics**: `process_voice()` executed against Groq STT
-   (`whisper-large-v3`) — STT chain reachable and functional.
-5. **TTS Audio**: espeak-ng fallback confirmed working (`_try_espeak_tts('hello')`
-   returned `True`) — spoken responses audible through VM audio.
-6. **Stability**: 5-minute process snapshot confirmed no crashes — same PIDs for
-   Hyprland, darkos-shell.py, waybar, hypridle, vmtoolsd across both snapshots.
-7. **Dock Highlight**: Cyan `.dock-highlight` CSS glow visible on active app icon.
-8. **Boot Animation**: Plymouth "CONTROL EVERYTHING" splash renders during boot.
-9. **SSH Test Profile**: `sshd.service` enabled on live ISO only (via symlink),
-   cleaned up during Calamares install. `openssh` + `dhcpcd` in package list.
-   Network bring-up via `ensure-network` script.
-
-API keys are configured per-session via `~/.config/darkos/env` (sourced by
-`~/.bash_profile`). The live ISO ships with NO API keys — users provide their
-own Groq and OpenRouter keys after installation.
-
 ## Phase 2 Verification
 
-The shipped Phase 2 login stack and shell chrome were validated on a fresh erase-disk UEFI installation in VMware Workstation. The Cairo AI Core HUD ring landed after that pass and still needs a real-session visual check:
+The shipped Phase 2 login stack and shell chrome were validated on a fresh erase-disk UEFI installation in VMware Workstation.
 
 1. **Plymouth Boot Splash**: The DarkOS `CONTROL EVERYTHING` boot animation loads cleanly during initramfs kernel execution.
-2. **ReGreet Login Display Manager**: The `greetd` + `cage` + `regreet` stack starts on boot with the DarkOS wallpaper, session selector (Hyprland), and user authentication.
+2. **ReGreet Login Display Manager**: The `greetd` + `cage` + `regreet` stack starts on boot with a plain dark background, session selector (Hyprland), and user authentication.
 3. **Desktop Shell Chrome**: Post-login Hyprland launches the verified shell surface:
    - **Top Bar & Left Rail**: Status indicators, workspace switcher, and quick launcher rail.
-   - **Center HUD & System Gauges**: live CPU, RAM, and Disk telemetry gauges; the later Cairo radar/dial HUD implementation is pending its own real-session visual validation.
-   - **Floating Dock**: Enlarged, glowing central AI Orb surrounded by pinned core application shortcuts.
+   - **System Gauges**: live CPU, RAM, and Disk telemetry gauges in the left panel.
+   - **Floating Dock**: pinned core application shortcuts around a live clock.
    - **Right Column Panels**: Fully populated and rendered in standard production order:
      - `Notifications` (System feed, Recent Mako popups, and Clear All action)
      - `Now Playing` (Album art tile, track metadata, progress bar, and media transport controls)
@@ -203,15 +175,13 @@ The shipped Phase 2 login stack and shell chrome were validated on a fresh erase
 
 Full specs in [ui-tokens.md](ui-tokens.md) and [ui-rules.md](ui-rules.md).
 
-## Architecture & AI Control
+## Architecture
 
 See [architecture.md](architecture.md) for the complete design. Key principles:
 
-- **OS-level AI control** via D-Bus + `hyprctl` (volume, brightness, workspaces, launching apps)
-- **In-app AI control** via AT-SPI (Linux accessibility API) — reads and acts on any app's UI generically
-- **Screen understanding** via periodic screenshots + vision model
-- The visual shell never blocks on the AI backend
+- A single GTK3 + gtk-layer-shell shell process draws the dock, rail and panels
 - Hosted apps (browser, media player, containers) are never modified — visual consistency comes from Hyprland's compositor-level decorations
+- The AI assistant (Iras), the HUD and the wallpaper were removed on 2026-10-17; the desktop is a solid colour and nothing in the session polls for AI context
 
 ## Roadmap
 
@@ -219,7 +189,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 |---|---|
 | 1 | Bootable and installable Arch + Hyprland + BlackArch ISO — historical VM verification; changed-image acceptance tracked in the audit |
 | 2 | Core shell chrome implemented; current HUD/Hyprland acceptance remains open |
-| 3 | AI assistant — historical SSH/VMware checks; microphone and installed-Btrfs acceptance remain open |
+| 3 | AI assistant — removed (2026-10-17) |
 | 4 | Daily-use native apps |
 | 5 | System management (Settings, Network, Security) |
 | 6 | Store & DevHub |
@@ -231,8 +201,7 @@ Full details in [build-plan.md](build-plan.md).
 
 ## Status
 
-- **Phases 1–2 have historical VM evidence** — the boot/install/session checks above cover their recorded ISO revisions. The Cairo AI Core HUD is implemented; its current Hyprland rendering and the changed image's boot/install/reboot acceptance remain tracked in the audit.
-- **Phase 3 has historical SSH/VMware and current regression evidence** — chat, speech-provider integration, OS controls, AT-SPI extraction, explain-this, and context-aware shell behavior have recorded checks. Real push-to-talk microphone/audio, installed-Btrfs safety snapshots, and target visual behavior still require acceptance.
+- **Phases 1–2 have historical VM evidence** — the boot/install/session checks above cover their recorded ISO revisions.
 - **Settings Performance has guarded power-profile controls** — it reads available profiles with `powerprofilesctl`, applies an explicit selection through the system authorization policy, and reads back the actual result. Kernel/scheduler package selection remains unfinished.
 - **Phase 7 implementation is present with acceptance still open** — basic native Mail provides a read-only IMAPS inbox and confirmed plain-text SMTPS sending, with account details and drafts kept in memory for the session. A real mailbox send/receive test remains open. Gaming Hub supports native launchers and installed Bottles Flatpaks; GNOME Camera (`snapshot`) supplies webcam capture and Kooha supplies recording. Hosted Windows/Steam workloads, Waydroid initialization, camera, and Wayland capture still need target testing.
 

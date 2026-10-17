@@ -18,7 +18,6 @@ DEFAULTS = {
     "reduce_motion": False,
     "icon_theme": "",
     "gtk_font": "",
-    "wallpaper_path": "",
     "a11y_speech": False,
     "a11y_captions": False,
     "a11y_magnifier": False,
@@ -28,6 +27,8 @@ DEFAULTS = {
     "shield_protection_enabled": True,
     "dock_position": "bottom",
     "dock_size": "default",
+    "effects": "auto",
+    "renderer": "auto",
 }
 
 # Settings whose value must come from a fixed set. settings.json is
@@ -36,6 +37,8 @@ DEFAULTS = {
 CHOICES = {
     "dock_position": ("bottom", "top", "left", "right"),
     "dock_size": ("compact", "default", "large"),
+    "effects": ("auto", "lite", "full"),
+    "renderer": ("auto", "software", "hardware"),
 }
 
 

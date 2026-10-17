@@ -4,6 +4,9 @@ After=local-fs.target nftables.service
 
 [Service]
 Type=simple
+Nice=10
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
 ExecStart=/usr/bin/python3 /usr/local/bin/darkos-netwatch.py
 Restart=on-failure
 RestartSec=5s

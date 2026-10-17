@@ -20,7 +20,6 @@ file_permissions=(
   ["/etc/gshadow"]="0:0:600"
   ["/etc/shadow"]="0:0:600"
   ["/etc/sudoers.d"]="0:0:750"
-  ["/etc/sudoers.d/darkos-ai-snapshot"]="0:0:440"
   ["/etc/sudoers.d/darkos"]="0:0:440"
   ["/etc/pam.d/vmtoolsd"]="0:0:644"
   ["/home/darkos"]="1000:1000:750"
@@ -48,7 +47,6 @@ file_permissions=(
   ["/usr/local/bin/the-void.sh"]="0:0:755"
   ["/usr/local/bin/darkos-tty1-login"]="0:0:755"
   ["/usr/local/bin/darkos-tool-groups"]="0:0:755"
-  ["/usr/local/bin/darkos-ai-snapshot"]="0:0:755"
   ["/usr/local/bin/darkos-diagnose.sh"]="0:0:755"
   ["/usr/local/bin/darkos-backup.py"]="0:0:755"
   ["/usr/local/bin/darkos-calculator.py"]="0:0:755"
@@ -77,11 +75,7 @@ file_permissions=(
   ["/usr/local/bin/darkos-store-gated-aur-install.py"]="0:0:755"
   ["/usr/local/bin/darkos-terminal.py"]="0:0:755"
   ["/usr/local/bin/darkos_shell/__init__.py"]="0:0:644"
-  ["/usr/local/bin/darkos_shell/actions.py"]="0:0:644"
-  ["/usr/local/bin/darkos_shell/activity_detector.py"]="0:0:644"
-  ["/usr/local/bin/darkos_shell/ai_brain.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/app_kit.py"]="0:0:644"
-  ["/usr/local/bin/darkos_shell/assistant_trigger.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/canvases.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/css.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/shield.py"]="0:0:644"
@@ -93,7 +87,11 @@ file_permissions=(
   ["/usr/local/bin/darkos-lock"]="0:0:755"
   ["/usr/local/bin/start-hyprland"]="0:0:755"
   ["/usr/local/bin/darkos-firstboot-tools"]="0:0:755"
+  ["/usr/local/bin/darkos-perf-apply"]="0:0:755"
   ["/usr/local/bin/ensure-network"]="0:0:755"
-  ["/usr/local/bin/generate-wallpaper.py"]="0:0:755"
   ["/etc/systemd/system/ensure-network.service"]="0:0:644"
 )
+
+# zstd decompresses several times faster than xz, so launching apps and
+# booting from the live squashfs costs far less CPU (the ISO is a bit larger).
+airootfs_image_tool_options=('-comp' 'zstd' '-Xcompression-level' '15' '-b' '1M')

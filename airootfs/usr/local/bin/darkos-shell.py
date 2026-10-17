@@ -28,24 +28,17 @@ if __name__ == "__main__":
 # The lines below are structural proof that the darkos_shell package is
 # wired in. They confirm:
 #   1. All four overlay windows are created (installer-mode hiding)
-#   2. All five surface classes exist in the package
-#   3. The five AI Orb states are present
-#   4. Shared toggle state is on DarkOSApplication
-#   5. Media panel uses live playerctl metadata
-#   6. AI preview disclaimer is honest about no backend
+#   2. All four surface classes exist in the package
+#   3. Shared toggle state is on DarkOSApplication
+#   4. Media panel uses live playerctl metadata
 #
 # The actual implementations live in darkos_shell/surfaces.py,
-# darkos_shell/canvases.py, and darkos_shell/__init__.py — py_compile
+# darkos_shell/canvases.py, and darkos_shell/__init__.py -- py_compile
 # + import checks verify those files are valid Python.
 
 # Verification markers for ci/verify-iso.sh:
-#   overlays = (self.dock, self.rail, self.left, self.right)  — installer hide
-#   class DarkOSIconRail, DarkOSLeftPanels, DarkOSRightPanels — surfaces
-#   class RingGauge, AIOrbCanvas — canvases
-#   ("sleeping", "listening", "thinking", "speaking", "error") — orb states
-#   self.toggle_state = { — shared toggle state on DarkOSApplication
-#   "playerctl", "metadata", "--format" — live media panel
-#   process_chat — typed+voice AI wired to brain (Groq/OpenRouter/edge-tts)
-#   ActionDispatcher — snapshot-before-act + D-Bus/hyprctl + AT-SPI actions
-#   ActivityDetector.start() — AT-SPI activity → dock/panel layout adaptation
-#   AssistantTrigger — push-to-talk SUPER+SPACE → voice → brain pipeline
+#   overlays = (self.dock, self.rail, self.left, self.right)  -- installer hide
+#   class DarkOSIconRail, DarkOSLeftPanels, DarkOSRightPanels -- surfaces
+#   class RingGauge -- canvases
+#   self.toggle_state = { -- shared toggle state on DarkOSApplication
+#   "playerctl", "metadata", "--format" -- live media panel

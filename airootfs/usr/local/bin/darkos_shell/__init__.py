@@ -3,14 +3,11 @@
 
 This package contains all shell logic split into focused modules:
 - tokens: design tokens (color, spacing, radius, glow)
-- canvases: GTK DrawingArea widgets (AI Orb, waveform, ring gauges)
+- canvases: GTK DrawingArea widgets (ring gauges)
 - system_sampler: live system metrics from /proc and /sys
 - css: GTK CSS stylesheet built from tokens
-- surfaces: GTK layer-shell window surfaces (Dock, HUD, Rail, Left, Right)
+- surfaces: GTK layer-shell window surfaces (Dock, Rail, Left, Right)
 - platform: OS control surface (D-Bus, hyprctl, AT-SPI)
-- ai_brain: STT + LLM + TTS with cloud-first, local fallback
-- activity_detector: AT-SPI context-aware shell layout
-- assistant_trigger: push-to-talk / wake-word activation
 
 The thin wrapper at /usr/local/bin/darkos-shell.py imports this package
 and hands off to DarkOSApplication.
@@ -25,7 +22,6 @@ from gi.repository import Gio, GLib, Gtk
 
 from darkos_shell.surfaces import (
     DarkOSDockWindow,
-    DarkOSHUDOverlay,
     DarkOSIconRail,
     DarkOSLeftPanels,
     DarkOSRightPanels,
@@ -37,13 +33,11 @@ from darkos_shell.surfaces import (
     make_icon_label,
     make_label,
 )
-from darkos_shell.canvases import AIOrbCanvas, RingGauge, WaveformCanvas
+from darkos_shell.canvases import RingGauge
 from darkos_shell.system_sampler import SystemSampler
 from darkos_shell.css import apply_css
 from darkos_shell.user_settings import load_settings, settings_path
-from darkos_shell.actions import ActionDispatcher
 from darkos_shell.tokens import (
-    AI_ASSISTANT_ENABLED,
     CAIRO_ACCENT,
     CAIRO_DANGER,
     CAIRO_MUTED,
@@ -95,7 +89,6 @@ class DarkOSApplication(Gtk.Application):
         )
         self.dock = None
         self.rail = None
-        self.hud = None
         self.left = None
         self.right = None
         self.installer_visibility = None
@@ -110,12 +103,6 @@ class DarkOSApplication(Gtk.Application):
             "focus": False,
             "airplane": False,
         }
-        self._brain = None
-        self._trigger = None
-        self._activity_detector = None
-        self._orb_state = "sleeping"
-        self._actions = None
-        self._ai_response_label = None
         self._settings_monitor = None
         self._settings_reload_id = 0
 
@@ -177,178 +164,35 @@ class DarkOSApplication(Gtk.Application):
             except Exception:
                 pass
 
-    def set_orb_state(self, state):
-        self._orb_state = state
-
-    @property
-    def orb_state(self):
-        return self._orb_state
-
-    @property
-    def actions(self):
-        if self._actions is None:
-            self._actions = ActionDispatcher()
-        return self._actions
-
-    @property
-    def brain(self):
-        if self._brain is None:
-            from darkos_shell.ai_brain import AIBrain
-            self._brain = AIBrain(actions=self.actions)
-        return self._brain
-
-    @property
-    def activity_detector(self):
-        if self._activity_detector is None:
-            from darkos_shell.activity_detector import ActivityDetector
-            self._activity_detector = ActivityDetector()
-        return self._activity_detector
-
-    @property
-    def trigger(self):
-        if self._trigger is None:
-            from darkos_shell.assistant_trigger import AssistantTrigger
-            self._trigger = AssistantTrigger(self.brain)
-        return self._trigger
-
-    # ── Activation ─────────────────────────────────────────────────────
-
     def do_activate(self):
         if self.dock is not None:
             return
         apply_css()
         self.dock = DarkOSDockWindow(self)
         self.rail = DarkOSIconRail(self)
-        # AI Core HUD is pure AI-assistant chrome (radar dial, nothing
-        # else lives in that window) -- skip it entirely while
-        # AI_ASSISTANT_ENABLED is False instead of creating and
-        # immediately hiding a window that exists only to animate.
-        self.hud = DarkOSHUDOverlay() if AI_ASSISTANT_ENABLED else None
         self.left = DarkOSLeftPanels(self)
         self.right = DarkOSRightPanels(self)
-        windows = [w for w in (self.dock, self.rail, self.hud, self.left, self.right) if w is not None]
-        for window in windows:
+        for window in (self.dock, self.rail, self.left, self.right):
             self.add_window(window)
-        # Command Center (HUD + info panels) starts closed — SUPER+H or
+        # Command Center (info panels) starts closed -- SUPER+H or
         # --toggle-command-center opens it. Dock + rail are the always-on
-        # base layer. See ui-rules.md § Layout (2026-08-23 decision).
-        for window in (self.hud, self.left, self.right):
-            if window is not None:
-                window.hide()
-
-        # Start activity detection → layout adaptation
-        detector = self.activity_detector
-        detector.add_listener(self._on_activity_changed)
-        detector.start()
-
-        # Voice trigger (push-to-talk) only runs with the AI assistant.
-        if AI_ASSISTANT_ENABLED:
-            trigger = self.trigger
-            trigger.add_listener(self._on_voice_activated)
-            trigger.start()
+        # base layer. See ui-rules.md, Layout (2026-08-23 decision).
+        for window in (self.left, self.right):
+            window.hide()
 
         self._watch_settings()
 
-    # ── Activity detection → layout ─────────────────────────────────────
-
-    def _on_activity_changed(self, profile_name, profile_data):
-        """Swap dock highlight always; only adjust Command Center panels if
-        Command Center is already open.
-
-        Dock highlight is part of the always-on base layer, so it updates
-        regardless. left/right are Command Center panels, though -- if we
-        show/hide them while Command Center is closed, it visibly pops open
-        on its own the moment the user switches apps, with no --toggle
-        pressed. That's the bug this guard closes (see ui-rules.md's known
-        activity_detector/Command-Center conflict, and the redesign-plan
-        audit that confirmed it by tracing this method)."""
-        if self.dock is None:
-            return
-        self.dock.set_activity_profile(profile_data.get("dock_highlight"))
-        if self.hud is None or not self.hud.is_visible():
-            return
-        if self.left is not None:
-            visible = profile_data.get("show_chat", True)
-            if visible and not self.left.is_visible():
-                self.left.show_all()
-            elif not visible and self.left.is_visible():
-                self.left.hide()
-        if self.right is not None:
-            visible = profile_data.get("show_system", True)
-            if visible and not self.right.is_visible():
-                self.right.show_all()
-            elif not visible and self.right.is_visible():
-                self.right.hide()
-
-    # ── Voice activation → brain pipeline ───────────────────────────────
-
-    def _on_voice_activated(self, audio_path):
-        """Dispatch the full voice pipeline on a background thread."""
-        import threading
-        threading.Thread(
-            target=self._voice_pipeline, args=(audio_path,), daemon=True
-        ).start()
-
-    def _voice_pipeline(self, audio_path):
-        """Background thread: STT → LLM → TTS, results posted back to UI."""
-        from pathlib import Path
-
-        try:
-            GLib.idle_add(self._set_orb_state, "listening")
-            text = self.brain.process_voice(audio_path)
-            if not text:
-                GLib.idle_add(self._set_orb_state, "error")
-                GLib.idle_add(self._ai_error, "No speech detected.")
-                return
-            GLib.idle_add(self._set_orb_state, "thinking")
-            reply, action_summary = self.brain.process_chat(text)
-            if not reply:
-                GLib.idle_add(self._set_orb_state, "error")
-                GLib.idle_add(self._ai_error, "No response from AI.")
-                return
-            GLib.idle_add(self._set_orb_state, "speaking")
-            spoken = self.brain.speak(reply)
-            result = reply
-            if action_summary:
-                result += "\n\n" + action_summary
-            if not spoken:
-                result += "\n\nSpeech playback is unavailable."
-            GLib.idle_add(self._ai_response, text, result)
-            GLib.idle_add(self._set_orb_state, "sleeping" if spoken else "error")
-        finally:
-            # Recordings can contain sensitive speech and must not accumulate.
-            try:
-                Path(audio_path).unlink(missing_ok=True)
-            except OSError:
-                pass
-
-    def _set_orb_state(self, state):
-        self._orb_state = state
-        if self.dock is not None and hasattr(self.dock, "ai_orb"):
-            self.dock.ai_orb.set_state(state)
-
-    def _ai_response(self, user_text, reply):
-        if self.left is not None:
-            self.left.show_ai_response(user_text, reply)
-
-    def _ai_error(self, message):
-        if self.left is not None:
-            self.left.show_stub(message)
-
-    # ── Command-line dispatch ──────────────────────────────────────────
+    # -- Command-line dispatch --------------------------------------------
 
     def do_command_line(self, command_line):
         import argparse
 
         parser = argparse.ArgumentParser(description="DarkOS Shell Controller")
-        parser.add_argument("--toggle-ai", action="store_true")
         parser.add_argument("--toggle-side-panels", action="store_true")
         parser.add_argument("--toggle-command-center", action="store_true")
         parser.add_argument("--toggle-control", action="store_true")
         parser.add_argument("--toggle-left", action="store_true")
         parser.add_argument("--toggle-rail", action="store_true")
-        parser.add_argument("--ptt-start", action="store_true")
-        parser.add_argument("--ptt-stop", action="store_true")
         parser.add_argument("--lock", action="store_true")
         parser.add_argument("--installer-mode", choices=("on", "off"))
         try:
@@ -363,12 +207,8 @@ class DarkOSApplication(Gtk.Application):
             self._toggle_window(self.left)
             self._toggle_window(self.right)
         if args.toggle_command_center:
-            # HUD visibility is the source of truth for "open" when it
-            # exists; with the AI assistant off there's no HUD window at
-            # all, so fall back to the left panel (weather/system) instead.
-            command_center = [w for w in (self.hud, self.left, self.right) if w is not None]
-            opening = not command_center[0].is_visible() if command_center else False
-            for window in command_center:
+            opening = not self.left.is_visible()
+            for window in (self.left, self.right):
                 if opening:
                     window.show_all()
                 else:
@@ -379,23 +219,6 @@ class DarkOSApplication(Gtk.Application):
             self._toggle_window(self.left)
         if args.toggle_rail:
             self._toggle_window(self.rail)
-        if args.toggle_ai or args.ptt_start or args.ptt_stop:
-            if not AI_ASSISTANT_ENABLED:
-                _notify("DarkOS", "The AI assistant is temporarily disabled.")
-            elif args.toggle_ai:
-                if not self.left.is_visible():
-                    self.left.show_all()
-                self.left.entry.grab_focus()
-            elif args.ptt_start:
-                if self.trigger.on_push_to_talk_start():
-                    self._set_orb_state("listening")
-                else:
-                    self._set_orb_state("error")
-                    self._ai_error("No working microphone recorder was found.")
-            elif args.ptt_stop:
-                if not self.trigger.on_push_to_talk_stop():
-                    self._set_orb_state("error")
-                    self._ai_error("No speech was captured.")
         if args.lock:
             launch(["loginctl", "lock-session"])
         return 0
@@ -443,14 +266,6 @@ class DarkOSApplication(Gtk.Application):
             "gaming": ["/usr/local/bin/darkos-gaming.py"],
             "search": ["/usr/local/bin/the-void.sh"],
         }
-        if action == "ai":
-            if not AI_ASSISTANT_ENABLED:
-                _notify("DarkOS", "The AI assistant is temporarily disabled.")
-                return
-            if not self.left.is_visible():
-                self.left.show_all()
-            self.left.entry.grab_focus()
-            return
         if action in commands:
             launch(commands[action])
             return
@@ -458,6 +273,14 @@ class DarkOSApplication(Gtk.Application):
         _notify("DarkOS", f"{action.title()} is a Phase {phase} surface and isn't built yet.")
 
     # ── Toggle state ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _apply_night_light(enabled):
+        return _night_light_apply(enabled)
+
+    @staticmethod
+    def _apply_focus(enabled):
+        return _focus_apply(enabled)
 
     def set_toggle(self, name, enabled):
         self.toggle_state[name] = enabled
@@ -518,11 +341,54 @@ class DarkOSApplication(Gtk.Application):
                 f"Airplane mode {'enabled' if enabled else 'disabled'}."
             )
         elif name in ("night_light", "focus"):
-            display_name = "Night Light" if name == "night_light" else "Focus"
-            self.right.set_control_status(
-                f"Preview only: {display_name} has no system backend yet.", True
-            )
+            apply = self._apply_night_light if name == "night_light" else self._apply_focus
+            message, failed = apply(enabled)
+            if failed and enabled:
+                self.toggle_state[name] = False  # backend missing: don't show it as on
+            self.right.set_control_status(message, failed)
         self.notify_state_listeners()
+
+
+NIGHT_LIGHT_KELVIN = "4000"
+
+
+def _night_light_apply(enabled, which=None, run=None, popen=None):
+    """Start/stop hyprsunset. Returns (message, is_error).
+
+    hyprsunset runs as a long-lived process that holds the colour
+    temperature, so on = spawn it, off = end it (the screen returns to
+    neutral when it exits).
+    """
+    import shutil
+    import subprocess
+    which = which or shutil.which
+    run = run or subprocess.run
+    popen = popen or subprocess.Popen
+    if not which("hyprsunset"):
+        return ("Night Light needs hyprsunset, which is not installed.", True)
+    run(["pkill", "-x", "hyprsunset"], capture_output=True)
+    if enabled:
+        popen(["hyprsunset", "-t", NIGHT_LIGHT_KELVIN],
+              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+              start_new_session=True)
+        return (f"Night Light on ({NIGHT_LIGHT_KELVIN} K).", False)
+    return ("Night Light off.", False)
+
+
+def _focus_apply(enabled, which=None, run=None):
+    """Switch mako between do-not-disturb and normal. Returns (message, is_error)."""
+    import shutil
+    import subprocess
+    which = which or shutil.which
+    run = run or subprocess.run
+    if not which("makoctl"):
+        return ("Focus needs mako (makoctl), which is not installed.", True)
+    result = run(["makoctl", "mode", "-s", "do-not-disturb" if enabled else "default"],
+                 capture_output=True, text=True)
+    if result.returncode != 0:
+        return ("Focus could not reach mako; is it running?", True)
+    return ("Focus on: notification pop-ups are hidden." if enabled
+            else "Focus off: notifications show again.", False)
 
 
 def main():

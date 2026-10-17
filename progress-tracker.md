@@ -268,3 +268,34 @@ hypothesis (fits the minutes-then-seconds pattern), not a confirmed cause.
 Removed it (commit `0d8b5f9`). If the next boot still hangs, next real step
 is a boot log that doesn't need the hung VM to cooperate (host-side mount
 or serial console), not more input injection into an already-stuck guest.
+
+## 2026-10-17 -- Wallpaper + AI removal, lag work, new features
+
+**Removed:** wallpaper (image, generator, swaybg, regreet background, hyprlock
+screenshot blur, Settings tab); the whole AI system (Iras brain, voice trigger,
+action layer, activity detector, HUD overlay, dock orb, chat card, waveform,
+cloud-tier stub, `darkos-ai-snapshot` + sudoers, Calamares API-keys module and
+its build step, `espeak-ng` kept for the screen reader). Desktop is a solid
+`rgb(0d0f12)` via `misc:background_color`.
+
+**Lag work (unmeasured on the VM -- see TESTING-MANUAL.md section 4):**
+dock `hyprctl` poll moved off the GTK main thread and to 3 s; hidden panels no
+longer poll; dock clock 1 s -> 20 s; staggered autostart; `darkos-perf-apply`
+writes a Lite/Full profile (Lite also removes opacity + rounding; default
+"auto" = Lite in a VM); renderer override in Settings; squashfs -> zstd;
+netwatch/integrity units run at idle priority; snapshot/integrity timers skip
+the live ISO.
+
+**Added:** Settings Performance (effects + renderer), Updates tab
+(`checkupdates`/`pkexec pacman -Syu`), Night Light (hyprsunset), Focus (mako DND
+mode + `/etc/xdg/mako/config`), PiP (`SUPER+SHIFT+P`), annotated screenshots via
+swappy (`SUPER+SHIFT+A`), Orca screen reader toggle, media/brightness keys,
+fullscreen, move-to-workspace, mouse move/resize binds. New packages: hyprsunset,
+swappy, orca, speech-dispatcher, pacman-contrib (all confirmed in Arch repos
+except orca/speech-dispatcher/pacman-contrib, which are standard `extra` but
+were not looked up).
+
+**Tests:** 18/18 CI files pass in a GTK/headless sandbox (new: `ci/test-polish.py`).
+Deleted tests for removed code. **Not done:** ISO build/boot, Hyprland config
+parse of the new lines, any real-device check. Stale VMware harness files listed
+in TESTING-MANUAL.md section 10.

@@ -119,16 +119,6 @@ def dock_exclusive_zone(layout, thickness):
     return layout.edge_margin + int(thickness) + DOCK_CLEARANCE
 
 
-# ── AI assistant (Iras) ─────────────────────────────────────────────
-# Pulled out of the shell for now at Hamza's request (2026-09-29): the
-# AI Core HUD radar + dock orb were two permanent ~30fps Cairo redraw
-# loops running from boot, on top of an unverified voice/LLM pipeline.
-# Flip this back to True to restore the HUD overlay, the dock orb, the
-# AI chat card in the left panel, and push-to-talk (SUPER+SPACE) /
-# SUPER+A — nothing was deleted, it's all still in surfaces.py,
-# ai_brain.py, assistant_trigger.py and __init__.py, just unwired.
-AI_ASSISTANT_ENABLED = False
-
 # ── Typography ───────────────────────────────────────────────────────
 FONT_BODY = "Inter, \"SF Pro Display\", sans-serif"
 FONT_HEADING = "\"Space Grotesk\", sans-serif"

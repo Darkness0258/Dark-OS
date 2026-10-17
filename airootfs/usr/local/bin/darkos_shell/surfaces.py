@@ -10,14 +10,11 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk, GtkLayerShell, Pango
 
 from darkos_shell.canvases import (
-    AIOrbCanvas,
     GLOW_STROKES_OUTSIDE_IN,
-    WaveformCanvas,
     stroke_glow,
 )
 from darkos_shell.css import CSS_STYLE
 from darkos_shell.tokens import (
-    AI_ASSISTANT_ENABLED,
     CAIRO_ACCENT,
     CAIRO_DANGER,
     CAIRO_MUTED,
@@ -167,8 +164,7 @@ def command_output(command, timeout=1.5):
 class DarkOSDockWindow(Gtk.Window):
     """Floating dock on any screen edge, in one of three sizes (the
     dock_position / dock_size settings; apply_layout() re-lays it out live).
-    Center slot is the AI Orb when AI_ASSISTANT_ENABLED, otherwise a live
-    clock (see tokens.py)."""
+    Center slot is a live clock."""
 
     _EDGES = {
         "bottom": GtkLayerShell.Edge.BOTTOM,
@@ -244,22 +240,13 @@ class DarkOSDockWindow(Gtk.Window):
         for key, icon, name, command, wm_class in left_apps:
             dock.pack_start(make_dock_slot(key, icon, name, command, wm_class), False, False, 2)
 
-        if AI_ASSISTANT_ENABLED:
-            orb_button = Gtk.Button()
-            add_class(orb_button, "orb-button")
-            orb_button.set_tooltip_text("Cycle DarkOS AI preview state")
-            orb_button.get_accessible().set_name("DarkOS AI preview state")
-            self.ai_orb = AIOrbCanvas(size=56)
-            orb_button.add(self.ai_orb)
-            orb_button.connect("clicked", self.on_orb_click)
-            dock.pack_start(orb_button, False, False, SPACE_SM)
-        else:
-            self.ai_orb = None
-            self.clock_label = make_label("--:--", "dock-clock")
-            self.clock_label.set_justify(Gtk.Justification.CENTER)
-            dock.pack_start(self.clock_label, False, False, SPACE_MD)
-            self._tick_clock()
-            GLib.timeout_add_seconds(1, self._tick_clock)
+        self.clock_label = make_label("--:--", "dock-clock")
+        self.clock_label.set_justify(Gtk.Justification.CENTER)
+        dock.pack_start(self.clock_label, False, False, SPACE_MD)
+        self._tick_clock()
+        # Minute resolution is all the label shows; a 1s timer woke the
+        # shell (and re-laid-out the dock) 60x more often than needed.
+        GLib.timeout_add_seconds(20, self._tick_clock)
 
         for key, icon, name, command, wm_class in right_apps:
             dock.pack_start(make_dock_slot(key, icon, name, command, wm_class), False, False, 2)
@@ -271,8 +258,9 @@ class DarkOSDockWindow(Gtk.Window):
         )
         self.show_all()
         self.apply_layout(settings["dock_position"], settings["dock_size"])
+        self._running_lock = threading.Lock()
         self._refresh_running_indicators()
-        GLib.timeout_add_seconds(2, self._refresh_running_indicators)
+        GLib.timeout_add_seconds(3, self._refresh_running_indicators)
 
     def apply_layout(self, position, size):
         """Move/resize the dock live. Returns True if anything changed.
@@ -313,8 +301,7 @@ class DarkOSDockWindow(Gtk.Window):
         self.resize(1, 1)
         self._exclusive_zone = None
         self._update_exclusive_zone()
-        if hasattr(self, "clock_label"):  # absent when the AI orb is the center slot
-            self._tick_clock()
+        self._tick_clock()
         return True
 
     def _update_exclusive_zone(self, allocation=None):
@@ -339,7 +326,23 @@ class DarkOSDockWindow(Gtk.Window):
         return True
 
     def _refresh_running_indicators(self):
-        running = _running_window_classes()
+        """Timer tick (main thread). `hyprctl` runs on a worker thread: it used
+        to run right here, so a slow compositor froze the whole shell UI."""
+        if not self.get_visible():
+            return True
+        if not self._running_lock.acquire(blocking=False):
+            return True  # previous poll still running
+        threading.Thread(target=self._poll_running, daemon=True).start()
+        return True
+
+    def _poll_running(self):
+        try:
+            running = _running_window_classes()
+        finally:
+            self._running_lock.release()
+        GLib.idle_add(self._apply_running, running)
+
+    def _apply_running(self, running):
         for key, dot in self._dock_dots.items():
             wm_class = self._dock_wm_classes.get(key, "")
             ctx = dot.get_style_context()
@@ -347,196 +350,7 @@ class DarkOSDockWindow(Gtk.Window):
                 ctx.add_class("running")
             else:
                 ctx.remove_class("running")
-        return True
-
-    def on_orb_click(self, _button):
-        states = ("sleeping", "listening", "thinking", "speaking", "error")
-        self.orb_cycle_index = (self.orb_cycle_index + 1) % len(states)
-        state = states[self.orb_cycle_index]
-        self.ai_orb.set_state(state)
-        self.application.set_orb_state(state)
-        if state == "error":
-            GLib.timeout_add(900, self.finish_error_pulse)
-
-    def set_activity_profile(self, highlight: str | None):
-        """Update dock icon highlight for the current activity profile."""
-        for icon_name, button in getattr(self, "_dock_icons", {}).items():
-            ctx = button.get_style_context()
-            ctx.remove_class("dock-highlight")
-            if highlight and icon_name == highlight:
-                ctx.add_class("dock-highlight")
-
-    def finish_error_pulse(self):
-        if self.ai_orb is not None and self.ai_orb.state == "error":
-            self.ai_orb.set_state("sleeping")
-            self.orb_cycle_index = 0
         return False
-
-
-class _HUDCanvas(Gtk.DrawingArea):
-    """Cairo-drawn radar/dial for the AI Core HUD."""
-
-    _STATE_STYLE = {
-        "sleeping": (CAIRO_PRIMARY, 0.50, 0.035, 1.5),
-        "listening": (CAIRO_PRIMARY, 0.82, 0.10, 3.0),
-        "thinking": (CAIRO_SECONDARY, 0.88, 0.16, 5.0),
-        "speaking": (CAIRO_ACCENT, 0.88, 0.13, 4.0),
-        "error": (CAIRO_DANGER, 0.94, 0.20, 6.0),
-    }
-
-    def __init__(self):
-        super().__init__()
-        self.set_size_request(280, 260)
-        self._state = "sleeping"
-        self._phase = 0.0
-        self._frame = 0
-        self.connect("draw", self._on_draw)
-        GLib.timeout_add(33, self._on_tick)
-
-    def set_state(self, state):
-        self._state = state
-        self.queue_draw()
-
-    def _on_tick(self):
-        style = self._STATE_STYLE.get(self._state, self._STATE_STYLE["sleeping"])
-        speed = style[2] * (0.0 if REDUCE_MOTION else 1.0)
-        self._phase = (self._phase + speed) % (math.pi * 200)
-        self._frame += 1
-        if self._state != "sleeping" or self._frame % 3 == 0:
-            self.queue_draw()
-        return True
-
-    def _stroke_ring(self, cr, cx, cy, radius, width, color, alpha):
-        cr.set_line_width(width)
-        cr.set_source_rgba(*color, alpha)
-        cr.arc(cx, cy, radius, 0, 2 * math.pi)
-        cr.stroke()
-
-    def _draw_dashed_ring(self, cr, cx, cy, radius, color, alpha):
-        segments = 20
-        for index in range(segments):
-            start = index / segments * 2 * math.pi
-            end = start + (1.0 / segments) * 2 * math.pi * 0.65
-            cr.arc(cx, cy, radius, start, end)
-            stroke_glow(cr, color, alpha)
-
-    def _draw_ticks(self, cr, cx, cy, radius, step_deg, color, alpha):
-        for angle_deg in range(0, 360, step_deg):
-            a = math.radians(angle_deg)
-            tick_inner = radius - 4
-            tick_outer = radius - (2 if angle_deg % 90 == 0 else 0)
-            cr.move_to(cx + tick_inner * math.cos(a), cy + tick_inner * math.sin(a))
-            cr.line_to(cx + tick_outer * math.cos(a), cy + tick_outer * math.sin(a))
-            cr.set_source_rgba(*color, alpha)
-            cr.set_line_width(1.0)
-            cr.stroke()
-
-    def _on_draw(self, widget, cr):
-        w = widget.get_allocated_width()
-        h = widget.get_allocated_height()
-        cx, cy = w / 2.0, h / 2.0 - 10
-
-        color, alpha = self._STATE_STYLE.get(
-            self._state, self._STATE_STYLE["sleeping"]
-        )[:2]
-
-        # Three concentric dashed rings with tick marks
-        for r, tick_step in ((54, 18), (88, 18), (122, 18)):
-            self._draw_dashed_ring(cr, cx, cy, r, color, alpha * 0.70)
-            self._draw_ticks(cr, cx, cy, r, tick_step, color, alpha * 0.50)
-
-        # Inner solid double-line ring with gap accents
-        for r, a in ((70, alpha * 0.35), (68, alpha * 0.55)):
-            self._stroke_ring(cr, cx, cy, r, 1.0, color, a)
-        for angle_deg in (90, 270):
-            a = math.radians(angle_deg)
-            x1 = cx + (69 - 3) * math.cos(a - 0.18)
-            y1 = cy + (69 - 3) * math.sin(a - 0.18)
-            x2 = cx + (69 + 3) * math.cos(a + 0.18)
-            y2 = cy + (69 + 3) * math.sin(a + 0.18)
-            cr.move_to(x1, y1)
-            cr.line_to(x2, y2)
-            cr.set_source_rgba(*CAIRO_TEXT, alpha * 0.30)
-            cr.set_line_width(2.0)
-            cr.stroke()
-
-        # Bezel ring + coarse ticks
-        bezel = 136
-        self._stroke_ring(cr, cx, cy, bezel, 1.0, CAIRO_TEXT, alpha * 0.20)
-        self._draw_ticks(cr, cx, cy, bezel, 15, CAIRO_TEXT, alpha * 0.20)
-
-        # Accent arc at top — position tracks anim_phase
-        top = -math.pi / 2.0
-        x1 = cx + 122 * math.cos(top)
-        y1 = cy + 122 * math.sin(top)
-        x2 = cx + 132 * math.cos(top)
-        y2 = cy + 132 * math.sin(top)
-        cr.move_to(x1, y1)
-        cr.line_to(x2, y2)
-        cr.set_source_rgba(*color, alpha * 0.55)
-        cr.set_line_width(1.5)
-        cr.stroke()
-        for i in range(3):
-            cr.move_to(x2 + 4, y2 - 6 + i * 4)
-            cr.line_to(x2 + 10, y2 - 6 + i * 4)
-            cr.set_source_rgba(*CAIRO_TEXT, alpha * (0.35 + i * 0.15))
-            cr.set_line_width(1.0)
-            cr.stroke()
-
-        # Radial spokes
-        for angle_deg in (0, 60, 120, 180, 240, 300):
-            a = math.radians(angle_deg)
-            cr.move_to(cx + 40 * math.cos(a), cy + 40 * math.sin(a))
-            cr.line_to(cx + bezel * math.cos(a), cy + bezel * math.sin(a))
-            cr.set_source_rgba(*CAIRO_TEXT, alpha * 0.10)
-            cr.set_line_width(1.0)
-            cr.stroke()
-
-        # Center breathing pulse
-        pulse = 4 + 3 * abs(math.sin(self._phase * 2.0))
-        cr.arc(cx, cy, pulse, 0, 2 * math.pi)
-        stroke_glow(cr, color, alpha * 0.80)
-
-        # DARK OS wordmark
-        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(12)
-        cr.set_source_rgba(*CAIRO_TEXT, alpha * 0.90)
-        label = "DARK OS"
-        extents = cr.text_extents(label)
-        cr.move_to(cx - extents.width / 2.0, cy + 155)
-        cr.show_text(label)
-
-        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(9)
-        cr.set_source_rgba(*color, alpha * 0.80)
-        tagline = "CONTROL EVERYTHING"
-        extents = cr.text_extents(tagline)
-        cr.move_to(cx - extents.width / 2.0, cy + 172)
-        cr.show_text(tagline)
-
-        return False
-
-
-class DarkOSHUDOverlay(Gtk.Window):
-    """AI Core HUD — Cairo radar/dial overlay, state-driven via orb machine."""
-
-    def __init__(self):
-        super().__init__(type=Gtk.WindowType.TOPLEVEL)
-        self.set_title("DarkOS AI Core")
-        self.set_decorated(False)
-        self.set_app_paintable(True)
-        add_class(self, "darkos-window")
-        configure_layer_window(
-            self,
-            "darkos-hud",
-            GtkLayerShell.Layer.TOP,
-            (GtkLayerShell.Edge.TOP,),
-            {GtkLayerShell.Edge.TOP: 76},
-        )
-
-        self._canvas = _HUDCanvas()
-        self.add(self._canvas)
-        self.show_all()
 
 
 class DarkOSIconRail(Gtk.Window):
@@ -567,9 +381,7 @@ class DarkOSIconRail(Gtk.Window):
         add_class(rail, "rail")
         rail.set_valign(Gtk.Align.CENTER)
         actions = (
-            ("system-search-symbolic", "Search", "search")
-            if not AI_ASSISTANT_ENABLED else
-            ("system-run-symbolic", "AI", "ai"),
+            ("system-search-symbolic", "Search", "search"),
             ("folder-symbolic", "Files", "files"),
             ("utilities-terminal-symbolic", "Terminal", "terminal"),
             ("preferences-system-symbolic", "Settings", "settings"),
@@ -598,7 +410,7 @@ class DarkOSIconRail(Gtk.Window):
 
 
 class DarkOSLeftPanels(Gtk.Window):
-    """Left-of-center panels: AI chat, weather, system overview."""
+    """Left-of-center panels: weather and system overview."""
 
     def __init__(self, application):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
@@ -623,8 +435,6 @@ class DarkOSLeftPanels(Gtk.Window):
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
         root.set_size_request(330, -1)
-        if AI_ASSISTANT_ENABLED:
-            root.pack_start(self.build_chat_panel(), False, False, 0)
         root.pack_start(self.build_weather_panel(), False, False, 0)
         root.pack_start(self.build_system_panel(), False, False, 0)
         self.add(root)
@@ -632,40 +442,6 @@ class DarkOSLeftPanels(Gtk.Window):
         self.refresh_system()
         from gi.repository import GLib
         GLib.timeout_add_seconds(2, self.refresh_system)
-
-    def build_chat_panel(self):
-        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=SPACE_SM)
-        add_class(panel, "glass-panel")
-        panel.pack_start(make_label("AI CHAT", "section-title"), False, False, 0)
-        panel.pack_start(
-            make_label("Good to see you. What should we explore?", wrap=True),
-            False,
-            False,
-            0,
-        )
-        self.waveform = WaveformCanvas()
-        panel.pack_start(self.waveform, False, False, 0)
-
-        entry_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_SM)
-        self.entry = Gtk.Entry()
-        add_class(self.entry, "ai-entry")
-        self.entry.set_placeholder_text("Ask DarkOS AI...")
-        self.entry.set_hexpand(True)
-        self.entry.connect("activate", self.on_submit)
-        entry_row.pack_start(self.entry, True, True, 0)
-        submit = make_icon_button(
-            "mail-send-symbolic", "Submit AI preview request", self.on_submit
-        )
-        entry_row.pack_start(submit, False, False, 0)
-        panel.pack_start(entry_row, False, False, 0)
-
-        self.response = make_label(
-            "Preview only: the AI backend is not connected.",
-            "stub-text",
-            wrap=True,
-        )
-        panel.pack_start(self.response, False, False, 0)
-        return panel
 
     @staticmethod
     def build_weather_panel():
@@ -711,68 +487,9 @@ class DarkOSLeftPanels(Gtk.Window):
         panel.pack_start(self.network_label, False, False, 0)
         return panel
 
-    def on_submit(self, _widget):
-        request_text = self.entry.get_text().strip()
-        if not request_text:
-            return
-        self.entry.set_text("")
-        self.response.set_text(f"Preview request: {request_text}")
-        self.response.get_style_context().remove_class("stub-text")
-        add_class(self.response, "status-text")
-        self.waveform.set_active(True)
-        # Send to brain on a background thread so the UI stays responsive.
-        import threading as _threading
-        thread = _threading.Thread(
-            target=self._run_chat, args=(request_text,), daemon=True
-        )
-        thread.start()
-
-    def _run_chat(self, text):
-        """Background thread: brain call, results posted back to UI."""
-        from gi.repository import GLib
-        GLib.idle_add(self.application._set_orb_state, "thinking")
-        reply, action_summary = self.application.brain.process_chat(text)
-        if not reply:
-            GLib.idle_add(self._show_chat_error, "No response from AI.")
-            return
-        GLib.idle_add(self.application._set_orb_state, "speaking")
-        spoken = self.application.brain.speak(reply)
-        result = reply
-        if action_summary:
-            result += "\n\n" + action_summary
-        if not spoken:
-            result += "\n\nSpeech playback is unavailable."
-        GLib.idle_add(self.show_ai_response, text, result)
-        GLib.idle_add(
-            self.application._set_orb_state,
-            "sleeping" if spoken else "error",
-        )
-
-    def _show_chat_error(self, message):
-        self.response.set_text(message)
-        self.response.get_style_context().remove_class("status-text")
-        add_class(self.response, "stub-text")
-        self.waveform.set_active(False)
-        self.application._set_orb_state("error")
-
-    def show_ai_response(self, user_text, reply):
-        self.response.set_text(reply)
-        self.response.get_style_context().remove_class("stub-text")
-        add_class(self.response, "status-text")
-        self.waveform.set_active(False)
-        # Update the intro label to show the last user query
-        for child in self.get_children():
-            if isinstance(child, Gtk.Box):
-                for sub in child.get_children():
-                    if isinstance(sub, Gtk.Label) and "explore" in (sub.get_text() or ""):
-                        sub.set_text(f"DarkOS AI — last query: {user_text[:40]}")
-
-    def show_stub(self, message):
-        self.response.set_text(message)
-        self.response.get_style_context().remove_class("status-text")
-        add_class(self.response, "stub-text")
-
     def refresh_system(self):
+        if not self.get_visible():
+            return True  # hidden panel: skip sampling /proc and /sys
         self.gauges["CPU"].set_value(self.sampler.cpu_percent())
         self.gauges["GPU"].set_value(self.sampler.gpu_percent())
         self.gauges["RAM"].set_value(self.sampler.memory_percent())
@@ -1085,6 +802,8 @@ class DarkOSRightPanels(Gtk.Window):
 
     def refresh_media(self):
         """Timer tick (main thread) — kick off a background fetch, don't block."""
+        if not self.get_visible():
+            return True
         if not self._media_fetch_lock.acquire(blocking=False):
             return True  # previous fetch still running (slow player) — skip this tick
         threading.Thread(target=self._fetch_media, daemon=True).start()
@@ -1121,6 +840,8 @@ class DarkOSRightPanels(Gtk.Window):
 
     def refresh_media_position(self):
         """Poll play position and update the progress bar + time display."""
+        if not self.get_visible():
+            return True
         if not hasattr(self, "media_progress") or not self.media_active:
             return True  # must return truthy — this is also a repeating GLib timer
         if not self._position_fetch_lock.acquire(blocking=False):

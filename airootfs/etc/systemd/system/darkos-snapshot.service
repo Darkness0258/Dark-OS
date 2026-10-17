@@ -1,6 +1,7 @@
 [Unit]
 Description=DarkOS snapshot (BTRFS rollback for @ and @home)
 After=local-fs.target
+ConditionPathExists=!/run/archiso
 
 [Service]
 Type=oneshot
