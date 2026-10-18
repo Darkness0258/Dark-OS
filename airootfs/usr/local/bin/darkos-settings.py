@@ -57,6 +57,7 @@ CATEGORIES = [
     ("fonts", "Fonts", "font-x-generic-symbolic"),
     ("icons", "Icons", "preferences-desktop-icons-symbolic"),
     ("themes", "Themes", "preferences-desktop-theme-symbolic"),
+    ("wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic"),
     ("motion", "Motion", "preferences-desktop-accessibility-symbolic"),
     ("designer", "Designer", "applications-graphics-symbolic"),
     ("permissions", "Permissions", "security-high-symbolic"),
@@ -254,6 +255,7 @@ class SettingsWindow(Gtk.ApplicationWindow):
             "fonts": self._build_fonts_tab,
             "icons": self._build_icons_tab,
             "themes": self._build_themes_tab,
+            "wallpaper": self._build_wallpaper_tab,
             "motion": self._build_motion_tab,
             "designer": self._build_designer_tab,
             "permissions": self._build_permissions_tab,
@@ -388,6 +390,7 @@ class SettingsWindow(Gtk.ApplicationWindow):
         self.updates_view.set_editable(False)
         self.updates_view.set_monospace(True)
         scroller = Gtk.ScrolledWindow()
+        scroller.set_shadow_type(Gtk.ShadowType.IN)
         scroller.set_min_content_height(220)
         scroller.add(self.updates_view)
         box.pack_start(scroller, True, True, 0)
@@ -873,6 +876,98 @@ class SettingsWindow(Gtk.ApplicationWindow):
             int(rgba.red * 255), int(rgba.green * 255), int(rgba.blue * 255)
         )
         self._save("accent_color", hex_color)
+
+    # -- Wallpaper -----------------------------------------------------------
+    def _build_wallpaper_tab(self):
+        from darkos_shell import wallpapers
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.pack_start(section_label("Wallpaper"), False, False, 0)
+        self.wallpaper_status = Gtk.Label(xalign=0, wrap=True)
+        box.pack_start(self.wallpaper_status, False, False, 0)
+
+        # No inner ScrolledWindow: the page is already scrollable, and a nested
+        # fixed-height one clipped everything below the first row.
+        flow = Gtk.FlowBox()
+        flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        flow.set_halign(Gtk.Align.START)
+        flow.set_valign(Gtk.Align.START)
+        flow.set_homogeneous(True)
+        flow.set_min_children_per_line(1)
+        flow.set_max_children_per_line(3)
+        flow.set_column_spacing(12)
+        flow.set_row_spacing(12)
+        self.wallpaper_tiles = {}
+        for entry in wallpapers.catalog():
+            flow.add(self._wallpaper_tile(entry))
+        box.pack_start(flow, False, False, 0)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        chooser_btn = Gtk.Button(label="Choose image...")
+        add_class(chooser_btn, "icon-button")
+        chooser_btn.connect("clicked", self._choose_wallpaper)
+        row.pack_start(chooser_btn, False, False, 0)
+        default_btn = Gtk.Button(label="Use default")
+        add_class(default_btn, "icon-button")
+        default_btn.connect("clicked", lambda _b: self._set_wallpaper(""))
+        row.pack_start(default_btn, False, False, 0)
+        box.pack_start(row, False, False, 0)
+        self._refresh_wallpaper_status()
+        return box
+
+    def _wallpaper_tile(self, entry):
+        button = Gtk.Button()
+        button.set_relief(Gtk.ReliefStyle.NONE)
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        try:
+            inner.pack_start(Gtk.Image.new_from_pixbuf(
+                GdkPixbuf.Pixbuf.new_from_file_at_scale(entry["thumb"], 256, 144, True)),
+                False, False, 0)
+        except GLib.Error:
+            inner.pack_start(Gtk.Image.new_from_icon_name("image-missing", Gtk.IconSize.DIALOG),
+                             False, False, 0)
+        label = Gtk.Label(label=entry["name"])
+        inner.pack_start(label, False, False, 0)
+        button.add(inner)
+        button.connect("clicked", lambda _b, p=entry["path"]: self._set_wallpaper(p))
+        self.wallpaper_tiles[entry["path"]] = (label, entry["name"])
+        return button
+
+    def _refresh_wallpaper_status(self):
+        from darkos_shell import wallpapers
+        chosen = self.settings.get("wallpaper_path") or ""
+        shown = wallpapers.resolve(chosen)
+        for path, (label, name) in self.wallpaper_tiles.items():
+            label.set_text(f"{name} (current)" if path == shown else name)
+        if shown is None:
+            text = "No wallpaper image found; using a plain dark background."
+        elif shown == wallpapers.default_path() and not chosen:
+            text = "Using the default wallpaper."
+        else:
+            text = f"Using {os.path.basename(shown)}."
+        self.wallpaper_status.set_text(text)
+
+    def _set_wallpaper(self, path):
+        self._save("wallpaper_path", path)
+        try:
+            subprocess.Popen(["python", "/usr/local/bin/darkos-window-fx.py", "--wallpaper-apply"])
+        except OSError:
+            pass  # no swaybg/compositor here (CI); real on the target system
+        self._refresh_wallpaper_status()
+
+    def _choose_wallpaper(self, *_):
+        chooser = Gtk.FileChooserDialog(title="Choose wallpaper", transient_for=self,
+                                        action=Gtk.FileChooserAction.OPEN)
+        chooser.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Select", Gtk.ResponseType.OK)
+        img_filter = Gtk.FileFilter()
+        img_filter.set_name("Images")
+        for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+            img_filter.add_pattern(pattern)
+        chooser.add_filter(img_filter)
+        if chooser.run() == Gtk.ResponseType.OK:
+            path = chooser.get_filename()
+            if path:
+                self._set_wallpaper(path)
+        chooser.destroy()
 
     # -- Motion ----------------------------------------------------------------
     def _build_motion_tab(self):

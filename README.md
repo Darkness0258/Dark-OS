@@ -119,7 +119,7 @@ has SHA-256 `CEB95BACC1AC69C783A89CB411239CBDD7AB278FEF3C83A8A09206E0CE032B25`.
 The shipped Phase 2 login stack and shell chrome were validated on a fresh erase-disk UEFI installation in VMware Workstation.
 
 1. **Plymouth Boot Splash**: The DarkOS `CONTROL EVERYTHING` boot animation loads cleanly during initramfs kernel execution.
-2. **ReGreet Login Display Manager**: The `greetd` + `cage` + `regreet` stack starts on boot with a plain dark background, session selector (Hyprland), and user authentication.
+2. **ReGreet Login Display Manager**: The `greetd` + `cage` + `regreet` stack starts on boot with the default DarkOS wallpaper, session selector (Hyprland), and user authentication.
 3. **Desktop Shell Chrome**: Post-login Hyprland launches the verified shell surface:
    - **Top Bar & Left Rail**: Status indicators, workspace switcher, and quick launcher rail.
    - **System Gauges**: live CPU, RAM, and Disk telemetry gauges in the left panel.
@@ -181,7 +181,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 
 - A single GTK3 + gtk-layer-shell shell process draws the dock, rail and panels
 - Hosted apps (browser, media player, containers) are never modified — visual consistency comes from Hyprland's compositor-level decorations
-- The AI assistant (Iras), the HUD and the wallpaper were removed on 2026-10-17; the desktop is a solid colour and nothing in the session polls for AI context
+- The AI assistant (Iras) and the HUD were removed on 2026-10-17, and nothing in the session polls for AI context. Nine wallpapers ship in `/usr/share/backgrounds/darkos/` (default: Midnight Silk); Settings > Wallpaper switches between them or takes your own image
 
 ## Roadmap
 

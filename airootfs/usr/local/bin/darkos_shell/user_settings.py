@@ -17,6 +17,7 @@ DEFAULTS = {
     "corner_radius": 16,
     "reduce_motion": False,
     "icon_theme": "",
+    "wallpaper_path": "",
     "gtk_font": "",
     "a11y_speech": False,
     "a11y_captions": False,

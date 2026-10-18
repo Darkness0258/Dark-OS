@@ -242,8 +242,92 @@ class UpdateParsingTests(unittest.TestCase):
         del spec
 
 
+class WallpaperTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from darkos_shell import wallpapers
+        cls.w = wallpapers
+        cls.bg = ROOT / "airootfs/usr/share/backgrounds/darkos"
+
+    def test_catalog_has_nine_real_images_with_thumbnails(self):
+        from PIL import Image
+        entries = self.w.catalog(str(self.bg))
+        self.assertEqual(len(entries), 9)
+        self.assertEqual(len({e["id"] for e in entries}), 9)
+        for e in entries:
+            with Image.open(e["path"]) as im:
+                self.assertEqual(im.format, "JPEG", e["path"])
+                self.assertGreaterEqual(im.size[0], 1920, e["path"])
+            with Image.open(e["thumb"]) as th:
+                self.assertLessEqual(th.size[0], 320, e["thumb"])
+        files = {p.name for p in self.bg.glob("*.jpg")}
+        self.assertEqual(files, {Path(e["path"]).name for e in entries},
+                         "every shipped jpg must be in the catalogue (and vice versa)")
+
+    def test_default_exists_and_is_used_by_greeter_and_lock_screen(self):
+        default = Path(self.w.default_path(str(self.bg)))
+        self.assertTrue(default.is_file())
+        shipped = "/usr/share/backgrounds/darkos/" + self.w.DEFAULT_FILE
+        self.assertIn(shipped, (ROOT / "airootfs/etc/greetd/regreet.toml").read_text())
+        self.assertIn(shipped, (ROOT / "airootfs/etc/xdg/hypr/hyprlock.conf").read_text())
+        self.assertIn("swaybg", (ROOT / "packages.x86_64").read_text().split())
+
+    def test_resolve_prefers_valid_choice_then_default_then_none(self):
+        d = str(self.bg)
+        pick = str(self.bg / "05-amber-flow.jpg")
+        self.assertEqual(self.w.resolve(pick, d), pick)
+        default = self.w.default_path(d)
+        for bad in ("", None, "relative/x.jpg", "/nonexistent/x.jpg", "/etc/passwd",
+                    str(self.bg / "thumbs")):
+            self.assertEqual(self.w.resolve(bad, d), default, repr(bad))
+        with tempfile.TemporaryDirectory() as empty:
+            self.assertIsNone(self.w.resolve("", empty))
+
+    def test_apply_starts_new_swaybg_before_stopping_old(self):
+        events = []
+        run = lambda argv, **_k: subprocess.CompletedProcess(argv, 0, "111 222\n", "")
+        popen = lambda argv, **_k: events.append(("start", argv))
+        kill = lambda pid, sig: events.append(("kill", pid))
+        pick = str(self.bg / "03-green-glass.jpg")
+        started, resolved = self.w.apply(pick, str(self.bg), run=run, popen=popen,
+                                         sleep=lambda _s: events.append(("wait",)),
+                                         which=lambda _n: "/usr/bin/swaybg", kill=kill)
+        self.assertTrue(started)
+        self.assertEqual(resolved, pick)
+        self.assertEqual([e[0] for e in events], ["start", "wait", "kill", "kill"])
+        self.assertEqual(events[0][1][:3], ["swaybg", "-i", pick])
+        self.assertIn("fill", events[0][1])
+        self.assertEqual([e[1] for e in events if e[0] == "kill"], [111, 222])
+
+    def test_apply_without_image_uses_plain_colour_and_without_swaybg_reports_it(self):
+        events = []
+        with tempfile.TemporaryDirectory() as empty:
+            started, resolved = self.w.apply("", empty,
+                run=lambda a, **_k: subprocess.CompletedProcess(a, 1, "", ""),
+                popen=lambda a, **_k: events.append(a), sleep=lambda _s: None,
+                which=lambda _n: "/usr/bin/swaybg")
+        self.assertEqual((started, resolved), (True, None))
+        self.assertEqual(events[0], ["swaybg", "-c", self.w.FALLBACK_COLOR])
+        self.assertEqual(self.w.apply("", which=lambda _n: None), (False, None))
+
+    def test_window_fx_commands(self):
+        calls = []
+        fx._notify = Mock()
+        rc = fx.run_wallpaper_apply({"wallpaper_path": "/x.jpg"},
+                                    apply=lambda p: calls.append(p) or (True, None))
+        self.assertEqual((rc, calls), (0, ["/x.jpg"]))
+        self.assertEqual(fx.run_wallpaper_apply({}, apply=lambda p: (False, None)), 1)
+        self.assertEqual(fx.run_wallpaper_apply({"wallpaper_path": ""},
+                                                apply=lambda p: calls.append(p) or (True, None)), 0)
+        self.assertEqual(calls[-1], "")
+
+    def test_fallback_colour_matches_hyprland_background(self):
+        conf = (ROOT / "airootfs/etc/xdg/hypr/hyprland.conf").read_text()
+        self.assertIn("background_color = rgb(%s)" % self.w.FALLBACK_COLOR.lstrip("#"), conf)
+
+
 class RemovalTests(unittest.TestCase):
-    """The AI assistant and wallpaper are gone and must stay gone."""
+    """The AI assistant and the old generated wallpaper are gone and must stay gone."""
 
     def test_ai_and_wallpaper_files_removed(self):
         for rel in ("airootfs/usr/local/bin/darkos_shell/ai_brain.py",
@@ -258,7 +342,8 @@ class RemovalTests(unittest.TestCase):
 
     def test_no_references_remain_in_runtime_config(self):
         banned = ("ai_brain", "assistant_trigger", "ActionDispatcher", "AI_ASSISTANT",
-                  "--ptt-", "--toggle-ai", "swaybg", "darkos-wallpaper", "darkosapikeys")
+                  "--ptt-", "--toggle-ai", "darkos-wallpaper.png", "generate-wallpaper",
+                  "darkosapikeys", "hyprctl hyprpaper")
         roots = [ROOT / "airootfs", ROOT / "build-iso.sh", ROOT / "profiledef.sh",
                  ROOT / "packages.x86_64"]
         offenders = []
@@ -276,8 +361,8 @@ class RemovalTests(unittest.TestCase):
 
     def test_hyprland_conf_shape(self):
         conf = (ROOT / "airootfs/etc/xdg/hypr/hyprland.conf").read_text()
-        self.assertNotIn("swaybg", conf)
-        self.assertIn("background_color = rgb(0d0f12)", conf)
+        self.assertIn("background_color = rgb(0d0f12)", conf)  # fallback colour
+        self.assertIn("darkos-window-fx.py --wallpaper-apply", conf)
         self.assertTrue(conf.rstrip().splitlines()[-1].startswith("source = ~/.config/hypr/conf.d/perf-auto.conf"),
                         "perf-auto.conf must be the last line so Lite wins")
         binds = [l for l in conf.splitlines() if l.startswith(("bind", "bindel", "bindl", "bindm"))]

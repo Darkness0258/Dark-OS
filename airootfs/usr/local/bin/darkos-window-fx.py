@@ -46,6 +46,13 @@ without GTK or a compositor; GTK/wofi are presentation only.
     --screen-reader {on,off}
         Start / stop the Orca screen reader (uses the eSpeak NG voice).
 
+    --wallpaper-apply
+        (Re)start swaybg with the wallpaper chosen in Settings (settings.json
+        "wallpaper_path"; empty = the default). Runs at every login.
+
+    --wallpaper-path
+        Print the image path that would be shown (empty if none).
+
     --a11y-apply
         Session-start: read settings.json and apply saved magnifier and
         screen-reader state.
@@ -85,7 +92,7 @@ ZOOM_ON = 2.0
 
 SETTINGS_CATALOG = (
     ("system", "System", "About this PC, CPU, memory, kernel"),
-    ("performance", "Performance", "Power profile, performance, balanced, power saver"),
+    ("performance", "Performance", "Power profile, desktop effects, lite, full, renderer, performance, power saver"),
     ("config", "Config", "Hyprland and session configuration"),
     ("devices", "Devices", "Disks, peripherals"),
     ("users", "Users", "Accounts and login"),
@@ -95,7 +102,9 @@ SETTINGS_CATALOG = (
     ("fonts", "Fonts", "GTK font"),
     ("icons", "Icons", "Icon theme"),
     ("themes", "Themes", "Accent color, appearance"),
+    ("wallpaper", "Wallpaper", "Desktop background"),
     ("motion", "Motion", "Reduce motion, animations"),
+    ("updates", "Updates", "Check and install system updates"),
     ("designer", "Designer", "Corner radius, dock position, dock size"),
     ("permissions", "Permissions", "App permissions"),
     ("accessibility", "Accessibility", "Magnifier, high contrast, captions, sticky keys"),
@@ -1104,6 +1113,27 @@ def run_a11y_apply(settings=None, screen_reader=None):
     return apply_zoom(ZOOM_MIN)
 
 
+# -- Wallpaper ----------------------------------------------------------------
+
+def run_wallpaper_apply(settings=None, apply=None):
+    """Apply the saved wallpaper. 0 = swaybg started, 1 = swaybg missing."""
+    from darkos_shell import wallpapers
+    settings = load_user_settings() if settings is None else settings
+    apply = apply or wallpapers.apply
+    started, _resolved = apply(settings.get("wallpaper_path") or "")
+    if not started:
+        _notify("Wallpaper unavailable", "swaybg is not installed.")
+        return 1
+    return 0
+
+
+def run_wallpaper_path(settings=None):
+    from darkos_shell import wallpapers
+    settings = load_user_settings() if settings is None else settings
+    print(wallpapers.resolve(settings.get("wallpaper_path") or "") or "")
+    return 0
+
+
 # -- Screen reader (Orca) ---------------------------------------------------
 
 def run_screen_reader(action, run=None, popen=None, which=None):
@@ -1313,6 +1343,10 @@ def main():
         return run_snap_picker()
     if "--a11y-apply" in argv:
         return run_a11y_apply()
+    if "--wallpaper-apply" in argv:
+        return run_wallpaper_apply()
+    if "--wallpaper-path" in argv:
+        return run_wallpaper_path()
     if "--snip-annotate" in argv:
         return run_snip(region=True, settle=_delay_arg(argv), annotate=True)
     if "--pip" in argv:
@@ -1344,7 +1378,8 @@ def main():
         f"--snap-picker | --snap {{{','.join(SNAP_SIDES)}}} | "
         f"--zoom {{in,out,reset,on,off,toggle}} | --snip [--delay N] | "
         f"--snip-screen [--delay N] | --snip-annotate | --pip | "
-        f"--screen-reader {{on,off}} | --a11y-apply",
+        f"--screen-reader {{on,off}} | --wallpaper-apply | --wallpaper-path | "
+        f"--a11y-apply",
         file=sys.stderr,
     )
     return 2

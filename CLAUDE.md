@@ -219,3 +219,12 @@ Visual design tokens live in `ui-tokens.md`, layout/motion rules in `ui-rules.md
 ## Phased Roadmap
 
 Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 (core shell chrome: top bar, dock, rail, side panels, lock screen, login, boot animation) is complete and VM-verified. Phase 3 (AI assistant: STT/TTS/brain, OS control, AT-SPI, push-to-talk, snapshots, Command Center) is core-wired and runtime-verified via SSH + VMware. Phases 4-8 cover daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.
+
+## Wallpapers and desktop effects (added 2026-10-17)
+
+- **Wallpapers.** Nine JPEGs plus 320x180 thumbnails live in `airootfs/usr/share/backgrounds/darkos/`; `darkos_shell/wallpapers.py` is the catalogue (`CATALOG`, `DEFAULT_FILE`) and the only code that starts `swaybg`. `darkos-window-fx.py --wallpaper-apply` runs from `hyprland.conf` at login and from Settings > Wallpaper. The greeter (`regreet.toml`) and lock screen (`hyprlock.conf`) use the default image. To add a wallpaper: add the JPEG and a thumbnail, add a `CATALOG` row, and add both paths to `wallpaper_assets` in `ci/verify-iso.sh` (`ci/test-polish.py` fails if a shipped JPEG is missing from the catalogue).
+- **Fallback colour.** `wallpapers.FALLBACK_COLOR` must equal `misc:background_color` in `hyprland.conf` (a test checks this).
+- **Effects profile.** `darkos-perf-apply` writes `~/.config/hypr/conf.d/perf-auto.conf` (Lite or Full); `hyprland.conf` sources it as its LAST line so Lite's overrides win. Settings > Performance writes `effects` and `renderer` to `settings.json`.
+- **Nothing blocks the GTK main thread.** The dock polls `hyprctl` on a worker thread, and hidden panels do not poll. Keep it that way; new periodic work needs the same.
+- **Adding a file** still means registering it in `build-iso.sh`, `profiledef.sh` and `ci/verify-iso.sh`.
+

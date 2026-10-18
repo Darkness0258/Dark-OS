@@ -234,6 +234,15 @@ CSS_STYLE = f"""
     border-color: {COLOR_PRIMARY};
 }}
 
+.action-button:disabled, .icon-button:disabled {{
+    opacity: 0.4;
+}}
+
+textview, textview text {{
+    background-color: alpha({COLOR_BG}, 0.64);
+    color: {COLOR_TEXT};
+}}
+
 .toggle-button {{
     background-color: alpha({COLOR_TEXT}, 0.06);
     background-image: none;
@@ -563,6 +572,49 @@ calendar:selected {{
 calendar.view {{
     background-color: {COLOR_BG_ALT};
     color: {COLOR_TEXT};
+}}
+
+/* Drop-downs (Gtk.ComboBoxText) and their pop-up menus. Without these the
+   GTK default light theme shows through under the light global text colour,
+   leaving the selected value unreadable. */
+combobox button, combobox button.combo {{
+    background-color: alpha({COLOR_BG}, 0.64);
+    background-image: none;
+    border: 1px solid alpha({COLOR_TEXT}, 0.18);
+    border-radius: {RADIUS_CONTROL}px;
+    box-shadow: none;
+    color: {COLOR_TEXT};
+    padding: {SPACE_SM}px {SPACE_MD}px;
+    text-shadow: none;
+}}
+
+combobox button:hover {{
+    border-color: {COLOR_PRIMARY};
+}}
+
+combobox arrow {{
+    color: {COLOR_TEXT_MUTED};
+}}
+
+menu, .menu {{
+    background-color: {COLOR_BG_ELEVATED};
+    border: 1px solid alpha({COLOR_TEXT}, 0.14);
+    border-radius: {RADIUS_CONTROL}px;
+    color: {COLOR_TEXT};
+}}
+
+menuitem {{
+    background-color: transparent;
+    color: {COLOR_TEXT};
+    padding: {SPACE_SM}px {SPACE_MD}px;
+}}
+
+menuitem label {{
+    color: {COLOR_TEXT};
+}}
+
+menuitem:hover {{
+    background-color: alpha({COLOR_PRIMARY}, 0.18);
 }}
 """
 

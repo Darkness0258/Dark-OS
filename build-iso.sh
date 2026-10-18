@@ -139,6 +139,7 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
+    usr/local/bin/darkos_shell/wallpapers.py
 )
 
 # Library modules (not mode-755 executables) that must be byte-identical
@@ -154,6 +155,7 @@ readonly cmp_scripts=(
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
+    usr/local/bin/darkos_shell/wallpapers.py
 )
 
 readonly archiso_hook_packages=(

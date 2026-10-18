@@ -1,5 +1,9 @@
 skip_selection = false
 
+[background]
+path = "/usr/share/backgrounds/darkos/01-midnight-silk.jpg"
+fit = "Cover"
+
 [env]
 XDG_CURRENT_DESKTOP = "Hyprland"
 XDG_SESSION_DESKTOP = "Hyprland"

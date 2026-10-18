@@ -1,7 +1,10 @@
 # DarkOS Testing Manual
 
-Build under test: the 2026-10-17 change set (wallpaper removed, AI assistant
-removed, Lite/Full effects profile, new features, lag fixes).
+Build under test: the 2026-10-17/18 change set (AI assistant removed, nine
+wallpapers restored with a Settings picker, Lite/Full effects profile, new
+features, lag fixes). Follows section 7 of `darkos-update-plan.md`: run it on
+**both** the VMware VM and the laptop, and log the commit hash and
+`hyprctl version` for every run.
 
 ## 0. What was and was not verified before you got this
 
@@ -13,10 +16,17 @@ Verified in a Linux sandbox (Python/GTK/headless sway):
   `shellcheck` clean on `start-hyprland` and `darkos-perf-apply`.
 - The real shell starts under a headless Wayland compositor: dock with a clock
   in the centre, left rail, no HUD, no crash.
+- Real `swaybg` under headless sway: the default wallpaper appears, switching
+  to another one replaces it (one `swaybg` left running), and a bad path in
+  `settings.json` falls back to the default.
+- Screenshots of the Settings Wallpaper, Performance and Updates tabs were
+  checked by eye (this found and fixed three layout/legibility bugs).
 
 **NOT verified (needs you, on the ISO):** the ISO build itself, boot, login,
 Hyprland config parsing, every new keybind, Night Light, Focus, Orca, swappy,
-PiP, the Updates tab, and above all **whether the lag is actually fixed**.
+PiP, the Updates tab, the wallpaper on the real greeter and lock screen, and
+above all **whether the lag is actually fixed** (the working theory is that the
+AI assistant caused it; that is untested).
 Nothing here replaces testing on the VM.
 
 ## 1. Build
@@ -53,7 +63,7 @@ Run the whole manual twice if you can: once with 3D acceleration on, once off.
 |---|---|---|---|
 | 3.1 | Boot the ISO | Boot menu, then the Plymouth splash, then login | |
 | 3.2 | Note the time from boot menu to login prompt | Write it down: ____ s | |
-| 3.3 | Log in | Desktop is a **plain dark colour** (no wallpaper image) | |
+| 3.3 | Log in | Desktop shows the **Midnight Silk** wallpaper (dark blue silk waves); a plain dark colour (`#0d0f12`) for a moment first is normal | |
 | 3.4 | Look at the dock | Centre of the dock is a **clock**, not an orb | |
 | 3.5 | Look at the top centre | No HUD ring | |
 | 3.6 | Press `SUPER+SPACE` and `SUPER+A` | Nothing happens (assistant is gone) | |
@@ -68,8 +78,13 @@ never re-tested, so this is the first real test of that fix.
 Open the terminal (`SUPER+Return` or `SUPER+Q`) and run each block. Record the
 numbers; a "feels fast/slow" note is also useful.
 
+Run this section on **both** the VM and the laptop. The plan's effects names
+(Off / Balanced / Full) map to this build's **Lite** (about Off) and **Full**;
+there is no Balanced yet.
+
 ```bash
 # 4.1 Which effects profile and renderer are active?
+hyprctl version | head -3          # record this in every test log
 cat ~/.config/hypr/conf.d/perf-auto.conf
 echo "LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-unset}"
 systemd-detect-virt
@@ -137,8 +152,15 @@ default.
 | 5.12 | Volume/brightness/media keys | Press the keys (or on a laptop the Fn row) | Volume changes, brightness changes (not in most VMs), play/pause | |
 | 5.13 | Fullscreen / move window | `SUPER+F`; `SUPER+SHIFT+2` | Window fullscreens; window jumps to workspace 2 | |
 | 5.14 | Mouse move/resize | `SUPER`+left drag, `SUPER`+right drag | Window moves / resizes | |
-| 5.15 | Lock screen | `SUPER+L` | Solid dark lock screen with clock; unlocks with your password | |
-| 5.16 | Greeter | Reboot an installed system | Login screen on a plain dark background | |
+| 5.15 | Lock screen | `SUPER+L` | Lock screen shows the default (Midnight Silk) wallpaper with the clock; unlocks with your password | |
+| 5.16 | Greeter | Reboot an installed system | Login screen shows the default wallpaper | |
+| 5.17 | Wallpaper picker | Settings > Wallpaper, click "Alpine Arc" | Desktop changes within about a second with no flash of a plain colour; the tile now says "(current)" | |
+| 5.18 | Wallpaper persists | Log out and back in | Still Alpine Arc (not the default) | |
+| 5.19 | Own image | "Choose image...", pick any PNG/JPG/WebP | It becomes the wallpaper; after re-login it is still applied | |
+| 5.20 | Use default | "Use default" | Back to Midnight Silk | |
+| 5.21 | Bad path | Put `{"wallpaper_path": "/nonexistent.jpg"}` in `~/.config/darkos/settings.json`, log in again | Default wallpaper, no error dialog | |
+| 5.22 | Wallpaper cost | After 5.17 run `pgrep -a swaybg` and `ps -o rss,cmd -C swaybg` | Exactly one `swaybg`; note its memory | |
+| 5.23 | Dropdowns | Settings > Performance | Both dropdowns are readable (light text on a dark box) and their pop-up lists are dark | |
 
 If 5.12 does nothing in a VM, that is normal for brightness; check volume first.
 
@@ -181,7 +203,8 @@ Run this inside the VM and paste the output (or upload the file):
 
 ```bash
 {
-  echo "== version"; cat /etc/darkos-build-sha 2>/dev/null; uname -r
+  echo "== version"; cat /etc/darkos-build-sha 2>/dev/null; uname -r; hyprctl version | head -3
+  echo "== swaybg"; pgrep -a swaybg
   echo "== virt"; systemd-detect-virt
   echo "== perf-auto"; cat ~/.config/hypr/conf.d/perf-auto.conf
   echo "== settings"; cat ~/.config/darkos/settings.json
@@ -199,8 +222,13 @@ and a `source` line that I could not check against a real Hyprland.
 
 ## 10. Known gaps (not done in this pass)
 
+- The opt-in Store, generated colour palette/icon family/type scale, the shell
+  spike (GTK3 vs GTK4 vs Quickshell vs DankMaterialShell), Windows and Android
+  lanes: planned in `darkos-update-plan.md`, not built.
 - Drag-to-edge window snapping, a desktop widgets board, tabs in the file
   manager, multi-monitor dock placement: not built.
+- The lock screen and greeter always use the default wallpaper, not the one you
+  picked.
 - Cloud accounts/tiers: not built (needs real credentials and a backend).
 - Captions and sticky keys: not built (captions needed the removed speech
   pipeline).
@@ -210,3 +238,21 @@ and a `source` line that I could not check against a real Hyprland.
   VMware harness.
 - The installed-system checks (Btrfs snapshots, ClamAV, firewall) are
   unchanged and still unverified on real hardware.
+
+## 11. Results table (copy per run; plan v2 section 7)
+
+Commit: ________   `hyprctl version`: ________
+
+| Test | VM | Laptop | Notes |
+|---|---|---|---|
+| 1 Build (CI builds, `verify-iso.sh` passes) | | | |
+| 2 Fresh boot (time to desktop) | | | |
+| 3 Idle CPU, 60 s, Lite and Full | | | |
+| 4 Command Center open/close, CPU back to idle | | | |
+| 5 All apps open; titlebar buttons work | | | |
+| 6 Window tools: Alt+Tab, snap, overview, search, PiP | | | |
+| 7 Store | not built | not built | opt-in Store is plan phase C |
+| 8 Effects level and renderer (Settings > Performance) | | | |
+| 9 Wallpaper picker (5.17-5.22) | | | |
+| 10 Design check (3 screenshots) | | | needs the UI references |
+

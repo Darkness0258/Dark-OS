@@ -299,3 +299,29 @@ were not looked up).
 Deleted tests for removed code. **Not done:** ISO build/boot, Hyprland config
 parse of the new lines, any real-device check. Stale VMware harness files listed
 in TESTING-MANUAL.md section 10.
+
+## 2026-10-18 -- Wallpapers restored (nine images), plan v2 added
+
+**Restored:** wallpapers, now the nine images supplied by the user (default
+`01-midnight-silk.jpg`; thumbnails in `thumbs/`). `darkos_shell/wallpapers.py` owns the
+catalogue and starts `swaybg` (new one first, then stops the old, so switching never
+flashes); `darkos-window-fx.py --wallpaper-apply` runs at login; Settings > Wallpaper is a
+3x3 picker plus "Choose image..." and "Use default"; greeter and lock screen use the
+default. The old Settings chooser called `hyprctl hyprpaper` although the ISO used
+`swaybg`, so it never changed anything and was never applied at login; that is fixed.
+`swaybg` is back in `packages.x86_64`. The AI assistant stays removed.
+
+**Fixed while testing in a headless compositor:** the first wallpaper-grid layout clipped
+rows 2-5 (nested fixed-height scroller); dropdowns (`Gtk.ComboBoxText`) had no CSS and
+showed light text on a light background, including the existing power-profile dropdown;
+disabled buttons looked enabled. Added CSS for combobox, menu, disabled `.action-button`
+and `textview`.
+
+**Verified here:** 18/18 CI test files (32 in `ci/test-polish.py`); real `swaybg` under
+headless sway applies the default, switches wallpapers and falls back for bad paths;
+screenshots of the Wallpaper, Performance and Updates tabs. **Not verified:** ISO build,
+boot, Hyprland parsing of the new config lines, lag on the VM or laptop.
+
+**Plan:** `darkos-update-plan.md` (v2, supplied by the user) is now the working plan; a status
+section was appended to it. Companion files `darkos-reference-projects.md` and
+`darkos-stitch-prompts.md` were not supplied.

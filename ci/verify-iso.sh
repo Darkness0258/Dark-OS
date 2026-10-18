@@ -61,6 +61,27 @@ for relative in usr/bin/plymouthd \
     }
 done
 
+readonly wallpaper_assets=(
+    usr/share/backgrounds/darkos/01-midnight-silk.jpg
+    usr/share/backgrounds/darkos/02-alpine-arc.jpg
+    usr/share/backgrounds/darkos/03-green-glass.jpg
+    usr/share/backgrounds/darkos/04-earth-horizon.jpg
+    usr/share/backgrounds/darkos/05-amber-flow.jpg
+    usr/share/backgrounds/darkos/06-dusk-lake.jpg
+    usr/share/backgrounds/darkos/07-glass-orbits.jpg
+    usr/share/backgrounds/darkos/08-misty-valley.jpg
+    usr/share/backgrounds/darkos/09-crimson-flow.jpg
+    usr/share/backgrounds/darkos/thumbs/01-midnight-silk.jpg
+    usr/share/backgrounds/darkos/thumbs/02-alpine-arc.jpg
+    usr/share/backgrounds/darkos/thumbs/03-green-glass.jpg
+    usr/share/backgrounds/darkos/thumbs/04-earth-horizon.jpg
+    usr/share/backgrounds/darkos/thumbs/05-amber-flow.jpg
+    usr/share/backgrounds/darkos/thumbs/06-dusk-lake.jpg
+    usr/share/backgrounds/darkos/thumbs/07-glass-orbits.jpg
+    usr/share/backgrounds/darkos/thumbs/08-misty-valley.jpg
+    usr/share/backgrounds/darkos/thumbs/09-crimson-flow.jpg
+)
+
 readonly native_app_scripts=(
     usr/local/bin/darkos-backup.py
     usr/local/bin/darkos-calculator.py
@@ -189,6 +210,11 @@ payload=(
     usr/bin/btrfs
     usr/bin/espeak-ng
     usr/bin/pamixer
+    usr/bin/swaybg
+    usr/bin/hyprsunset
+    usr/bin/swappy
+    usr/bin/orca
+    usr/bin/checkupdates
     usr/bin/playerctl
     usr/bin/vmtoolsd
     "${phase5_executables[@]}"
@@ -212,6 +238,7 @@ payload=(
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
+    usr/local/bin/darkos_shell/wallpapers.py
     usr/local/bin/darkos-tool-groups
     usr/local/bin/darkos-tty1-login
     usr/local/bin/ensure-network
@@ -225,6 +252,7 @@ payload=(
     "${native_app_scripts[@]}"
     "${native_desktop_entries[@]}"
     etc/xdg/mimeapps.list
+    "${wallpaper_assets[@]}"
     usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
@@ -288,8 +316,10 @@ required_files=(
     usr/local/bin/darkos_shell/app_kit.py
     usr/local/bin/darkos_shell/shield.py
     usr/local/bin/darkos_shell/user_settings.py
+    usr/local/bin/darkos_shell/wallpapers.py
     "${native_desktop_entries[@]}"
     etc/xdg/mimeapps.list
+    "${wallpaper_assets[@]}"
     usr/share/icons/darkos/darkos.png
     usr/share/calamares/branding/darkos/icons/darkos.png
     usr/share/calamares/branding/darkos/stylesheet.qss
@@ -411,8 +441,8 @@ if greetd["default_session"].get("user") != "greeter":
     raise SystemExit("greetd does not run ReGreet as the greeter account")
 
 regreet = tomllib.loads((root / "etc/greetd/regreet.toml").read_text(encoding="utf-8"))
-if "background" in regreet:
-    raise SystemExit("ReGreet must use the plain solid background (no wallpaper image)")
+if regreet.get("background", {}).get("path") != "/usr/share/backgrounds/darkos/01-midnight-silk.jpg":
+    raise SystemExit("ReGreet does not use the default DarkOS wallpaper")
 
 greeter_avatar = (root / "var/lib/AccountsService/users/greeter").read_text(encoding="utf-8")
 if "Icon=/usr/share/icons/darkos/darkos.png" not in greeter_avatar:
@@ -565,6 +595,7 @@ readonly library_modules=(
     usr/local/bin/darkos_shell/surfaces.py
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
+    usr/local/bin/darkos_shell/wallpapers.py
 )
 for relative in "${scripts[@]}"; do
     path="$extracted/$relative"

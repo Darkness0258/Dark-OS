@@ -83,6 +83,7 @@ file_permissions=(
   ["/usr/local/bin/darkos_shell/system_sampler.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/tokens.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/user_settings.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/wallpapers.py"]="0:0:644"
   ["/usr/local/bin/darkos-installer"]="0:0:755"
   ["/usr/local/bin/darkos-lock"]="0:0:755"
   ["/usr/local/bin/start-hyprland"]="0:0:755"
