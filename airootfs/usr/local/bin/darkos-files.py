@@ -3,8 +3,8 @@
 
 Replaces the Phase 1 "ranger in a terminal" stopgap. Every control is a
 stock GTK3 widget (TreeView, ListBox, buttons) so AT-SPI can drive it
-generically, same reasoning as darkos-terminal.py — see architecture.md's
-"AI control mechanism".
+generically, same reasoning as darkos-terminal.py (AT-SPI, which screen readers and test
+tools use, can drive stock widgets).
 
 Archive scope (v1, deliberately not full in-archive navigation): double-
 click a .zip/.tar* to preview its file list and extract it; select files

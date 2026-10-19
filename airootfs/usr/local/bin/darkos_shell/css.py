@@ -210,7 +210,7 @@ CSS_STYLE = f"""
     padding: {SPACE_SM}px;
 }}
 
-.ai-entry, entry {{
+entry {{
     background-color: alpha({COLOR_BG}, 0.64);
     border: 1px solid alpha({COLOR_PRIMARY}, 0.40);
     border-radius: {RADIUS_CONTROL}px;

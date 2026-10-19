@@ -4,8 +4,8 @@
 Replaces the Phase 1 kitty wrapper. Real terminal emulation (PTY, ANSI,
 scrollback) is VTE's job; this file only owns DarkOS chrome — tabs, glass
 styling, keybinds. Every interactive control is a stock GTK3 widget (no
-custom Cairo-drawn buttons) so AT-SPI can walk it like any other app —
-see architecture.md's "AI control mechanism" section.
+custom Cairo-drawn buttons) so AT-SPI (screen readers, test tools) can walk it
+like any other app.
 
 CLI contract matches the old the-void.sh, so existing callers keep working:
     darkos-terminal.py                  -> interactive shell
