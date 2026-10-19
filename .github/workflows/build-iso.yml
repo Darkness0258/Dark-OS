@@ -69,9 +69,15 @@ jobs:
           python ci/test-native-storage.py
           python ci/test-shield.py
           python ci/test-window-fx.py
-          python ci/test-activity-detector.py
           xvfb-run -a dbus-run-session -- python ci/test-native-apps-linux.py
           xvfb-run -a dbus-run-session -- python ci/test-dock-layout.py
+          xvfb-run -a dbus-run-session -- python ci/test-continuous-protection.py
+          xvfb-run -a dbus-run-session -- python ci/test-security-ui.py
+          xvfb-run -a dbus-run-session -- python ci/test-polish.py
+          python ci/test-integrity-check.py
+          python ci/test-store-gated-install.py
+          python ci/test-store-gated-aur-install.py
+          python ci/test-ci-coverage.py
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
           set -euo pipefail
