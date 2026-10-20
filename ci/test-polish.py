@@ -349,7 +349,7 @@ class RemovalTests(unittest.TestCase):
     def test_no_references_remain_in_runtime_config(self):
         banned = ("ai_brain", "assistant_trigger", "ActionDispatcher", "AI_ASSISTANT",
                   "--ptt-", "--toggle-ai", "darkos-wallpaper.png", "generate-wallpaper",
-                  "darkosapikeys", "hyprctl hyprpaper", "ai-entry", "installer API keys",
+                  "darkosapikeys", "hyprctl hyprpaper", "ai-entry", "orb-button", "installer API keys",
                   ".config/darkos/env", "GROQ_API", "OPENROUTER_API")
         roots = [ROOT / "airootfs", ROOT / "build-iso.sh", ROOT / "profiledef.sh",
                  ROOT / "packages.x86_64"]

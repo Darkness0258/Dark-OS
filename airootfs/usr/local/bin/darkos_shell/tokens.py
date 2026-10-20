@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Design tokens mirroring ui-tokens.md.
+"""Design tokens: the source of truth for colors, spacing, radii and fonts.
 
 Both CSS hex strings and Cairo (r,g,b) tuples live here so no component
 hardcodes a value. Import this module, never copy a literal.

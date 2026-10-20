@@ -17,15 +17,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Many changes (GTK CSS, shell surface code, Waybar config, Hyprland config) can be iterated on directly inside a running VM:
 
-- **Shell CSS or panel layout:** edit `airootfs/usr/local/bin/darkos-shell.py` in the source checkout, then restart the shell inside the VM with `python /usr/local/bin/darkos-shell.py --toggle-hud` followed by `killall darkos-shell.py` and `python /usr/local/bin/darkos-shell.py &` (or log out/in). The build's byte-identical check will catch any unintended edits when you eventually run `build-iso.sh`.
+- **Shell CSS or panel layout:** edit `airootfs/usr/local/bin/darkos-shell.py` in the source checkout, then restart the shell inside the VM with `pkill -f darkos-shell.py` and then `python /usr/local/bin/darkos-shell.py &` (or log out/in). The build's byte-identical check will catch any unintended edits when you eventually run `build-iso.sh`.
 - **Waybar config/CSS:** edit files under `airootfs/etc/xdg/waybar/`, then `killall waybar && waybar &`.
 - **Hyprland config:** edit `airootfs/etc/xdg/hypr/hyprland.conf`, then `hyprctl reload`.
 
 Run the full build only when you need to verify packaging, permissions, symlinks, and the Calamares build all still pass.
 
-### Live-testing helpers in `out/`
+### Live-testing helpers
 
-The `out/` directory holds ~14 VM helper scripts for Phase 2 iteration: hot-reload (shell/Waybar/Hyprland), audit (surface inventory), lock probe (hyprlock state), waybar reload, smoke test (post-login surface check), and others. Use these inside a running VM to iterate without rebuilding.
+No VM helper scripts are kept in the repository. `out/` is build output; any scripts found there are local to one developer machine and unverified.
 
 ## Validation
 
@@ -70,13 +70,13 @@ This repo is developed on a Windows host with `core.autocrlf=true`. All shell sc
 
 At build time, mkarchiso copies releng profile defaults into `airootfs/`. Do **not** commit conflicting base files (e.g. `airootfs/etc/passwd` from releng) that would break releng seeding — keep only the project's additions and overrides in `airootfs/`.
 
-## Use the `darkos-build` Skill
+## Changing build inputs
 
-For any change touching `build-iso.sh`, `ci/verify-iso.sh`, `ci/build-calamares.sh`, `profiledef.sh`, `packages.x86_64`, `pacman.conf`, or any file under `airootfs/`, invoke the `darkos-build` skill. It documents the exact enforcement points for new runtime scripts and prevents tripping build-time checks.
+For any change touching `build-iso.sh`, `ci/verify-iso.sh`, `ci/build-calamares.sh`, `profiledef.sh`, `packages.x86_64`, `pacman.conf`, or any file under `airootfs/`, follow the enforcement-point rules in this file (the `darkos-build` skill that used to document them is not in the repository) and run every test the workflow runs before pushing.
 
 ## Project Structure
 
-DarkOS is an ArchISO profile for an Arch Linux respin (the AI assistant was removed 2026-10-17). The live ISO payload lives under `airootfs/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`. Generated ISOs go to `out/`, which also holds ~14 live-testing helper scripts (hot-reload, audit, lock probes, waybar reload, smoke tests) used during Phase 2 development inside a running VM.
+DarkOS is an ArchISO profile for an Arch Linux respin (the AI assistant was removed 2026-10-17). The live ISO payload lives under `airootfs/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`. Generated ISOs go to `out/`.
 
 Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in `airootfs/usr/share/applications/` (`darkos-installer`, `the-void`, `darkos-tool-groups`), Hyprland/Waybar config in `airootfs/etc/xdg/`, Calamares modules in `airootfs/etc/calamares/`, and systemd enablement in `airootfs/etc/systemd/system/`.
 
@@ -102,11 +102,11 @@ Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in 
 
 ### Shell surface (Phase 2)
 
-The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) owned by a single `Gtk.Application` instance. A fresh instance is created on the first `activate()` call; subsequent calls return immediately — this is why command-line flags like `--toggle-hud` work on an already-running process. The application owns shared toggle state (`wifi`, `bluetooth`, `dark_mode`, `night_light`, `focus`, `airplane`) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
+The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) owned by a single `Gtk.Application` instance. A fresh instance is created on the first `activate()` call; subsequent calls return immediately — this is why command-line flags like `--toggle-command-center` work on an already-running process. The application owns shared toggle state (`wifi`, `bluetooth`, `dark_mode`, `night_light`, `focus`, `airplane`) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
 
 Four independent layer-shell windows are anchored separately to compositor edges:
 
-- `darkos-dock` — floating bottom dock (Files, Terminal, Browser, live clock, Notes, Store, Settings, Logout via wlogout). Exclusive zone 82px.
+- `darkos-dock` — floating bottom dock (Files, Terminal, Browser, live clock, Notes, Store, Settings, Logout via wlogout). Exclusive zone is computed from the measured dock thickness (`tokens.dock_exclusive_zone`).
 - `darkos-rail` — left-side vertical icon rail (10 actions: Search, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming).
 - `darkos-left` — left-of-center panels (weather stub, system overview with live CPU/GPU/RAM/Disk gauges). Refreshes every 2s via `SystemSampler` reading `/proc/stat`, `/proc/meminfo`, `/sys/class/drm`, and `/proc/net/dev`.
 - `darkos-right` — right-of-center panels (notifications, connectivity toggles, media widget reading `playerctl`, calendar).
@@ -165,7 +165,7 @@ Every script in the `runtime_scripts` list must be:
 - Byte-identical between `airootfs/` source and the packaged squashfs (`cmp -s`).
 - Listed in `bash_scripts` if it's a shell script (passes `bash -n`), or `python_scripts` if it's Python (passes `python -m py_compile`).
 
-When adding a new runtime script, you must update **all four** enforcement points: the source file itself, `profiledef.sh` `file_permissions`, `build-iso.sh` `runtime_scripts` + `bash_scripts`/`python_scripts`, and `ci/verify-iso.sh` `payload` + `scripts` arrays. The `.claude/skills/darkos-build/SKILL.md` skill documents the exact steps.
+When adding a new runtime script, you must update **all four** enforcement points: the source file itself, `profiledef.sh` `file_permissions`, `build-iso.sh` `runtime_scripts` + `bash_scripts`/`python_scripts`, and `ci/verify-iso.sh` `payload` + `scripts` arrays.
 
 ## Live ISO vs Installed System
 
@@ -192,7 +192,7 @@ Changes that work on bare metal may fail silently in VMware. Test inside the QEM
 
 ## Shell CSS and Design Tokens
 
-`darkos-shell.py` defines color constants in two forms: hex strings for CSS injection and `(r, g, b)` tuples for Cairo rendering. Both derive from `ui-tokens.md`. When changing a token, update both the hex constant and the Cairo tuple, and the corresponding CSS `alpha()` call if the alpha changes. The glow system uses three layered strokes (sharp core, mid glow, outer haze) — this applies to all Cairo-drawn elements (orb, radar, gauges). GTK widget glow uses CSS `box-shadow` with `alpha(color, 0.20)`.
+`darkos-shell.py` defines color constants in two forms: hex strings for CSS injection and `(r, g, b)` tuples for Cairo rendering. Both derive from `darkos_shell/tokens.py`, the source of truth. When changing a token, update both the hex constant and the Cairo tuple, and the corresponding CSS `alpha()` call if the alpha changes. The glow system uses three layered strokes (sharp core, mid glow, outer haze) — this applies to all Cairo-drawn elements (gauges). GTK widget glow uses CSS `box-shadow` with `alpha(color, 0.20)`.
 
 ## CI
 
@@ -210,15 +210,15 @@ GitHub Actions (`.github/workflows/build-iso.yml`) runs on every push to `main` 
 
 ## Design System Reference
 
-Visual design tokens live in `ui-tokens.md`, layout/motion rules in `ui-rules.md`, and a per-surface component inventory in `ui-registry.md`. All three describe the same Phase 2 shell; `ui-tokens.md` is the source of truth for color values, and `darkos-shell.py` must stay in sync with it.
+Visual design tokens live in `darkos_shell/tokens.py`, the source of truth; `css.py` and the Cairo drawing code derive from it. Design direction and rules are in `docs/MASTER-PLAN.md`.
 
 ## Multi-Agent Instructions
 
-`AGENTS.md` (root) and `.agents/AGENTS.md` contain workspace-level multi-agent session rules. Read them when spawning subagents or interpreting agent-framework directives in this repo.
+`AGENTS.md` (root) contains workspace-level multi-agent session rules. Comments in source files that cite `architecture.md`, `build-plan.md`, `ui-rules.md`, `ui-tokens.md` or `ui-registry.md` refer to documents deleted in commits 683bea4 and 75ebfa4; read them with `git show 683bea4~1:<name>` (they predate the 2026-10 changes). Read them when spawning subagents or interpreting agent-framework directives in this repo.
 
 ## Phased Roadmap
 
-Phase 1 (bootable Arch + Hyprland + BlackArch ISO) is complete and VM-verified. Phase 2 (core shell chrome: top bar, dock, rail, side panels, lock screen, login, boot animation) is complete and VM-verified. Phase 3 (AI assistant: STT/TTS/brain, OS control, AT-SPI, push-to-talk, snapshots, Command Center) is core-wired and runtime-verified via SSH + VMware. Phases 4-8 cover daily-use apps, system management, store/DevHub, hosted apps/gaming/mail, and distributability. Full details in `build-plan.md`.
+The AI assistant was removed on 2026-10-17 (and its leftovers on 2026-10-19). Earlier phase claims are historical records; what is currently verified is tracked in `docs/STATUS.md`, and the current phases (P0-P12) are in `docs/MASTER-PLAN.md`. Nothing has been boot-verified since the removal.
 
 ## Wallpapers and desktop effects (added 2026-10-17)
 

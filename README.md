@@ -15,9 +15,9 @@ DarkOS is a real startup product — not a demo, not a theme pack, not a Windows
 
 ## Features
 
-Current completion status: [through-Phase-7 audit](ci/phase-7-audit.md).
-Several Phase 5–7 requirements remain open; package declarations and GTK startup
-checks are not a claim of full daily-driver or hardware acceptance.
+Current status, with what is verified and what is not: [docs/STATUS.md](docs/STATUS.md).
+The working plan is [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md). Package declarations and
+GTK startup checks are not a claim of full daily-driver or hardware acceptance.
 
 - **Arch Linux under the hood** — rolling releases, pacman + AUR, full software ecosystem
 - **BlackArch layered in** — 2,900+ security tools available as opt-in groups at install time
@@ -153,11 +153,10 @@ The shipped Phase 2 login stack and shell chrome were validated on a fresh erase
 ├── pacman.conf                  # Repository configuration
 ├── profiledef.sh                # archiso profile metadata
 ├── build-iso.sh                 # Local build wrapper
-├── architecture.md              # Stack, app catalog, AI control design
-├── build-plan.md                # 9-phase phased roadmap
-├── project-overview.md          # Product vision and success criteria
-├── ui-tokens.md                 # Design tokens (colors, spacing, type)
-├── ui-rules.md                  # Layout and motion conventions
+├── docs/
+│   ├── MASTER-PLAN.md           # The plan: phases, decisions, test manual
+│   └── STATUS.md                # What is verified, what is not
+├── TESTING-MANUAL.md            # Per-pass feature checks (supplements the plan's manual)
 └── .github/workflows/build-iso.yml  # CI pipeline (GitHub Actions)
 ```
 
@@ -173,11 +172,11 @@ The shipped Phase 2 login stack and shell chrome were validated on a fresh erase
 | Display face | Space Grotesk | Headings, logo |
 | Corner radius | 16px | Panels, dialogs |
 
-Full specs in [ui-tokens.md](ui-tokens.md) and [ui-rules.md](ui-rules.md).
+Tokens live in [tokens.py](airootfs/usr/local/bin/darkos_shell/tokens.py); the design direction is in [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md).
 
 ## Architecture
 
-See [architecture.md](architecture.md) for the complete design. Key principles:
+See [CLAUDE.md](CLAUDE.md) for the build invariants and [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) for the plan. Key principles:
 
 - A single GTK3 + gtk-layer-shell shell process draws the dock, rail and panels
 - Hosted apps (browser, media player, containers) are never modified — visual consistency comes from Hyprland's compositor-level decorations
@@ -197,7 +196,7 @@ See [architecture.md](architecture.md) for the complete design. Key principles:
 | 8 | Distributable (real hardware, onboarding) |
 | 9 | DarkOS Cloud (accounts, tiers, opt-in services) |
 
-Full details in [build-plan.md](build-plan.md).
+The current phases are in [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md).
 
 ## Status
 
