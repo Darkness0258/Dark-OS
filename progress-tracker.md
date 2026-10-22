@@ -10,11 +10,9 @@ time than it saved. This file only carries forward from here.
 
 ## Current status
 
-- **AI assistant (Iras):** intentionally disabled — `AI_ASSISTANT_ENABLED = False`
-  in `darkos_shell/tokens.py`. Nothing was deleted; the HUD, dock orb, AI
-  chat card, push-to-talk, `ai_brain.py`, `assistant_trigger.py` are all
-  still in the tree, just unwired while it's off. Flip the flag back to
-  restore all of it in one line.
+- **AI assistant (Iras):** removed 2026-10-17; the leftovers (including a
+  re-add in `a08bc81`) were removed 2026-10-19. `ci/test-polish.py`
+  `RemovalTests` fails if any of it returns.
 - **Sandboxing (bubblewrap):** `darkos-sandbox-launch.py` exists and is
   hardened (binds `/etc`, gives a private tmpfs scratch `$HOME`) but is
   **not currently wired to any `.desktop` file** — Calculator/Reader/
@@ -37,8 +35,8 @@ time than it saved. This file only carries forward from here.
   maximize, Super+Ctrl+Down picker), and Hyprland cursor-zoom magnifier.
   Titlebar maximize hover opens a snap-layout popover. High-contrast lives
   in Settings → Accessibility and `css.py`. Not VM-verified this session.
-- **Dock:** center slot is the AI orb when the flag is on, a live clock
-  when it's off. Running-app indicator dots added under dock icons
+- **Dock:** center slot is a live clock (the AI orb went away with the
+  assistant). Running-app indicator dots added under dock icons
   (`hyprctl clients -j`, matched against each app's real `WM_CLASS`).
   Position (bottom/top/left/right) and size (compact/default/large) are
   settings (Settings → Designer) applied live: the shell watches
@@ -325,3 +323,17 @@ boot, Hyprland parsing of the new config lines, lag on the VM or laptop.
 **Plan:** `darkos-update-plan.md` (v2, supplied by the user) is now the working plan; a status
 section was appended to it. Companion files `darkos-reference-projects.md` and
 `darkos-stitch-prompts.md` were not supplied.
+
+## 2026-10-19 — P0 "repo truth" pass (plan: `docs/MASTER-PLAN.md`)
+
+**Done:** reverted `a08bc81` (it re-added 13 removed AI files; 12 byte-identical, the
+snapshot script had lost its exec bit); removed the leftovers it exposed (env loader in
+`start-hyprland`, AI-era VMware scripts, `.ai-entry`/`.orb-button` CSS, `kitty`); the
+workflow now runs every test and `ci/test-ci-coverage.py` fails if one is left out;
+fixed dangling doc references in README, CLAUDE.md, AGENTS.md; added `docs/STATUS.md`;
+replaced `darkos-update-plan.md` (v2) with `docs/MASTER-PLAN.md` (v5).
+
+**Verified here:** all `ci/test-*` files pass under xvfb in an Ubuntu 24.04 sandbox;
+actionlint clean; `start-hyprland` run against a stub Hyprland (old script exported
+`LD_PRELOAD` from the user env file, new one does not). **Not verified:** ISO build of
+this tree, boot, Hyprland config parsing, lag, install.

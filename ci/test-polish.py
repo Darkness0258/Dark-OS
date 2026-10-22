@@ -337,13 +337,20 @@ class RemovalTests(unittest.TestCase):
                     "airootfs/usr/local/bin/darkos-ai-snapshot",
                     "airootfs/usr/local/bin/generate-wallpaper.py",
                     "airootfs/usr/share/backgrounds/darkos/darkos-wallpaper.png",
+                    "airootfs/usr/local/bin/darkos_shell/darkos_cloud.py",
+                    "airootfs/etc/sudoers.d/darkos-ai-snapshot",
+                    "ci/test-activity-detector.py", "ci/test-phase3-linux.py",
+                    "ci/vm-verify-phase3.py", "ci/build-darkos-calamares-module.sh",
+                    "ci/vmware-phase3-guest.sh", "ci/vmware-calamares-atspi.py",
+                    "ci/vmware-installed-flow-guest.sh", "ci/run-vmware-test.ps1",
                     "calamares-modules"):
             self.assertFalse((ROOT / rel).exists(), rel)
 
     def test_no_references_remain_in_runtime_config(self):
         banned = ("ai_brain", "assistant_trigger", "ActionDispatcher", "AI_ASSISTANT",
                   "--ptt-", "--toggle-ai", "darkos-wallpaper.png", "generate-wallpaper",
-                  "darkosapikeys", "hyprctl hyprpaper")
+                  "darkosapikeys", "hyprctl hyprpaper", "ai-entry", "orb-button", "installer API keys",
+                  ".config/darkos/env", "GROQ_API", "OPENROUTER_API")
         roots = [ROOT / "airootfs", ROOT / "build-iso.sh", ROOT / "profiledef.sh",
                  ROOT / "packages.x86_64"]
         offenders = []

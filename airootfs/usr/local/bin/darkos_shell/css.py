@@ -107,7 +107,7 @@ CSS_STYLE = f"""
     padding: {SPACE_XS}px;
 }}
 
-.icon-button, .dock-icon-button, .orb-button {{
+.icon-button, .dock-icon-button {{
     background-color: transparent;
     background-image: none;
     border: 1px solid transparent;
@@ -118,7 +118,7 @@ CSS_STYLE = f"""
     text-shadow: none;
 }}
 
-.icon-button label, .dock-icon-button label, .orb-button label,
+.icon-button label, .dock-icon-button label,
 .action-button label, .toggle-button label {{
     color: inherit;
     font-family: Inter, "Noto Sans", sans-serif;
@@ -182,22 +182,14 @@ CSS_STYLE = f"""
     min-height: 4px;
 }}
 
-.orb-button {{
-    background-color: alpha({COLOR_BG}, 0.30);
-    border-color: alpha({COLOR_PRIMARY}, 0.42);
-    border-radius: 999px;
-    box-shadow: 0 0 16px alpha({COLOR_PRIMARY}, 0.30);
-    padding: {SPACE_XS}px;
-}}
-
-.icon-button:hover, .dock-icon-button:hover, .orb-button:hover {{
+.icon-button:hover, .dock-icon-button:hover {{
     background-color: alpha({COLOR_PRIMARY}, 0.14);
     border-color: alpha({COLOR_PRIMARY}, 0.35);
     box-shadow: 0 0 16px alpha({COLOR_PRIMARY}, 0.34);
     color: {COLOR_PRIMARY};
 }}
 
-.icon-button:focus, .dock-icon-button:focus, .orb-button:focus,
+.icon-button:focus, .dock-icon-button:focus,
 .action-button:focus, .toggle-button:focus, entry:focus {{
     border-color: {COLOR_TEXT};
     box-shadow: 0 0 0 2px alpha({COLOR_PRIMARY}, 0.65);
@@ -210,7 +202,7 @@ CSS_STYLE = f"""
     padding: {SPACE_SM}px;
 }}
 
-.ai-entry, entry {{
+entry {{
     background-color: alpha({COLOR_BG}, 0.64);
     border: 1px solid alpha({COLOR_PRIMARY}, 0.40);
     border-radius: {RADIUS_CONTROL}px;

@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-DarkOS is an ArchISO profile for an Arch Linux respin (the AI assistant was removed 2026-10-17). Root-level project docs describe product direction and design: `README.md`, `architecture.md`, `build-plan.md`, `project-overview.md`, `ui-rules.md`, and `ui-tokens.md`.
+DarkOS is an ArchISO profile for an Arch Linux respin (the AI assistant was removed 2026-10-17). Project docs: `README.md`, `CLAUDE.md`, `docs/MASTER-PLAN.md` (the plan) and `docs/STATUS.md` (what is verified and what is not).
 
 The live ISO payload lives under `airootfs/`. Runtime scripts belong in `airootfs/usr/local/bin/`, desktop launchers in `airootfs/usr/share/applications/`, Hyprland and Waybar config in `airootfs/etc/xdg/`, Calamares installer modules in `airootfs/etc/calamares/`, and systemd enablement under `airootfs/etc/systemd/system/`. Build inputs are `packages.x86_64`, `pacman.conf`, `profiledef.sh`, and `build-iso.sh`. CI helpers live in `ci/`; generated ISOs and split release artifacts go to `out/`.
 
@@ -20,7 +20,7 @@ Shell scripts use Bash with `set -Eeuo pipefail` for build and verification path
 
 ## Testing Guidelines
 
-There are no unit tests. Correctness is enforced through syntax checks, full ISO builds, and `ci/verify-iso.sh`. For changes under `airootfs/usr/local/bin/`, run the relevant `bash -n` or `python -m py_compile` check. For installer, package, permission, or boot payload changes, run a full `sudo bash build-iso.sh` and boot the resulting ISO in QEMU.
+Tests live in `ci/test-*.py` and `ci/test-*.sh`; the workflow runs every one (`ci/test-ci-coverage.py` fails if one is left out). Run one with `xvfb-run -a dbus-run-session -- python3 ci/test-NAME.py`. Add a test with every change and show it can fail. Beyond tests, correctness is enforced through syntax checks, full ISO builds, and `ci/verify-iso.sh`. For changes under `airootfs/usr/local/bin/`, run the relevant `bash -n` or `python -m py_compile` check. For installer, package, permission, or boot payload changes, run a full `sudo bash build-iso.sh` and boot the resulting ISO in QEMU.
 
 ## Commit & Pull Request Guidelines
 

@@ -2,9 +2,24 @@
 
 Build under test: the 2026-10-17/18 change set (AI assistant removed, nine
 wallpapers restored with a Settings picker, Lite/Full effects profile, new
-features, lag fixes). Follows section 7 of `darkos-update-plan.md`: run it on
-**both** the VMware VM and the laptop, and log the commit hash and
-`hyprctl version` for every run.
+features, lag fixes) as cleaned up by the 2026-10-19 P0 pass. This file lists
+feature checks; the boot-truth record to fill in is Appendix B of
+`docs/MASTER-PLAN.md`. Run on **both** the VMware VM and the laptop, and log
+the commit hash (`cat /etc/darkos-build-sha`) and `hyprctl version` every time.
+
+## 0b. Checks specific to the 2026-10-19 pass (do these first)
+
+Nothing below needs the desktop to be usable; run it in a terminal.
+
+| # | Command | Expected |
+|---|---|---|
+| 0b.1 | `cat /etc/darkos-build-sha` | first 8 characters of the commit you meant to test |
+| 0b.2 | `ls /usr/local/bin/darkos_shell/ai_brain.py` | "No such file or directory" |
+| 0b.3 | `ls /etc/sudoers.d/` | no `darkos-ai-snapshot` |
+| 0b.4 | `which kitty` | not found (it was removed with the AI test harness) |
+| 0b.5 | `ls /usr/share/backgrounds/darkos/` | nine `NN-name.jpg` files plus `thumbs`, no `darkos-wallpaper.png` |
+| 0b.6 | `grep -c darkos/env /usr/local/bin/start-hyprland` | `0` |
+| 0b.7 | `hyprctl configerrors` | empty. If not, send the output: it is the single most useful line |
 
 ## 0. What was and was not verified before you got this
 
@@ -30,6 +45,12 @@ AI assistant caused it; that is untested).
 Nothing here replaces testing on the VM.
 
 ## 1. Build
+
+Easiest: let CI build it. Push to `main`, wait for the green run, download the
+release parts (`darkos-iso-part-aa`, `-ab`, ...) and join them in `cmd`:
+`copy /b darkos-iso-part-aa + darkos-iso-part-ab darkos.iso` (add the third part
+if there is one). The release number must be higher than `v194`, which still
+has the AI files. To build on an Arch host instead:
 
 ```bash
 # Arch host / CI, repo root
@@ -193,7 +214,8 @@ If 5.12 does nothing in a VM, that is normal for brightness; check volume first.
 for t in ci/test-*.py; do xvfb-run -a dbus-run-session -- python3 "$t" || echo "FAILED $t"; done
 ```
 
-All should pass. Needed typelibs on Debian/Ubuntu: `gir1.2-gtk-3.0
+All should pass. The workflow runs the same files and `ci/test-ci-coverage.py`
+fails if one is left out. Needed typelibs on Debian/Ubuntu: `gir1.2-gtk-3.0
 gir1.2-gtklayershell-0.1 gir1.2-vte-2.91 gir1.2-gtksource-3.0
 gir1.2-poppler-0.18 python3-gi-cairo xvfb dbus-x11`.
 
@@ -224,7 +246,7 @@ and a `source` line that I could not check against a real Hyprland.
 
 - The opt-in Store, generated colour palette/icon family/type scale, the shell
   spike (GTK3 vs GTK4 vs Quickshell vs DankMaterialShell), Windows and Android
-  lanes: planned in `darkos-update-plan.md`, not built.
+  lanes: planned in `docs/MASTER-PLAN.md`, not built.
 - Drag-to-edge window snapping, a desktop widgets board, tabs in the file
   manager, multi-monitor dock placement: not built.
 - The lock screen and greeter always use the default wallpaper, not the one you
@@ -232,14 +254,12 @@ and a `source` line that I could not check against a real Hyprland.
 - Cloud accounts/tiers: not built (needs real credentials and a backend).
 - Captions and sticky keys: not built (captions needed the removed speech
   pipeline).
-- `ci/vmware-phase3-guest.sh`, `ci/vmware-calamares-atspi.py` and
-  `ci/run-vmware-test.ps1` still describe the old AI/API-key flow. They were
-  left alone and will report failures; rewrite or delete them before using the
-  VMware harness.
+- The VMware automation scripts that verified the removed assistant were deleted
+  (they are in history at `2b149a1`). A small new harness belongs in plan phase P1.
 - The installed-system checks (Btrfs snapshots, ClamAV, firewall) are
   unchanged and still unverified on real hardware.
 
-## 11. Results table (copy per run; plan v2 section 7)
+## 11. Results table (copy per run; plan Appendix B)
 
 Commit: ________   `hyprctl version`: ________
 
