@@ -30,8 +30,8 @@ from darkos_shell.tokens import DOCK_EDGE_MARGIN, dock_exclusive_zone  # noqa: E
 from darkos_shell.user_settings import DEFAULTS, save_settings, settings_path  # noqa: E402
 
 OUT_W, OUT_H = 1920, 1080
-# The icon rail: exclusive_zone 68 plus its 12px left margin (wlroots adds the margin).
-RAIL_RESERVED_LEFT = 68 + 12
+# There is no rail any more: the dock is the only surface that reserves space.
+RAIL_RESERVED_LEFT = 0
 SHOTS = os.environ.get("HEADLESS_SHOTS") or tempfile.mkdtemp(prefix="darkos-dock-")
 
 app = DarkOSApplication()

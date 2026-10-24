@@ -1,54 +1,89 @@
 #!/usr/bin/env python3
-"""Design tokens: the source of truth for colors, spacing, radii and fonts.
+"""Design tokens: the source of truth for colors, type, spacing, radii and motion.
 
+"Calm Dark" (docs/MASTER-PLAN.md section 5). Colours are *generated* by
+darkos_shell/palette.py from the accent seed, so the surfaces, the text
+colours and the accent text/label colours always meet the contrast rules.
 Both CSS hex strings and Cairo (r,g,b) tuples live here so no component
 hardcodes a value. Import this module, never copy a literal.
 
-Accent color, corner radius, and reduce-motion are user-configurable via
-Settings (darkos-settings.py) — see user_settings.py. They're read once at
-import time, so a change takes effect on the next shell restart.
+Accent color, corner radius, reduce-motion and high-contrast are
+user-configurable via Settings (darkos-settings.py) -- see user_settings.py.
+They're read once at import time, so a change takes effect on the next shell
+restart (the Settings page says so). Only the dock position/size are applied
+live.
+
+Old names (COLOR_BG, COLOR_BG_ALT, COLOR_PRIMARY, COLOR_SECONDARY ...) are kept
+as aliases so every app keeps working; new code should use the SURFACE_*,
+ACCENT and TEXT_* names.
 """
 from collections import namedtuple
 
+from darkos_shell import palette as _palette
 from darkos_shell.user_settings import CHOICES, load_settings
 
 _settings = load_settings()
 
-
-def _hex_to_rgb(hex_str):
-    hex_str = hex_str.lstrip("#")
-    return tuple(int(hex_str[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
-
+# ── Modes ────────────────────────────────────────────────────────────
+# REDUCE_MOTION is consulted by the animation call sites that have been
+# wired to check it; the shell itself no longer animates anything of its
+# own (motion budget: compositor animations only, see hyprland.conf).
+REDUCE_MOTION = bool(_settings.get("reduce_motion"))
+HIGH_CONTRAST = bool(_settings.get("high_contrast"))
 
 # ── Color ────────────────────────────────────────────────────────────
-COLOR_BG = "#000000"
-COLOR_BG_ALT = "#0d0f12"
-COLOR_BG_ELEVATED = "#16181c"
-COLOR_TEXT = "#f2f5f7"
-COLOR_TEXT_MUTED = "#9aa4ad"
-COLOR_PRIMARY = _settings.get("accent_color") or "#00e5ff"
-COLOR_SECONDARY = "#2d7bff"
-COLOR_ACCENT = "#a855f7"
-COLOR_WARNING = "#ff8a00"
-COLOR_DANGER = "#ff3b3b"
-COLOR_SUCCESS = "#22e07a"
-COLOR_BORDER = "#ffffff"
-
-CAIRO_PRIMARY = _hex_to_rgb(COLOR_PRIMARY)
-CAIRO_SECONDARY = (0.176, 0.482, 1.0)
-CAIRO_ACCENT = (0.659, 0.333, 0.969)
-CAIRO_TEXT = (0.949, 0.961, 0.969)
-CAIRO_MUTED = (0.604, 0.643, 0.678)
-CAIRO_DANGER = (1.0, 0.231, 0.231)
-
-# ── Glow ─────────────────────────────────────────────────────────────
-# Three strokes painted outside-in: outer haze, mid glow, sharp core.
-# Alpha decreases away from the source.
-GLOW_STROKES_OUTSIDE_IN = (
-    (10.0, 0.12),
-    (5.0, 0.40),
-    (2.0, 1.0),
+PALETTE = _palette.generate_palette(
+    _settings.get("accent_color") or "#00e5ff", high_contrast=HIGH_CONTRAST
 )
+
+# Three tonal surfaces. base = windows and page background, raised = cards,
+# sidebars, toolbars and title bars, overlay = menus, popovers, dialogs and
+# the dock.
+SURFACE_BASE = PALETTE["bg_base"]
+SURFACE_RAISED = PALETTE["bg_raised"]
+SURFACE_OVERLAY = PALETTE["bg_overlay"]
+
+TEXT = PALETTE["text"]
+TEXT_MUTED = PALETTE["text_muted"]
+TEXT_DISABLED = PALETTE["text_disabled"]
+BORDER_CONTROL = PALETTE["border_control"]  # >= 3:1 on every surface
+
+# One accent. ACCENT is for fills, the focus ring and the active item;
+# ACCENT_TEXT is the same hue adjusted to be readable as text; ON_ACCENT is
+# the label colour on a filled accent button.
+ACCENT = PALETTE["accent"]
+ACCENT_HOVER = PALETTE["accent_hover"]
+ACCENT_PRESSED = PALETTE["accent_pressed"]
+ACCENT_TEXT = PALETTE["accent_text"]
+ON_ACCENT = PALETTE["on_accent"]
+
+SUCCESS = PALETTE["success"]
+WARNING = PALETTE["warning"]
+DANGER = PALETTE["danger"]
+ON_DANGER = PALETTE["on_danger"]
+
+# Legacy names (aliases).
+COLOR_BG = SURFACE_BASE
+COLOR_BG_ALT = SURFACE_RAISED
+COLOR_BG_ELEVATED = SURFACE_OVERLAY
+COLOR_TEXT = TEXT
+COLOR_TEXT_MUTED = TEXT_MUTED
+COLOR_PRIMARY = ACCENT
+COLOR_SECONDARY = ACCENT  # one accent: the old blue and purple are gone
+COLOR_ACCENT = ACCENT
+COLOR_WARNING = WARNING
+COLOR_DANGER = DANGER
+COLOR_SUCCESS = SUCCESS
+COLOR_BORDER = BORDER_CONTROL
+
+CAIRO_PRIMARY = _palette.to_rgb_floats(ACCENT)
+CAIRO_SECONDARY = CAIRO_PRIMARY
+CAIRO_ACCENT = CAIRO_PRIMARY
+CAIRO_TEXT = _palette.to_rgb_floats(TEXT)
+CAIRO_MUTED = _palette.to_rgb_floats(TEXT_MUTED)
+CAIRO_DANGER = _palette.to_rgb_floats(DANGER)
+CAIRO_WARNING = _palette.to_rgb_floats(WARNING)
+CAIRO_BASE = _palette.to_rgb_floats(SURFACE_BASE)
 
 # ── Spacing ──────────────────────────────────────────────────────────
 SPACE_XS = 4
@@ -59,15 +94,16 @@ SPACE_XL = 48
 
 # ── Radius ───────────────────────────────────────────────────────────
 RADIUS_CONTROL = 8
-RADIUS_PANEL = int(_settings.get("corner_radius") or 16)
+RADIUS_PANEL = max(0, min(32, int(_settings.get("corner_radius") or 16)))
 RADIUS_DIALOG = 24
 
 # ── Motion ───────────────────────────────────────────────────────────
-# Consulted by animation call sites that have been wired to check it
-# (see surfaces.py's _HUDCanvas); not yet threaded through every animated
-# surface in the shell — a real incremental follow-up, not a silent gap.
-REDUCE_MOTION = bool(_settings.get("reduce_motion"))
-HIGH_CONTRAST = bool(_settings.get("high_contrast"))
+# Budget: compositor animations only, brief, never looping, nothing animates
+# while hidden. These are the targets hyprland.conf is tuned to (ms).
+MOTION_WINDOW_MS = 200
+MOTION_WORKSPACE_MS = 250
+MOTION_PANEL_MS = 200
+MOTION_HOVER_MS = 150
 
 # ── Dock ─────────────────────────────────────────────────────────────
 # Position and size are user settings (Settings > Designer). The geometry
@@ -120,7 +156,23 @@ def dock_exclusive_zone(layout, thickness):
 
 
 # ── Typography ───────────────────────────────────────────────────────
-FONT_BODY = "Inter, \"SF Pro Display\", sans-serif"
-FONT_HEADING = "\"Space Grotesk\", sans-serif"
-FONT_MONO = "\"JetBrains Mono\", \"Fira Code\", monospace"
+# One UI family (Inter ships in the package list; Space Grotesk never did, so
+# it silently fell back) and one mono family. The Nerd Font family name is
+# listed first because that is what ttf-jetbrains-mono-nerd registers.
+FONT_BODY = "Inter, \"Noto Sans\", sans-serif"
+FONT_HEADING = FONT_BODY
+FONT_MONO = "\"JetBrainsMono Nerd Font\", \"JetBrains Mono\", \"Fira Code\", monospace"
 
+# Type scale: caption / body / lead / title / display. CSS may only use these.
+FONT_SIZE_CAPTION = 12
+FONT_SIZE_BODY = 14
+FONT_SIZE_LEAD = 16
+FONT_SIZE_TITLE = 20
+FONT_SIZE_DISPLAY = 28
+TYPE_SCALE = (
+    FONT_SIZE_CAPTION,
+    FONT_SIZE_BODY,
+    FONT_SIZE_LEAD,
+    FONT_SIZE_TITLE,
+    FONT_SIZE_DISPLAY,
+)

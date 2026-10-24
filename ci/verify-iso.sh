@@ -460,7 +460,7 @@ hyprland_config="$extracted/etc/xdg/hypr/hyprland.conf"
 # shellcheck disable=SC2016 # $mainMod is literal Hyprland configuration.
 for setting in 'exec-once = hypridle' 'nm-applet --indicator' \
     'blueman-applet' 'bind = $mainMod, L, exec, loginctl lock-session' \
-    'match:namespace ^(waybar|darkos-(dock|rail|left|right))$' \
+    'match:namespace ^(darkos-dock)$' \
     'blur on' 'ignore_alpha 0.08'; do
     grep -Fq "$setting" "$hyprland_config" || {
         printf 'Hyprland shell configuration is missing: %s\n' "$setting" >&2
@@ -880,22 +880,27 @@ grep -Fq '  - name: greetd' "$services_config" || {
 shell_source="$extracted/usr/local/bin/darkos-shell.py"
 shell_pkg="$extracted/usr/local/bin/darkos_shell"
 # Overlays tuple is defined in darkos_shell/__init__.py (DarkOSApplication)
-grep -Fq 'overlays = (self.dock, self.rail, self.left, self.right)' \
+grep -Fq 'overlays = (self.dock, self.center)' \
     "$shell_pkg/__init__.py" "$shell_source" || {
     printf 'DarkOS shell does not hide every overlay during installation\n' >&2
     exit 1
 }
-for component in 'class DarkOSIconRail' 'class DarkOSLeftPanels' \
-    'class DarkOSRightPanels' 'class RingGauge'; do
+for component in 'class DarkOSDockWindow' 'class DarkOSCommandCenter' \
+    'class ResourceRow' 'def generate_palette'; do
     grep -Fq "$component" "$shell_pkg/"*.py "$shell_source" || {
         printf 'DarkOS shell component is missing: %s\n' "$component" >&2
         exit 1
     }
 done
-if grep -Fq 'class DarkOSSidePanels' "$shell_pkg/"*.py "$shell_source"; then
-    printf 'Legacy combined DarkOSSidePanels still exists\n' >&2
-    exit 1
-fi
+# Calm Dark has one dock and one Command Center: none of the old surfaces
+# (icon rail, left/right panels, ring gauges, combined side panels) may return.
+for legacy in 'class DarkOSIconRail' 'class DarkOSLeftPanels' \
+    'class DarkOSRightPanels' 'class RingGauge' 'class DarkOSSidePanels'; do
+    if grep -Fq "$legacy" "$shell_pkg/"*.py "$shell_source"; then
+        printf 'Legacy DarkOS shell surface still exists: %s\n' "$legacy" >&2
+        exit 1
+    fi
+done
 if grep -Fq -- '-gtk-icon-size:' "$shell_pkg/"*.py "$shell_source"; then
     printf 'DarkOS shell uses the invalid GTK3 CSS property -gtk-icon-size\n' >&2
     exit 1

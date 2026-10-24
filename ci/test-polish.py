@@ -368,7 +368,9 @@ class RemovalTests(unittest.TestCase):
 
     def test_hyprland_conf_shape(self):
         conf = (ROOT / "airootfs/etc/xdg/hypr/hyprland.conf").read_text()
-        self.assertIn("background_color = rgb(0d0f12)", conf)  # fallback colour
+        # Fallback colour = palette surface base (tokens.SURFACE_BASE);
+        # tools/gen-theme.py --check (in test-design-tokens.py) keeps it in sync.
+        self.assertIn("background_color = rgb(060a11)", conf)
         self.assertIn("darkos-window-fx.py --wallpaper-apply", conf)
         self.assertTrue(conf.rstrip().splitlines()[-1].startswith("source = ~/.config/hypr/conf.d/perf-auto.conf"),
                         "perf-auto.conf must be the last line so Lite wins")

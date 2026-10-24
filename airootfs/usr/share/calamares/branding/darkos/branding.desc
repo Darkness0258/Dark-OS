@@ -40,10 +40,10 @@ images:
     productWelcome:      "icons/darkos.png"
 
 style:
-   SidebarBackground:        "#000000"
-   SidebarText:              "#e2e8f0"
+   SidebarBackground:        "#060a11"
+   SidebarText:              "#eff2f6"
    SidebarTextCurrent:       "#00e5ff"
-   SidebarBackgroundCurrent: "#1a1a2e"
+   SidebarBackgroundCurrent: "#161c24"
 
 ### SLIDESHOW
 slideshow:               "show.qml"

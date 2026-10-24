@@ -1,656 +1,779 @@
 #!/usr/bin/env python3
-"""GTK CSS stylesheet built from design tokens."""
+"""GTK CSS stylesheet built from design tokens ("Calm Dark").
 
-from darkos_shell.tokens import (
-    CAIRO_PRIMARY,
-    COLOR_ACCENT,
-    COLOR_BG,
-    COLOR_BG_ALT,
-    COLOR_BG_ELEVATED,
-    COLOR_BORDER,
-    COLOR_DANGER,
-    COLOR_PRIMARY,
-    COLOR_SECONDARY,
-    COLOR_TEXT,
-    COLOR_TEXT_MUTED,
-    COLOR_WARNING,
-    RADIUS_CONTROL,
-    RADIUS_DIALOG,
-    RADIUS_PANEL,
-    SPACE_LG,
-    SPACE_MD,
-    SPACE_SM,
-    SPACE_XS,
-)
+Rules this file follows (docs/MASTER-PLAN.md section 5):
+* three tonal surfaces; the accent only on fills, the active item and focus
+* 1px low-contrast borders; shadows only on floating things; no glow except
+  the keyboard-focus ring
+* type only from the 12/14/16/20/28 scale, spacing from 4/8/16/32/48
+* no CSS transitions: motion is the compositor's job
 
-CSS_STYLE = f"""
-* {{
-    font-family: Inter, "Noto Sans", sans-serif;
-    font-size: 13px;
-    color: {COLOR_TEXT};
-}}
+The stylesheet is a string.Template so the CSS stays readable (no doubled
+braces); build_css() fills it from the palette and tokens.
+"""
+import string
 
-.darkos-window {{
+from darkos_shell import tokens as _tokens
+
+_CSS_TEMPLATE = string.Template(r"""
+* {
+    font-family: ${FONT_BODY};
+    font-size: ${FS_BODY}px;
+    color: ${TEXT};
+}
+
+selection {
+    background-color: alpha(${ACCENT}, 0.40);
+    color: ${TEXT};
+}
+
+.darkos-window {
     background-color: transparent;
-}}
+}
 
-.glass-panel {{
-    background-color: alpha({COLOR_BG_ELEVATED}, 0.78);
-    border: 1px solid alpha({COLOR_TEXT}, 0.06);
-    border-radius: {RADIUS_PANEL}px;
-    box-shadow: 0 8px 24px alpha({COLOR_BG}, 0.55);
-    padding: {SPACE_MD}px;
-}}
+/* ── Type scale ── */
+.display { font-size: ${FS_DISPLAY}px; font-weight: 700; }
+.title { font-size: ${FS_TITLE}px; font-weight: 600; }
+.lead { font-size: ${FS_LEAD}px; font-weight: 500; }
+.caption { color: ${TEXT_MUTED}; font-size: ${FS_CAPTION}px; }
 
-.hud-stage {{
-    background-color: transparent;
-    padding: {SPACE_SM}px;
-}}
+.section-title {
+    color: ${TEXT};
+    font-size: ${FS_LEAD}px;
+    font-weight: 600;
+}
 
-.hud-wordmark {{
-    color: {COLOR_TEXT};
-    font-family: "Space Grotesk", Inter, "Noto Sans", sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 2px;
-}}
-
-.section-title {{
-    color: {COLOR_PRIMARY};
-    font-family: "Space Grotesk", Inter, "Noto Sans", sans-serif;
-    font-size: 15px;
+.eyebrow {
+    color: ${TEXT_MUTED};
+    font-size: ${FS_CAPTION}px;
     font-weight: 600;
     letter-spacing: 0.5px;
-}}
+}
 
-.eyebrow {{
-    color: {COLOR_TEXT_MUTED};
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}}
+.body-muted { color: ${TEXT_MUTED}; }
+.status-text { color: ${ACCENT_TEXT}; }
+.stub-text { color: ${TEXT_MUTED}; }
+.flag-text { color: ${WARNING}; font-weight: 600; }
 
-.body-muted {{
-    color: {COLOR_TEXT_MUTED};
-}}
+/* ── Surfaces ── */
+.app-window { background-color: ${BASE}; }
 
-.status-text {{
-    color: {COLOR_PRIMARY};
-}}
+.card, .glass-panel {
+    background-color: ${RAISED};
+    border: 1px solid alpha(${TEXT}, 0.08);
+    border-radius: ${RADIUS_PANEL}px;
+    padding: ${SPACE_MD}px;
+}
 
-.stub-text {{
-    color: {COLOR_WARNING};
-}}
+/* Floating, so it is the one thing here that gets a shadow. */
+.command-center {
+    background-color: ${OVERLAY};
+    border: 1px solid alpha(${TEXT}, 0.10);
+    border-radius: ${RADIUS_PANEL}px;
+    box-shadow: 0 12px 32px alpha(${BLACK}, 0.50);
+}
 
-.flag-text {{
-    color: {COLOR_WARNING};
-    font-weight: 600;
-}}
+.cc-section { padding: ${SPACE_MD}px; }
 
-.dock-bar {{
-    background-color: alpha({COLOR_BG_ALT}, 0.82);
-    border: 1px solid alpha({COLOR_PRIMARY}, 0.30);
-    border-radius: {RADIUS_DIALOG}px;
-    box-shadow: 0 8px 24px alpha({COLOR_PRIMARY}, 0.18);
-    padding: {SPACE_XS}px {SPACE_MD}px;
-}}
+.cc-divider {
+    background-color: alpha(${TEXT}, 0.08);
+    min-height: 1px;
+}
 
-.dock-bar.vertical {{
-    padding: {SPACE_MD}px {SPACE_XS}px;
-}}
+.cc-empty {
+    color: ${TEXT_MUTED};
+    padding: ${SPACE_SM}px 0;
+}
+
+.cc-notification {
+    background-color: ${RAISED};
+    border-radius: ${RADIUS_CONTROL}px;
+    padding: ${SPACE_SM}px ${SPACE_MD}px;
+}
+
+/* Compact resource rows (CPU / memory / disk): a label, a thin bar, a value. */
+.resource-label { color: ${TEXT_MUTED}; font-size: ${FS_CAPTION}px; }
+.resource-value { font-size: ${FS_CAPTION}px; font-weight: 600; }
+
+.resource-bar trough {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${BASE};
+    border-radius: 999px;
+    min-height: 6px;
+}
+
+.resource-bar progress {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${ACCENT};
+    border-radius: 999px;
+    min-height: 6px;
+}
+
+.resource-bar.warn progress { background-color: ${WARNING}; }
+.resource-bar.crit progress { background-color: ${DANGER}; }
+
+/* ── Dock ── (frosted: the compositor blurs what is behind it) */
+.dock-bar {
+    background-color: alpha(${OVERLAY}, ${DOCK_ALPHA});
+    border: 1px solid alpha(${TEXT}, 0.10);
+    border-radius: ${RADIUS_DIALOG}px;
+    box-shadow: 0 8px 24px alpha(${BLACK}, 0.45);
+    padding: ${SPACE_XS}px ${SPACE_SM}px;
+}
+
+.dock-bar.vertical {
+    padding: ${SPACE_SM}px ${SPACE_XS}px;
+}
 
 /* The GTK theme gives every button a 24px min-height, so without this a
    "compact" dock could never get shorter than the default one. */
-.dock-bar.compact .dock-icon-button {{
+.dock-bar.compact .dock-icon-button {
     min-width: 0;
     min-height: 0;
-    padding: {SPACE_XS}px;
-}}
+    padding: ${SPACE_XS}px;
+}
 
-.icon-button, .dock-icon-button {{
-    background-color: transparent;
-    background-image: none;
-    border: 1px solid transparent;
-    border-radius: {RADIUS_CONTROL}px;
-    box-shadow: none;
-    color: {COLOR_TEXT_MUTED};
-    padding: {SPACE_SM}px;
-    text-shadow: none;
-}}
+/* Only the thin side is fixed (1px); the long side fills the dock, so the
+   divider never forces the dock wider or taller than its buttons. */
+.dock-separator {
+    background-color: alpha(${TEXT}, 0.14);
+    min-width: 1px;
+    min-height: 0;
+    margin: ${SPACE_SM}px ${SPACE_XS}px;
+}
 
-.icon-button label, .dock-icon-button label,
-.action-button label, .toggle-button label {{
-    color: inherit;
-    font-family: Inter, "Noto Sans", sans-serif;
-    text-shadow: none;
-}}
+.dock-bar.vertical .dock-separator {
+    min-width: 0;
+    min-height: 1px;
+    margin: ${SPACE_XS}px ${SPACE_SM}px;
+}
 
-.dock-icon-button {{
-    color: {COLOR_PRIMARY};
-    font-size: 20px;
-}}
-
-.dock-highlight {{
-    background-color: alpha({COLOR_ACCENT}, 0.16);
-    border: 1px solid alpha({COLOR_ACCENT}, 0.55);
-    box-shadow: 0 0 12px 1px alpha({COLOR_ACCENT}, 0.35);
-}}
-
-.dock-label {{
-    color: {COLOR_TEXT_MUTED};
-    font-size: 10px;
-    font-weight: 500;
+.dock-label {
+    color: ${TEXT_MUTED};
+    font-size: ${FS_CAPTION}px;
     padding: 0;
-}}
+}
 
-.dock-clock {{
-    color: {COLOR_PRIMARY};
-    font-family: "Space Grotesk", Inter, "Noto Sans", sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    padding: 0 {SPACE_SM}px;
-}}
-
-.dock-running-dot {{
-    background-color: alpha({COLOR_TEXT}, 0.28);
+.dock-running-dot {
+    background-color: alpha(${TEXT}, 0.28);
     border-radius: 999px;
     min-width: 4px;
     min-height: 4px;
-}}
+}
 
-.dock-running-dot.running {{
-    background-color: {COLOR_PRIMARY};
-    box-shadow: 0 0 4px alpha({COLOR_PRIMARY}, 0.75);
-}}
+.dock-running-dot.running {
+    background-color: ${ACCENT};
+}
 
-.media-art {{
-    background-color: alpha({COLOR_BG}, 0.60);
-    border: 1px solid alpha({COLOR_BORDER}, 0.30);
-    border-radius: 12px;
-    color: {COLOR_TEXT_MUTED};
-}}
+.media-art {
+    background-color: ${BASE};
+    border: 1px solid alpha(${TEXT}, 0.10);
+    border-radius: ${RADIUS_CONTROL}px;
+    color: ${TEXT_MUTED};
+}
 
-.media-progress {{
-    background-color: alpha({COLOR_TEXT}, 0.10);
-    border-radius: 4px;
-    min-height: 4px;
-}}
+.media-title { color: ${TEXT}; font-weight: 600; }
 
-.media-progress-filled {{
-    background-color: {COLOR_PRIMARY};
-    border-radius: 4px;
-    min-height: 4px;
-}}
-
-.icon-button:hover, .dock-icon-button:hover {{
-    background-color: alpha({COLOR_PRIMARY}, 0.14);
-    border-color: alpha({COLOR_PRIMARY}, 0.35);
-    box-shadow: 0 0 16px alpha({COLOR_PRIMARY}, 0.34);
-    color: {COLOR_PRIMARY};
-}}
-
-.icon-button:focus, .dock-icon-button:focus,
-.action-button:focus, .toggle-button:focus, entry:focus {{
-    border-color: {COLOR_TEXT};
-    box-shadow: 0 0 0 2px alpha({COLOR_PRIMARY}, 0.65);
-}}
-
-.rail {{
-    background-color: alpha({COLOR_BG_ALT}, 0.82);
-    border: 1px solid alpha({COLOR_TEXT}, 0.12);
-    border-radius: {RADIUS_PANEL}px;
-    padding: {SPACE_SM}px;
-}}
-
-entry {{
-    background-color: alpha({COLOR_BG}, 0.64);
-    border: 1px solid alpha({COLOR_PRIMARY}, 0.40);
-    border-radius: {RADIUS_CONTROL}px;
-    color: {COLOR_TEXT};
-    padding: {SPACE_SM}px {SPACE_MD}px;
-}}
-
-.action-button {{
-    background-color: alpha({COLOR_PRIMARY}, 0.12);
-    background-image: none;
-    border: 1px solid alpha({COLOR_PRIMARY}, 0.40);
-    border-radius: {RADIUS_CONTROL}px;
+.media-progress trough {
+    border: none;
     box-shadow: none;
-    color: {COLOR_PRIMARY};
-    padding: {SPACE_SM}px {SPACE_MD}px;
-    text-shadow: none;
-}}
-
-.action-button:hover {{
-    background-color: alpha({COLOR_PRIMARY}, 0.22);
-    border-color: {COLOR_PRIMARY};
-}}
-
-.action-button:disabled, .icon-button:disabled {{
-    opacity: 0.4;
-}}
-
-textview, textview text {{
-    background-color: alpha({COLOR_BG}, 0.64);
-    color: {COLOR_TEXT};
-}}
-
-.toggle-button {{
-    background-color: alpha({COLOR_TEXT}, 0.06);
     background-image: none;
-    border: 1px solid alpha({COLOR_TEXT}, 0.12);
-    border-radius: {RADIUS_CONTROL}px;
+    background-color: ${BASE};
+    border-radius: 999px;
+    min-height: 4px;
+}
+
+.media-progress progress {
+    border: none;
     box-shadow: none;
-    color: {COLOR_TEXT};
-    padding: {SPACE_SM}px;
+    background-image: none;
+    background-color: ${ACCENT};
+    border-radius: 999px;
+    min-height: 4px;
+}
+
+/* ── Buttons ── (reset the stock gradient, then one rule per variant) */
+.icon-button, .dock-icon-button, .action-button, .toggle-button,
+.app-titlebar-btn, .path-crumb {
+    background-image: none;
+    box-shadow: none;
     text-shadow: none;
-}}
+}
 
-.toggle-button:checked {{
-    background-color: alpha({COLOR_PRIMARY}, 0.20);
-    border-color: {COLOR_PRIMARY};
-    box-shadow: 0 0 12px alpha({COLOR_PRIMARY}, 0.32);
-    color: {COLOR_PRIMARY};
-}}
+.icon-button label, .dock-icon-button label,
+.action-button label, .toggle-button label {
+    color: inherit;
+    text-shadow: none;
+}
 
-.toggle-button:disabled {{
-    opacity: 0.40;
-}}
+.icon-button, .dock-icon-button {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: ${RADIUS_CONTROL}px;
+    color: ${TEXT};
+    padding: ${SPACE_SM}px;
+}
 
-.media-title {{
-    color: {COLOR_TEXT};
-    font-weight: 700;
-}}
+.icon-button:hover, .dock-icon-button:hover {
+    background-color: alpha(${TEXT}, 0.10);
+}
 
-.calendar {{
+.icon-button:active, .dock-icon-button:active {
+    background-color: alpha(${TEXT}, 0.16);
+}
+
+.action-button {
+    background-color: alpha(${TEXT}, 0.06);
+    border: 1px solid alpha(${TEXT}, 0.16);
+    border-radius: ${RADIUS_CONTROL}px;
+    color: ${TEXT};
+    padding: ${SPACE_SM}px ${SPACE_MD}px;
+}
+
+.action-button:hover { background-color: alpha(${TEXT}, 0.12); }
+.action-button:active { background-color: alpha(${TEXT}, 0.18); }
+
+/* The one filled accent button per screen. */
+.action-button.primary, .action-button.suggested-action {
+    background-color: ${ACCENT};
+    border-color: ${ACCENT};
+    color: ${ON_ACCENT};
+    font-weight: 600;
+}
+
+.action-button.primary:hover, .action-button.suggested-action:hover {
+    background-color: ${ACCENT_HOVER};
+    border-color: ${ACCENT_HOVER};
+}
+
+.action-button.primary:active, .action-button.suggested-action:active {
+    background-color: ${ACCENT_PRESSED};
+    border-color: ${ACCENT_PRESSED};
+}
+
+.action-button.destructive {
+    color: ${DANGER};
+    border-color: alpha(${DANGER}, 0.55);
+}
+
+.action-button.destructive:hover { background-color: alpha(${DANGER}, 0.14); }
+
+.action-button:disabled, .icon-button:disabled, .dock-icon-button:disabled {
+    opacity: 0.45;
+}
+
+.toggle-button {
+    background-color: alpha(${TEXT}, 0.06);
+    border: 1px solid alpha(${TEXT}, 0.12);
+    border-radius: ${RADIUS_CONTROL}px;
+    color: ${TEXT};
+    padding: ${SPACE_SM}px;
+}
+
+.toggle-button:hover { background-color: alpha(${TEXT}, 0.12); }
+
+.toggle-button:checked {
+    background-color: ${ACCENT};
+    border-color: ${ACCENT};
+    color: ${ON_ACCENT};
+}
+
+.toggle-button:disabled { opacity: 0.45; }
+
+/* Keyboard focus is the only place glow is allowed. */
+.icon-button:focus, .dock-icon-button:focus, .action-button:focus,
+.toggle-button:focus, .app-titlebar-btn:focus, .path-crumb:focus,
+combobox button:focus {
+    box-shadow: 0 0 0 2px alpha(${ACCENT}, 0.80);
+}
+
+entry {
+    background-color: ${BASE};
+    border: 1px solid ${BORDER_CONTROL};
+    border-radius: ${RADIUS_CONTROL}px;
+    caret-color: ${TEXT};
+    color: ${TEXT};
+    padding: ${SPACE_SM}px ${SPACE_MD}px;
+}
+
+entry:focus {
+    border-color: ${ACCENT};
+    box-shadow: 0 0 0 2px alpha(${ACCENT}, 0.35);
+}
+
+entry:disabled { opacity: 0.55; }
+
+/* Stock-light widgets: GTK paints its own light trough/background under
+   these, so each needs an opaque dark colour, not a low-alpha overlay. */
+textview, textview text {
+    background-color: ${BASE};
+    color: ${TEXT};
+}
+
+.calendar {
     background-color: transparent;
     border: none;
-    color: {COLOR_TEXT};
-}}
+    color: ${TEXT};
+}
 
-.calendar button {{
+.calendar button {
     background-color: transparent;
     background-image: none;
     border-color: transparent;
     box-shadow: none;
-    color: {COLOR_TEXT_MUTED};
+    color: ${TEXT_MUTED};
     text-shadow: none;
-}}
+}
 
-.calendar button:checked {{
-    background-color: alpha({COLOR_PRIMARY}, 0.24);
-    color: {COLOR_TEXT};
+.calendar button:checked {
+    background-color: ${ACCENT};
+    color: ${ON_ACCENT};
     border-radius: 999px;
-}}
+}
 
-/* trough needs an opaque dark background, not an alpha overlay: GTK paints
-   its own stock-light trough underneath first, so a low-alpha color (the
-   original alpha({COLOR_TEXT}, 0.08) here) blends toward white instead of
-   toward dark. Same fix shape as calendar/notebook/textview above. */
-scale trough {{
-    background-color: {COLOR_BG_ALT};
-    border-radius: {RADIUS_CONTROL}px;
+scale trough {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${BASE};
+    border-radius: 999px;
     min-height: 6px;
-}}
+}
 
-scale highlight {{
-    background-color: {COLOR_PRIMARY};
-    border-radius: {RADIUS_CONTROL}px;
-}}
+scale highlight {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${ACCENT};
+    border-radius: 999px;
+}
 
-scale slider {{
-    background-color: {COLOR_TEXT};
-    border: 2px solid {COLOR_PRIMARY};
+scale slider {
+    background-color: ${TEXT};
+    border: 2px solid ${ACCENT};
     border-radius: 50%;
     min-width: 14px;
     min-height: 14px;
-}}
+}
 
-/* GtkLevelBar had no rule at all yet -- same stock-light trough issue as
-   scale above, confirmed by rendering it (see the redesign-plan audit). */
-levelbar trough {{
-    background-color: {COLOR_BG_ALT};
-    border-radius: {RADIUS_CONTROL}px;
+levelbar trough {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${BASE};
+    border-radius: 999px;
     min-height: 6px;
-}}
+}
 
-levelbar block.filled {{
-    background-color: {COLOR_PRIMARY};
-    border-radius: {RADIUS_CONTROL}px;
-}}
+levelbar block.filled {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${ACCENT};
+    border-radius: 999px;
+}
 
-levelbar block.empty {{
-    background-color: transparent;
-}}
+levelbar block.empty { background-color: transparent; }
 
-/* Same trough issue as scale/levelbar, same fix. Also: GTK defaults both
-   progressbar's fill and switch's "on" state to its own suggested-action
-   blue, not this app's accent -- COLOR_PRIMARY everywhere fixes both. */
-progressbar trough {{
-    background-color: {COLOR_BG_ALT};
-    border-radius: {RADIUS_CONTROL}px;
-}}
+progressbar trough {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${BASE};
+    border-radius: 999px;
+}
 
-progressbar progress {{
-    background-color: {COLOR_PRIMARY};
-    border-radius: {RADIUS_CONTROL}px;
-}}
+progressbar progress {
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    background-color: ${ACCENT};
+    border-radius: 999px;
+}
 
-switch {{
-    background-color: {COLOR_BG_ALT};
-    border-radius: {RADIUS_CONTROL}px;
-}}
+switch {
+    background-color: ${BASE};
+    border: 1px solid ${BORDER_CONTROL};
+    border-radius: 999px;
+}
 
-switch:checked {{
-    background-color: {COLOR_PRIMARY};
-}}
+switch:checked {
+    background-color: ${ACCENT};
+    border-color: ${ACCENT};
+}
 
-switch slider {{
-    background-color: {COLOR_TEXT};
+switch slider {
+    background-color: ${TEXT};
     border-radius: 50%;
-}}
+}
 
-/* Same stock-light-chrome gap as scale/levelbar/progressbar above, this
-   time on Gtk.ListBox -- found rendering the real Quarantine list, same
-   as those were found: by actually looking, not assumed. */
-list {{
+switch:checked slider { background-color: ${ON_ACCENT}; }
+
+list { background-color: transparent; }
+
+row {
     background-color: transparent;
-}}
+    color: ${TEXT};
+    border-radius: ${RADIUS_CONTROL}px;
+}
 
-row {{
-    background-color: {COLOR_BG_ALT};
-    color: {COLOR_TEXT};
-}}
+row:hover { background-color: alpha(${TEXT}, 0.06); }
 
-row:hover {{
-    background-color: {COLOR_BG_ELEVATED};
-}}
+row:selected {
+    background-color: alpha(${ACCENT}, 0.18);
+    color: ${TEXT};
+}
 
-separator {{
-    background-color: alpha({COLOR_TEXT}, 0.12);
+separator {
+    background-color: alpha(${TEXT}, 0.10);
     min-height: 1px;
-}}
+}
 
-/* ── App windows (Files, Terminal) — normal floating windows, not
-   layer-shell. Glass/blur/rounding comes from Hyprland's compositor
-   (decoration{{}} + per-class windowrule opacity), these classes only
-   handle in-content styling. ── */
+scrollbar { background-color: transparent; }
 
-.app-window {{
-    background-color: {COLOR_BG_ALT};
-}}
+scrollbar trough { background-color: transparent; }
 
-.app-titlebar {{
-    background-color: alpha({COLOR_BG_ELEVATED}, 0.95);
-    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.08);
-    min-height: 36px;
-    padding: 0 {SPACE_XS}px 0 {SPACE_MD}px;
-}}
+scrollbar slider {
+    background-color: alpha(${TEXT}, 0.30);
+    border-radius: 999px;
+    min-width: 6px;
+    min-height: 6px;
+}
 
-.app-titlebar-title {{
-    color: {COLOR_TEXT};
+scrollbar slider:hover { background-color: alpha(${TEXT}, 0.50); }
+
+tooltip, tooltip.background {
+    background-color: ${OVERLAY};
+    border: 1px solid alpha(${TEXT}, 0.12);
+    border-radius: ${RADIUS_CONTROL}px;
+}
+
+tooltip label { color: ${TEXT}; }
+
+/* ── App windows (Files, Void, Settings ...) — normal floating windows, not
+   layer-shell. Rounding and shadow come from Hyprland's compositor. ── */
+.app-titlebar {
+    background-color: ${RAISED};
+    border-bottom: 1px solid alpha(${TEXT}, 0.08);
+    min-height: 40px;
+    padding: 0 ${SPACE_XS}px 0 ${SPACE_MD}px;
+}
+
+.app-titlebar-title {
+    color: ${TEXT};
     font-weight: 600;
-}}
+}
 
-.app-titlebar-btn {{
+.app-titlebar-btn {
     background-color: transparent;
-    background-image: none;
     border: none;
-    border-radius: {RADIUS_CONTROL}px;
-    box-shadow: none;
-    color: {COLOR_TEXT_MUTED};
-    min-width: 28px;
-    min-height: 28px;
+    border-radius: ${RADIUS_CONTROL}px;
+    color: ${TEXT_MUTED};
+    min-width: 32px;
+    min-height: 32px;
     padding: 0;
-}}
+}
 
-.app-titlebar-btn:hover {{
-    background-color: alpha({COLOR_TEXT}, 0.10);
-    color: {COLOR_TEXT};
-}}
+.app-titlebar-btn:hover {
+    background-color: alpha(${TEXT}, 0.10);
+    color: ${TEXT};
+}
 
-.app-titlebar-btn-close:hover {{
-    background-color: {COLOR_DANGER};
-    color: {COLOR_BG};
-}}
+.app-titlebar-btn-close:hover {
+    background-color: ${DANGER};
+    color: ${ON_DANGER};
+}
 
-.toolbar {{
-    background-color: alpha({COLOR_BG_ELEVATED}, 0.90);
-    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.10);
-    padding: {SPACE_XS}px {SPACE_SM}px;
-}}
+.toolbar {
+    background-color: ${RAISED};
+    border-bottom: 1px solid alpha(${TEXT}, 0.08);
+    padding: ${SPACE_XS}px ${SPACE_SM}px;
+}
 
-.sidebar {{
-    background-color: alpha({COLOR_BG_ELEVATED}, 0.85);
-    border-right: 1px solid alpha({COLOR_TEXT}, 0.10);
-    padding: {SPACE_SM}px;
-}}
+.sidebar {
+    background-color: ${RAISED};
+    border-right: 1px solid alpha(${TEXT}, 0.08);
+    padding: ${SPACE_SM}px;
+}
 
-.sidebar-row {{
-    border-radius: {RADIUS_CONTROL}px;
-    color: {COLOR_TEXT_MUTED};
-    padding: {SPACE_XS}px {SPACE_SM}px;
-}}
+.sidebar-row {
+    border-radius: ${RADIUS_CONTROL}px;
+    color: ${TEXT_MUTED};
+    padding: ${SPACE_XS}px ${SPACE_SM}px;
+}
 
-.sidebar-row:hover {{
-    background-color: alpha({COLOR_TEXT}, 0.06);
-}}
+.sidebar-row:hover {
+    background-color: alpha(${TEXT}, 0.06);
+    color: ${TEXT};
+}
 
-.sidebar-row.active {{
-    background-color: alpha({COLOR_PRIMARY}, 0.16);
-    color: {COLOR_PRIMARY};
-}}
+/* The active item is where the accent belongs. */
+.sidebar-row.active {
+    background-color: alpha(${ACCENT}, 0.16);
+    box-shadow: inset 3px 0 0 ${ACCENT};
+    color: ${TEXT};
+}
 
-.path-bar {{
-    background-color: alpha({COLOR_BG}, 0.45);
-    border: 1px solid alpha({COLOR_PRIMARY}, 0.28);
-    border-radius: {RADIUS_CONTROL}px;
-    padding: 2px {SPACE_XS}px;
-}}
-
-.path-crumb {{
-    background-color: transparent;
-    background-image: none;
-    border: none;
-    box-shadow: none;
-    color: {COLOR_TEXT_MUTED};
-    padding: {SPACE_XS}px {SPACE_SM}px;
-}}
-
-.path-crumb:hover {{
-    color: {COLOR_PRIMARY};
-}}
-
-.path-crumb-current {{
-    color: {COLOR_TEXT};
+.sidebar-heading {
+    color: ${TEXT_MUTED};
+    font-size: ${FS_CAPTION}px;
     font-weight: 600;
-}}
+    letter-spacing: 0.5px;
+    padding: ${SPACE_MD}px ${SPACE_SM}px ${SPACE_XS}px ${SPACE_SM}px;
+}
 
-treeview.darkos-list {{
+.path-bar {
+    background-color: ${BASE};
+    border: 1px solid ${BORDER_CONTROL};
+    border-radius: ${RADIUS_CONTROL}px;
+    padding: 2px ${SPACE_XS}px;
+}
+
+.path-crumb {
     background-color: transparent;
-    color: {COLOR_TEXT};
-}}
-
-treeview.darkos-list:selected {{
-    background-color: alpha({COLOR_PRIMARY}, 0.20);
-    border-radius: {RADIUS_CONTROL}px;
-    color: {COLOR_TEXT};
-}}
-
-treeview.darkos-list header button {{
-    background-color: alpha({COLOR_BG_ELEVATED}, 0.92);
-    background-image: none;
     border: none;
-    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.12);
-    color: {COLOR_TEXT_MUTED};
+    color: ${TEXT_MUTED};
+    padding: ${SPACE_XS}px ${SPACE_SM}px;
+}
+
+.path-crumb:hover { color: ${TEXT}; }
+
+.path-crumb-current {
+    color: ${TEXT};
     font-weight: 600;
-    padding: {SPACE_SM}px;
-}}
+}
 
-notebook.terminal-tabs > header {{
-    background-color: alpha({COLOR_BG_ALT}, 0.92);
-    border-bottom: 1px solid alpha({COLOR_TEXT}, 0.10);
-    padding: 0 {SPACE_XS}px;
-}}
-
-notebook.terminal-tabs tab {{
+treeview.darkos-list {
     background-color: transparent;
-    border: none;
-    color: {COLOR_TEXT_MUTED};
-    padding: {SPACE_XS}px {SPACE_MD}px;
-}}
+    color: ${TEXT};
+}
 
-notebook.terminal-tabs tab:checked {{
-    background-color: alpha({COLOR_PRIMARY}, 0.14);
-    border-bottom: 2px solid {COLOR_PRIMARY};
-    color: {COLOR_PRIMARY};
-}}
+treeview.darkos-list:selected {
+    background-color: alpha(${ACCENT}, 0.20);
+    color: ${TEXT};
+}
 
-/* Like GtkCalendar above, GtkNotebook's page-content area (the "stack"
-   CSS node) is themed independently of its ancestors' background-color
-   and renders as stock light-theme unless targeted directly. */
-notebook, notebook stack {{
-    background-color: {COLOR_BG_ALT};
-    color: {COLOR_TEXT};
-}}
-
-/* Same story as calendar/notebook above: GtkTextView's "text" CSS node
-   (the actual editable content area) is themed independently of its
-   ancestors and renders as stock light-theme unless targeted directly. */
-textview, textview text {{
-    background-color: {COLOR_BG_ALT};
-    color: {COLOR_TEXT};
-}}
-
-.statusbar {{
-    background-color: alpha({COLOR_BG_ELEVATED}, 0.88);
-    border-top: 1px solid alpha({COLOR_TEXT}, 0.10);
-    color: {COLOR_TEXT_MUTED};
-    font-size: 11px;
-    padding: {SPACE_XS}px {SPACE_MD}px;
-}}
-
-/* GtkCalendar ships its own internal theming that ignores a plain
-   background-color on its parent — needs its CSS nodes targeted directly
-   or it renders as a stock light-theme widget inside an otherwise dark app. */
-calendar {{
-    background-color: {COLOR_BG_ALT};
-    color: {COLOR_TEXT};
-    border: none;
-}}
-
-calendar.header {{
-    background-color: alpha({COLOR_BG_ELEVATED}, 0.92);
-    color: {COLOR_TEXT};
-}}
-
-calendar.button {{
-    background-color: transparent;
+treeview.darkos-list header button {
+    background-color: ${RAISED};
     background-image: none;
     border: none;
-    color: {COLOR_TEXT_MUTED};
-}}
-
-calendar.button:hover {{
-    color: {COLOR_PRIMARY};
-}}
-
-calendar:selected {{
-    background-color: {COLOR_PRIMARY};
-    color: {COLOR_BG};
-    border-radius: {RADIUS_CONTROL}px;
-}}
-
-calendar.view {{
-    background-color: {COLOR_BG_ALT};
-    color: {COLOR_TEXT};
-}}
-
-/* Drop-downs (Gtk.ComboBoxText) and their pop-up menus. Without these the
-   GTK default light theme shows through under the light global text colour,
-   leaving the selected value unreadable. */
-combobox button, combobox button.combo {{
-    background-color: alpha({COLOR_BG}, 0.64);
-    background-image: none;
-    border: 1px solid alpha({COLOR_TEXT}, 0.18);
-    border-radius: {RADIUS_CONTROL}px;
+    border-bottom: 1px solid alpha(${TEXT}, 0.10);
     box-shadow: none;
-    color: {COLOR_TEXT};
-    padding: {SPACE_SM}px {SPACE_MD}px;
+    color: ${TEXT_MUTED};
+    font-weight: 600;
+    padding: ${SPACE_SM}px;
+}
+
+notebook.terminal-tabs > header {
+    background-color: ${RAISED};
+    border-bottom: 1px solid alpha(${TEXT}, 0.08);
+    padding: 0 ${SPACE_XS}px;
+}
+
+notebook.terminal-tabs tab {
+    background-color: transparent;
+    border: none;
+    color: ${TEXT_MUTED};
+    padding: ${SPACE_XS}px ${SPACE_MD}px;
+}
+
+notebook.terminal-tabs tab:checked {
+    background-color: alpha(${ACCENT}, 0.12);
+    border-bottom: 2px solid ${ACCENT};
+    color: ${TEXT};
+}
+
+/* GtkNotebook's page area, GtkCalendar and GtkTextView's text node are themed
+   independently of their ancestors and render stock-light unless targeted. */
+notebook, notebook stack {
+    background-color: ${BASE};
+    color: ${TEXT};
+}
+
+.statusbar {
+    background-color: ${RAISED};
+    border-top: 1px solid alpha(${TEXT}, 0.08);
+    color: ${TEXT_MUTED};
+    font-size: ${FS_CAPTION}px;
+    padding: ${SPACE_XS}px ${SPACE_MD}px;
+}
+
+calendar {
+    background-color: ${BASE};
+    color: ${TEXT};
+    border: none;
+}
+
+calendar.header {
+    background-color: ${RAISED};
+    color: ${TEXT};
+}
+
+calendar.button {
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    color: ${TEXT_MUTED};
+}
+
+calendar.button:hover { color: ${TEXT}; }
+
+calendar:selected {
+    background-color: ${ACCENT};
+    color: ${ON_ACCENT};
+    border-radius: ${RADIUS_CONTROL}px;
+}
+
+calendar.view {
+    background-color: ${BASE};
+    color: ${TEXT};
+}
+
+/* Drop-downs (Gtk.ComboBoxText) and their pop-up menus. */
+combobox button, combobox button.combo {
+    background-color: ${BASE};
+    background-image: none;
+    border: 1px solid ${BORDER_CONTROL};
+    border-radius: ${RADIUS_CONTROL}px;
+    box-shadow: none;
+    color: ${TEXT};
+    padding: ${SPACE_SM}px ${SPACE_MD}px;
     text-shadow: none;
-}}
-
-combobox button:hover {{
-    border-color: {COLOR_PRIMARY};
-}}
-
-combobox arrow {{
-    color: {COLOR_TEXT_MUTED};
-}}
-
-menu, .menu {{
-    background-color: {COLOR_BG_ELEVATED};
-    border: 1px solid alpha({COLOR_TEXT}, 0.14);
-    border-radius: {RADIUS_CONTROL}px;
-    color: {COLOR_TEXT};
-}}
-
-menuitem {{
-    background-color: transparent;
-    color: {COLOR_TEXT};
-    padding: {SPACE_SM}px {SPACE_MD}px;
-}}
-
-menuitem label {{
-    color: {COLOR_TEXT};
-}}
-
-menuitem:hover {{
-    background-color: alpha({COLOR_PRIMARY}, 0.18);
-}}
-"""
-
-HIGH_CONTRAST_CSS = """
-* {
-    color: #ffffff;
 }
-.app-window, .glass-panel, .dock-bar, .rail, .sidebar, .toolbar,
-.app-titlebar, .hud-stage {
-    background-color: #000000;
-    border: 2px solid #ffffff;
+
+combobox button:hover { border-color: ${ACCENT}; }
+
+combobox arrow { color: ${TEXT_MUTED}; }
+
+menu, .menu, popover, popover.background {
+    background-color: ${OVERLAY};
+    border: 1px solid alpha(${TEXT}, 0.12);
+    border-radius: ${RADIUS_CONTROL}px;
+    color: ${TEXT};
+}
+
+menuitem {
+    background-color: transparent;
+    color: ${TEXT};
+    padding: ${SPACE_SM}px ${SPACE_MD}px;
+}
+
+menuitem label { color: ${TEXT}; }
+
+menuitem:hover { background-color: alpha(${ACCENT}, 0.18); }
+
+menuitem:disabled label { color: ${TEXT_DISABLED}; }
+""")
+
+# High Contrast: opaque, hard borders, no translucency or shadow. Layered on
+# top of the normal sheet (the palette is already the 7:1 one).
+_HC_TEMPLATE = string.Template(r"""
+.app-window, .card, .glass-panel, .command-center, .dock-bar, .sidebar,
+.toolbar, .app-titlebar {
+    background-color: ${BLACK};
+    border: 2px solid ${TEXT};
     box-shadow: none;
 }
-.app-titlebar-title, .section-title, .eyebrow, .body-muted, .dock-label,
-.path-crumb, .status-text {
-    color: #ffffff;
-}
-entry, textview, list, treeview, .sidebar-row {
-    background-color: #000000;
-    color: #ffffff;
-    border: 2px solid #ffffff;
+entry, textview, list, treeview, .sidebar-row, combobox button {
+    background-color: ${BLACK};
+    color: ${TEXT};
+    border: 2px solid ${TEXT};
 }
 button, .icon-button, .action-button, .toggle-button, .dock-icon-button {
-    background-color: #000000;
-    color: #ffffff;
-    border: 2px solid #ffffff;
+    background-color: ${BLACK};
+    color: ${TEXT};
+    border: 2px solid ${TEXT};
 }
-"""
+.action-button.primary, .toggle-button:checked {
+    background-color: ${ACCENT};
+    color: ${ON_ACCENT};
+}
+""")
+
+
+def _values(palette):
+    t = _tokens
+    p = palette
+    return {
+        "FONT_BODY": t.FONT_BODY,
+        "FS_CAPTION": t.FONT_SIZE_CAPTION,
+        "FS_BODY": t.FONT_SIZE_BODY,
+        "FS_LEAD": t.FONT_SIZE_LEAD,
+        "FS_TITLE": t.FONT_SIZE_TITLE,
+        "FS_DISPLAY": t.FONT_SIZE_DISPLAY,
+        "SPACE_XS": t.SPACE_XS, "SPACE_SM": t.SPACE_SM, "SPACE_MD": t.SPACE_MD,
+        "RADIUS_CONTROL": t.RADIUS_CONTROL,
+        "RADIUS_PANEL": t.RADIUS_PANEL,
+        "RADIUS_DIALOG": t.RADIUS_DIALOG,
+        "BASE": p["bg_base"], "RAISED": p["bg_raised"], "OVERLAY": p["bg_overlay"],
+        "TEXT": p["text"], "TEXT_MUTED": p["text_muted"], "TEXT_DISABLED": p["text_disabled"],
+        "BORDER_CONTROL": p["border_control"],
+        "ACCENT": p["accent"], "ACCENT_HOVER": p["accent_hover"],
+        "ACCENT_PRESSED": p["accent_pressed"], "ACCENT_TEXT": p["accent_text"],
+        "ON_ACCENT": p["on_accent"],
+        "WARNING": p["warning"], "DANGER": p["danger"], "ON_DANGER": p["on_danger"],
+        "BLACK": p["black"],
+        # Frosted dock; fully opaque in High Contrast.
+        "DOCK_ALPHA": "1.0" if p["bg_base"] == p["bg_overlay"] else "0.86",
+    }
+
+
+def build_css(palette=None, high_contrast=None):
+    """Return the stylesheet for `palette` (default: the live tokens)."""
+    palette = palette or _tokens.PALETTE
+    if high_contrast is None:
+        high_contrast = _tokens.HIGH_CONTRAST
+    values = _values(palette)
+    css = _CSS_TEMPLATE.substitute(values)
+    if high_contrast:
+        css += _HC_TEMPLATE.substitute(values)
+    return css
+
+
+CSS_STYLE = build_css()
+# Kept for callers that import the name; the High Contrast rules are part of
+# build_css() now that the palette itself switches.
+HIGH_CONTRAST_CSS = _HC_TEMPLATE.substitute(_values(_tokens.PALETTE))
+
+
+def css_parse_errors(css):
+    """GTK silently drops rules it can't parse; return them as strings so a
+    test (or a developer) can see them."""
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk
+
+    errors = []
+    provider = Gtk.CssProvider()
+    provider.connect(
+        "parsing-error",
+        lambda _p, section, error: errors.append(
+            f"line {section.get_start_line() + 1}: {error.message}"
+        ),
+    )
+    try:
+        provider.load_from_data(css.encode())
+    except Exception as error:  # GLib.Error on a fatal parse failure
+        errors.append(str(error))
+    return errors
 
 
 def apply_css() -> None:
     """Load DarkOS GTK CSS into the default screen's style provider."""
+    import sys
+
     import gi
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk, Gdk
-    css = CSS_STYLE
-    try:
-        from darkos_shell.user_settings import load_settings
-        if load_settings().get("high_contrast"):
-            css += HIGH_CONTRAST_CSS
-    except Exception:
-        pass
+    from gi.repository import Gdk, Gtk
+
+    for message in css_parse_errors(CSS_STYLE):
+        print(f"DarkOS CSS: {message}", file=sys.stderr)
     provider = Gtk.CssProvider()
-    provider.load_from_data(css.encode())
+    provider.load_from_data(CSS_STYLE.encode())
     Gtk.StyleContext.add_provider_for_screen(
         Gdk.Screen.get_default(),
         provider,

@@ -24,7 +24,7 @@ if ! command -v hyprctl > /dev/null; then
     echo "  skip: hyprctl not on PATH -- are you inside the real Hyprland session?"
 else
     layers_out="$(hyprctl layers 2>&1)"
-    for ns in darkos-dock darkos-hud darkos-rail darkos-left darkos-right; do
+    for ns in darkos-dock; do
         if echo "$layers_out" | grep -q "$ns"; then
             echo "  ok: $ns is mapped"
         else

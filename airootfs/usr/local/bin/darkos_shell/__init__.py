@@ -2,11 +2,12 @@
 """DarkOS core shell chrome — application entry point.
 
 This package contains all shell logic split into focused modules:
-- tokens: design tokens (color, spacing, radius, glow)
-- canvases: GTK DrawingArea widgets (ring gauges)
+- palette: Calm Dark colour generation and contrast checks (no GTK)
+- tokens: design tokens (color, type scale, spacing, radius, motion)
+- canvases: small custom widgets (ResourceRow)
 - system_sampler: live system metrics from /proc and /sys
 - css: GTK CSS stylesheet built from tokens
-- surfaces: GTK layer-shell window surfaces (Dock, Rail, Left, Right)
+- surfaces: GTK layer-shell window surfaces (Dock, Command Center)
 - platform: OS control surface (D-Bus, hyprctl, AT-SPI)
 
 The thin wrapper at /usr/local/bin/darkos-shell.py imports this package
@@ -21,62 +22,13 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib, Gtk
 
 from darkos_shell.surfaces import (
+    DarkOSCommandCenter,
     DarkOSDockWindow,
-    DarkOSIconRail,
-    DarkOSLeftPanels,
-    DarkOSRightPanels,
-    add_class,
     command_output,
-    configure_layer_window,
     launch,
-    make_icon_button,
-    make_icon_label,
-    make_label,
 )
-from darkos_shell.canvases import RingGauge
-from darkos_shell.system_sampler import SystemSampler
 from darkos_shell.css import apply_css
 from darkos_shell.user_settings import load_settings, settings_path
-from darkos_shell.tokens import (
-    CAIRO_ACCENT,
-    CAIRO_DANGER,
-    CAIRO_MUTED,
-    CAIRO_PRIMARY,
-    CAIRO_SECONDARY,
-    CAIRO_TEXT,
-    COLOR_ACCENT,
-    COLOR_BG_ALT,
-    COLOR_BG_ELEVATED,
-    COLOR_DANGER,
-    COLOR_PRIMARY,
-    COLOR_SECONDARY,
-    COLOR_TEXT,
-    COLOR_TEXT_MUTED,
-    COLOR_WARNING,
-    GLOW_STROKES_OUTSIDE_IN,
-    RADIUS_CONTROL,
-    RADIUS_DIALOG,
-    RADIUS_PANEL,
-    SPACE_LG,
-    SPACE_MD,
-    SPACE_SM,
-    SPACE_XL,
-    SPACE_XS,
-)
-
-
-def _notify(summary, body, urgency="normal"):
-    """Best-effort desktop toast via notify-send -> mako (same pattern as
-    darkos-protect.py's _notify). Used for one-line status messages that
-    used to force the Command Center open just to show a sentence."""
-    import subprocess
-    try:
-        subprocess.run(
-            ["notify-send", "--urgency", urgency, summary, body],
-            timeout=5, capture_output=True,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        pass
 
 
 class DarkOSApplication(Gtk.Application):
@@ -88,9 +40,7 @@ class DarkOSApplication(Gtk.Application):
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
         self.dock = None
-        self.rail = None
-        self.left = None
-        self.right = None
+        self.center = None
         self.installer_visibility = None
         self.state_listeners = []
         self.current_theme = "dark"
@@ -98,7 +48,6 @@ class DarkOSApplication(Gtk.Application):
         self.toggle_state = {
             "wifi": self.query_wifi(),
             "bluetooth": self.query_bluetooth(),
-            "dark_mode": True,
             "night_light": False,
             "focus": False,
             "airplane": False,
@@ -169,16 +118,13 @@ class DarkOSApplication(Gtk.Application):
             return
         apply_css()
         self.dock = DarkOSDockWindow(self)
-        self.rail = DarkOSIconRail(self)
-        self.left = DarkOSLeftPanels(self)
-        self.right = DarkOSRightPanels(self)
-        for window in (self.dock, self.rail, self.left, self.right):
+        self.center = DarkOSCommandCenter(self)
+        for window in (self.dock, self.center):
             self.add_window(window)
-        # Command Center (info panels) starts closed -- SUPER+H or
-        # --toggle-command-center opens it. Dock + rail are the always-on
-        # base layer. See ui-rules.md, Layout (2026-08-23 decision).
-        for window in (self.left, self.right):
-            window.hide()
+        # The Command Center starts closed: SUPER+H, SUPER+S, the status bar's
+        # control button or --toggle-command-center opens it. The dock is the
+        # only always-on surface of ours (the status bar is Waybar).
+        self.center.hide()
 
         self._watch_settings()
 
@@ -188,11 +134,11 @@ class DarkOSApplication(Gtk.Application):
         import argparse
 
         parser = argparse.ArgumentParser(description="DarkOS Shell Controller")
+        # All three open the one Command Center; the older names stay so a
+        # saved keybinding or Waybar config keeps working.
         parser.add_argument("--toggle-side-panels", action="store_true")
         parser.add_argument("--toggle-command-center", action="store_true")
         parser.add_argument("--toggle-control", action="store_true")
-        parser.add_argument("--toggle-left", action="store_true")
-        parser.add_argument("--toggle-rail", action="store_true")
         parser.add_argument("--lock", action="store_true")
         parser.add_argument("--installer-mode", choices=("on", "off"))
         try:
@@ -203,22 +149,8 @@ class DarkOSApplication(Gtk.Application):
         self.activate()
         if args.installer_mode:
             self.set_installer_mode(args.installer_mode == "on")
-        if args.toggle_side_panels:
-            self._toggle_window(self.left)
-            self._toggle_window(self.right)
-        if args.toggle_command_center:
-            opening = not self.left.is_visible()
-            for window in (self.left, self.right):
-                if opening:
-                    window.show_all()
-                else:
-                    window.hide()
-        if args.toggle_control:
-            self._toggle_window(self.right)
-        if args.toggle_left:
-            self._toggle_window(self.left)
-        if args.toggle_rail:
-            self._toggle_window(self.rail)
+        if args.toggle_side_panels or args.toggle_command_center or args.toggle_control:
+            self._toggle_window(self.center)
         if args.lock:
             launch(["loginctl", "lock-session"])
         return 0
@@ -233,7 +165,7 @@ class DarkOSApplication(Gtk.Application):
     # ── Installer mode ─────────────────────────────────────────────────
 
     def set_installer_mode(self, enabled):
-        overlays = (self.dock, self.rail, self.left, self.right)
+        overlays = (self.dock, self.center)
         if enabled:
             if self.installer_visibility is None:
                 self.installer_visibility = tuple(
@@ -250,27 +182,6 @@ class DarkOSApplication(Gtk.Application):
             else:
                 window.hide()
         self.installer_visibility = None
-
-    # ── Rail actions ───────────────────────────────────────────────────
-
-    def handle_rail_action(self, action):
-        commands = {
-            "files": ["/usr/local/bin/darkos-files.py"],
-            "terminal": ["/usr/local/bin/the-void.sh"],
-            "settings": ["/usr/local/bin/darkos-settings.py"],
-            "browser": ["firefox"],
-            "store": ["/usr/local/bin/darkos-store.py"],
-            "notes": ["/usr/local/bin/darkos-notes.py"],
-            "gallery": ["/usr/local/bin/darkos-gallery.py"],
-            "music": ["mpv", "--player-operation-mode=pseudo-gui"],
-            "gaming": ["/usr/local/bin/darkos-gaming.py"],
-            "search": ["/usr/local/bin/the-void.sh"],
-        }
-        if action in commands:
-            launch(commands[action])
-            return
-        phase = {"gallery": "4", "music": "7", "gaming": "7"}.get(action, "later")
-        _notify("DarkOS", f"{action.title()} is a Phase {phase} surface and isn't built yet.")
 
     # ── Toggle state ───────────────────────────────────────────────────
 
@@ -289,18 +200,18 @@ class DarkOSApplication(Gtk.Application):
                 self.airplane_radio_state[name] = enabled
             self.toggle_state[name] = False
             display_name = "Wi-Fi" if name == "wifi" else "Bluetooth"
-            self.right.set_control_status(
+            self.center.set_control_status(
                 f"{display_name} will be {'enabled' if enabled else 'disabled'} "
                 "when airplane mode is disabled."
             )
         elif name == "wifi":
             launch(["nmcli", "radio", "wifi", "on" if enabled else "off"])
-            self.right.set_control_status(
+            self.center.set_control_status(
                 f"Wi-Fi {'enabled' if enabled else 'disabled'} via NetworkManager."
             )
         elif name == "bluetooth":
             launch(["bluetoothctl", "power", "on" if enabled else "off"])
-            self.right.set_control_status(
+            self.center.set_control_status(
                 f"Bluetooth {'enabled' if enabled else 'disabled'}."
             )
         elif name == "airplane":
@@ -337,7 +248,7 @@ class DarkOSApplication(Gtk.Application):
                 self.toggle_state["wifi"] = radio_state["wifi"]
                 self.toggle_state["bluetooth"] = radio_state["bluetooth"]
                 self.airplane_radio_state = None
-            self.right.set_control_status(
+            self.center.set_control_status(
                 f"Airplane mode {'enabled' if enabled else 'disabled'}."
             )
         elif name in ("night_light", "focus"):
@@ -345,7 +256,7 @@ class DarkOSApplication(Gtk.Application):
             message, failed = apply(enabled)
             if failed and enabled:
                 self.toggle_state[name] = False  # backend missing: don't show it as on
-            self.right.set_control_status(message, failed)
+            self.center.set_control_status(message, failed)
         self.notify_state_listeners()
 
 

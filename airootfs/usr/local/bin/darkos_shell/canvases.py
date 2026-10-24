@@ -1,82 +1,65 @@
-#!/usr/bin/env python3
-"""GTK DrawingArea widgets for the shell: ring gauges."""
+"""Small custom widgets for the shell.
 
-import math
+ResourceRow replaces the old ring gauges: a label, a thin bar and a number on
+one line, so a resource read-out costs one row instead of a quarter of a
+panel (docs/MASTER-PLAN.md section 5: no giant gauges).
+"""
+import gi
 
-import cairo
-from gi.repository import GLib, Gtk
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
 
-from darkos_shell.tokens import (
-    CAIRO_ACCENT,
-    CAIRO_DANGER,
-    CAIRO_MUTED,
-    CAIRO_PRIMARY,
-    CAIRO_SECONDARY,
-    CAIRO_TEXT,
-    GLOW_STROKES_OUTSIDE_IN,
-)
+from darkos_shell.tokens import SPACE_SM
 
 
-__all__ = [
-    "GLOW_STROKES_OUTSIDE_IN",
-    "RingGauge",
-    "stroke_glow",
-]
+class ResourceRow(Gtk.Box):
+    """`CPU  [=====----]  42%`. The bar turns amber at WARN_AT and red at
+    CRIT_AT, so colour only appears when it means something."""
 
+    WARN_AT = 85.0
+    CRIT_AT = 95.0
 
-def stroke_glow(cr, color, alpha=1.0, width_scale=1.0):
-    """Stroke the current Cairo path: outer haze, mid glow, crisp core."""
-    final_index = len(GLOW_STROKES_OUTSIDE_IN) - 1
-    for index, (line_width, alpha_scale) in enumerate(GLOW_STROKES_OUTSIDE_IN):
-        cr.set_line_width(line_width * width_scale)
-        cr.set_source_rgba(*color, min(1.0, alpha * alpha_scale))
-        if index == final_index:
-            cr.stroke()
-        else:
-            cr.stroke_preserve()
+    def __init__(self, title):
+        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=SPACE_SM)
+        self.title = Gtk.Label(label=title)
+        self.title.set_xalign(0.0)
+        self.title.set_size_request(72, -1)
+        self.title.get_style_context().add_class("resource-label")
 
+        self.bar = Gtk.ProgressBar()
+        self.bar.set_valign(Gtk.Align.CENTER)
+        self.bar.set_hexpand(True)
+        self.bar.get_style_context().add_class("resource-bar")
 
-class RingGauge(Gtk.DrawingArea):
-    """Circular progress gauge for system metrics (CPU, GPU, RAM, Disk)."""
+        self.value = Gtk.Label(label="--")
+        self.value.set_xalign(1.0)
+        self.value.set_width_chars(5)
+        self.value.get_style_context().add_class("resource-value")
 
-    def __init__(self, name, color):
-        super().__init__()
-        self.name = name
-        self.color = color
-        self.value = None
-        self.set_size_request(92, 92)
-        self.connect("draw", self.on_draw)
+        self.pack_start(self.title, False, False, 0)
+        self.pack_start(self.bar, True, True, 0)
+        self.pack_start(self.value, False, False, 0)
+        # show_all() on the parent must not resurrect a row that has no data.
+        self.set_no_show_all(True)
+        self.show()
+        self.title.show()
+        self.bar.show()
+        self.value.show()
 
-    def set_value(self, value):
-        self.value = None if value is None else max(0.0, min(100.0, value))
-        self.queue_draw()
-
-    def on_draw(self, widget, cr):
-        width = widget.get_allocated_width()
-        height = widget.get_allocated_height()
-        cx, cy = width / 2.0, height / 2.0
-        radius = min(cx, cy) - 9
-        start = -math.pi / 2.0
-
-        cr.set_line_width(5.0)
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.set_source_rgba(*CAIRO_TEXT, 0.08)
-        cr.arc(cx, cy, radius, 0, 2 * math.pi)
-        cr.stroke()
-        if self.value is not None:
-            cr.arc(cx, cy, radius, start, start + 2 * math.pi * self.value / 100.0)
-            stroke_glow(cr, self.color, 0.92)
-
-        cr.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(15)
-        value_text = "--" if self.value is None else f"{self.value:.0f}%"
-        extents = cr.text_extents(value_text)
-        cr.move_to(cx - extents.width / 2.0, cy + 2)
-        cr.set_source_rgba(*CAIRO_TEXT, 0.96)
-        cr.show_text(value_text)
-        cr.set_font_size(11)
-        extents = cr.text_extents(self.name)
-        cr.move_to(cx - extents.width / 2.0, cy + 20)
-        cr.set_source_rgba(*CAIRO_MUTED, 0.94)
-        cr.show_text(self.name)
-        return False
+    def set_percent(self, percent):
+        """Show `percent` (0-100). None means the source doesn't exist on this
+        machine (no GPU counters, say), so the whole row is hidden."""
+        if percent is None:
+            self.hide()
+            return
+        self.show()
+        percent = max(0.0, min(100.0, float(percent)))
+        self.bar.set_fraction(percent / 100.0)
+        self.value.set_text(f"{percent:.0f}%")
+        context = self.bar.get_style_context()
+        for name in ("warn", "crit"):
+            context.remove_class(name)
+        if percent >= self.CRIT_AT:
+            context.add_class("crit")
+        elif percent >= self.WARN_AT:
+            context.add_class("warn")

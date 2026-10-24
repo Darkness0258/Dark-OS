@@ -13,7 +13,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#000000"
+        color: "#060a11"
 
         ColumnLayout {
             anchors.centerIn: parent
@@ -27,7 +27,7 @@ Item {
                 font.weight: Font.Bold
                 color: "#00e5ff"
                 style: Text.Raised
-                styleColor: "#000000"
+                styleColor: "#060a11"
             }
 
             Text {
@@ -35,7 +35,7 @@ Item {
                 text: "Control Everything"
                 font.pixelSize: 20
                 font.family: "Inter, sans-serif"
-                color: "#9aa4ad"
+                color: "#b1b8c2"
             }
 
             Text {
@@ -43,7 +43,7 @@ Item {
                 text: "Arch + BlackArch + Hyprland"
                 font.pixelSize: 13
                 font.family: "Inter, sans-serif"
-                color: "#9aa4ad"
+                color: "#b1b8c2"
             }
         }
     }

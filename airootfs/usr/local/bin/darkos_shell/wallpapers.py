@@ -17,7 +17,7 @@ BACKGROUND_DIR = "/usr/share/backgrounds/darkos"
 DEFAULT_FILE = "01-midnight-silk.jpg"
 # Shown until swaybg has drawn the image, and if the image is ever missing.
 # Must match misc:background_color in hyprland.conf.
-FALLBACK_COLOR = "#0d0f12"
+FALLBACK_COLOR = "#060a11"
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 
 CATALOG = (

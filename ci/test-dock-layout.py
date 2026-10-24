@@ -261,14 +261,21 @@ class DockWindowTests(unittest.TestCase):
         self.assertNotIn("vertical", self.classes(dock))
         self.assertNotIn("compact", self.classes(dock))
 
-    def test_clock_is_stacked_only_on_vertical_docks(self):
+    def test_dock_has_a_launcher_first_and_no_clock(self):
+        """One launcher, then the pinned apps; the clock lives in the status
+        bar (a second clock in the dock was the old design's duplicate)."""
         dock = self.make_dock()
-        self.assertEqual(dock.clock_label.get_text().count("\n"), 0)
-        self.assertRegex(dock.clock_label.get_text(), r"^\d\d:\d\d$")
-        dock.apply_layout("right", "default")
-        self.assertRegex(dock.clock_label.get_text(), r"^\d\d\n\d\d$")
-        dock.apply_layout("top", "default")
-        self.assertRegex(dock.clock_label.get_text(), r"^\d\d:\d\d$")
+        self.assertFalse(hasattr(dock, "clock_label"))
+        self.assertEqual(
+            list(dock._dock_icons),
+            ["launcher", "files", "terminal", "browser", "notes", "store", "settings"],
+        )
+        launcher = dock._dock_icons["launcher"]
+        self.assertEqual(launcher.get_tooltip_text(), "Apps")
+        # The separator follows the launcher on every edge.
+        for position in ("bottom", "left"):
+            dock.apply_layout(position, "default")
+            self.assertTrue(dock._dock_separator.get_visible())
 
     def test_every_icon_keeps_a_tooltip_and_accessible_name_when_labels_are_hidden(self):
         for saved in ({"dock_position": "left"}, {"dock_size": "compact"}):

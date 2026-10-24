@@ -32,8 +32,7 @@ app = DarkOSApplication()
 app.register(None)
 app.activate()
 if os.environ.get("STALL_OPEN_PANELS", "1") == "1":
-    app.left.show_all()
-    app.right.show_all()
+    app.center.show_all()
 
 gaps, last, started = [], [time.time()], time.time()
 

@@ -71,6 +71,8 @@ jobs:
           python ci/test-window-fx.py
           xvfb-run -a dbus-run-session -- python ci/test-native-apps-linux.py
           xvfb-run -a dbus-run-session -- python ci/test-dock-layout.py
+          xvfb-run -a dbus-run-session -- python ci/test-design-tokens.py
+          xvfb-run -a dbus-run-session -- python ci/test-command-center.py
           xvfb-run -a dbus-run-session -- python ci/test-continuous-protection.py
           xvfb-run -a dbus-run-session -- python ci/test-security-ui.py
           xvfb-run -a dbus-run-session -- python ci/test-polish.py
