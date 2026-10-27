@@ -88,7 +88,7 @@ class NotesWindow(Gtk.ApplicationWindow):
         if self.standalone_mode:
             edit_toolbar.pack_start(make_icon_button("document-save-symbolic", "Save", self._manual_save), False, False, 0)
         else:
-            edit_toolbar.pack_start(make_icon_button("edit-symbolic", "Rename note", self._rename_note), False, False, 0)
+            edit_toolbar.pack_start(make_icon_button("document-edit-symbolic", "Rename note", self._rename_note), False, False, 0)
         editor_box.pack_start(edit_toolbar, False, False, 0)
 
         self.textview = Gtk.TextView()

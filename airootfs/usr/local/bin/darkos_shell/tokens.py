@@ -163,6 +163,9 @@ FONT_BODY = "Inter, \"Noto Sans\", sans-serif"
 FONT_HEADING = FONT_BODY
 FONT_MONO = "\"JetBrainsMono Nerd Font\", \"JetBrains Mono\", \"Fira Code\", monospace"
 
+# The same mono families in the comma-separated form Pango (VTE) wants.
+FONT_MONO_PANGO = "JetBrainsMono Nerd Font, JetBrains Mono, Fira Code, monospace"
+
 # Type scale: caption / body / lead / title / display. CSS may only use these.
 FONT_SIZE_CAPTION = 12
 FONT_SIZE_BODY = 14

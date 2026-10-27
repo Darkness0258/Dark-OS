@@ -46,7 +46,7 @@ POWER_PROFILE_SET_TIMEOUT = 45
 
 CATEGORIES = [
     ("system", "System", "computer-symbolic"),
-    ("performance", "Performance", "utilities-system-monitor-symbolic"),
+    ("performance", "Performance", "power-profile-performance-symbolic"),
     ("updates", "Updates", "software-update-available-symbolic"),
     ("config", "Config", "text-x-generic-symbolic"),
     ("devices", "Devices", "drive-harddisk-symbolic"),
@@ -55,14 +55,40 @@ CATEGORIES = [
     ("startup", "Startup", "media-playback-start-symbolic"),
     ("storage", "Storage", "drive-multidisk-symbolic"),
     ("fonts", "Fonts", "font-x-generic-symbolic"),
-    ("icons", "Icons", "preferences-desktop-icons-symbolic"),
-    ("themes", "Themes", "preferences-desktop-theme-symbolic"),
+    ("icons", "Icons", "view-app-grid-symbolic"),
+    ("themes", "Themes", "preferences-desktop-appearance-symbolic"),
     ("wallpaper", "Wallpaper", "preferences-desktop-wallpaper-symbolic"),
     ("motion", "Motion", "preferences-desktop-accessibility-symbolic"),
-    ("designer", "Designer", "applications-graphics-symbolic"),
+    ("designer", "Dock & panels", "applications-graphics-symbolic"),
     ("permissions", "Permissions", "security-high-symbolic"),
     ("accessibility", "Accessibility", "preferences-desktop-accessibility-symbolic"),
 ]
+
+
+# The sidebar is grouped, not one 17-row list. Ids only: CATEGORIES above stays
+# the single place for labels and icons. Any category missing here is listed
+# under "More" so a page can never silently vanish from the sidebar.
+CATEGORY_GROUPS = (
+    ("Appearance", ("themes", "wallpaper", "fonts", "icons", "designer")),
+    ("System", ("system", "performance", "updates", "storage", "devices", "config",
+                "startup", "services", "users")),
+    ("Access & privacy", ("accessibility", "motion", "permissions")),
+)
+
+
+def grouped_categories():
+    """[(heading, [(id, label, icon), ...]), ...] covering every category once."""
+    by_id = {cid: (cid, label, icon) for cid, label, icon in CATEGORIES}
+    groups, placed = [], set()
+    for heading, ids in CATEGORY_GROUPS:
+        members = [by_id[cid] for cid in ids if cid in by_id]
+        placed.update(cid for cid, _l, _i in members)
+        if members:
+            groups.append((heading, members))
+    leftovers = [item for item in CATEGORIES if item[0] not in placed]
+    if leftovers:
+        groups.append(("More", leftovers))
+    return groups
 
 
 def parse_checkupdates(output):
@@ -222,17 +248,27 @@ class SettingsWindow(Gtk.ApplicationWindow):
 
         self.sidebar = Gtk.ListBox()
         add_class(self.sidebar, "sidebar")
-        for cid, label, icon in CATEGORIES:
-            row = Gtk.ListBoxRow()
-            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            hbox.set_margin_top(4)
-            hbox.set_margin_bottom(4)
-            add_class(hbox, "sidebar-row")
-            hbox.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
-            hbox.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
-            row.add(hbox)
-            row.category_id = cid
-            self.sidebar.add(row)
+        self.category_rows = {}
+        for heading, members in grouped_categories():
+            heading_row = Gtk.ListBoxRow()
+            heading_row.set_selectable(False)
+            heading_row.set_activatable(False)
+            heading_label = Gtk.Label(label=heading.upper(), xalign=0)
+            add_class(heading_label, "sidebar-heading")
+            heading_row.add(heading_label)
+            self.sidebar.add(heading_row)
+            for cid, label, icon in members:
+                row = Gtk.ListBoxRow()
+                hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+                hbox.set_margin_top(4)
+                hbox.set_margin_bottom(4)
+                add_class(hbox, "sidebar-row")
+                hbox.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
+                hbox.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+                row.add(hbox)
+                row.category_id = cid
+                self.category_rows[cid] = row
+                self.sidebar.add(row)
         self.sidebar.connect("row-selected", self._on_category_selected)
         scroller = Gtk.ScrolledWindow()
         scroller.set_size_request(200, -1)
@@ -263,18 +299,19 @@ class SettingsWindow(Gtk.ApplicationWindow):
         }
         for cid, _label, _icon in CATEGORIES:
             page = self._wrap_page(builders[cid]())
+            # A Gtk.Stack only switches to a child that is itself visible, so
+            # without this the sidebar could highlight one page while the
+            # first-added page was displayed (and launcher deep links, which
+            # select a page before the window is shown, did nothing).
+            page.show_all()
             self.stack.add_named(page, cid)
         body.pack_start(self.stack, True, True, 0)
 
+        # DARKOS_SETTINGS_TAB (the launcher's deep links) wins; otherwise open
+        # on the first real page, never on a group heading.
         wanted = os.environ.get("DARKOS_SETTINGS_TAB", "")
-        selected = False
-        for index, (cid, _label, _icon) in enumerate(CATEGORIES):
-            if cid == wanted:
-                self.sidebar.select_row(self.sidebar.get_row_at_index(index))
-                selected = True
-                break
-        if not selected:
-            self.sidebar.select_row(self.sidebar.get_row_at_index(0))
+        first = grouped_categories()[0][1][0][0]
+        self.sidebar.select_row(self.category_rows.get(wanted) or self.category_rows[first])
 
     def _wrap_page(self, content):
         scroller = Gtk.ScrolledWindow()

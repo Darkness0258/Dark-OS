@@ -23,24 +23,39 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Vte  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from darkos_shell.css import apply_css  # noqa: E402
 from darkos_shell.app_kit import build_titlebar  # noqa: E402
+from darkos_shell.palette import ensure_contrast  # noqa: E402
+from darkos_shell.tokens import (  # noqa: E402
+    ACCENT,
+    FONT_MONO_PANGO,
+    SURFACE_BASE,
+    SURFACE_RAISED,
+    TEXT,
+    TEXT_MUTED,
+)
 
 APP_ID = "org.darkos.Terminal"
 WM_CLASS = "darkos-terminal"
 DEFAULT_TITLE = "Shell"
 
-# ANSI 0-15. Slots 0/2/4/5/6/12/13/14/15 map straight to design tokens;
-# red/yellow/white get colors of their own because the token set doesn't
-# define values that would read correctly in those ANSI slots (e.g. the
-# warning-orange token in the "yellow" slot breaks tools that expect a
-# real yellow for diffs/warnings).
+# Background, foreground, cursor and font come from the design tokens, so the
+# terminal follows the theme. The ANSI hues are the conventional ones, nudged
+# only as far as needed to read on that background: 4.5:1 for the eight
+# colours programs print text in, 3:1 for bright black ("dim" text such as
+# comments and prompts), checked by ci/test-void.py.
+BACKGROUND = SURFACE_BASE
+FOREGROUND = TEXT
+
+
+def _readable(color, minimum=4.5):
+    return ensure_contrast(color, BACKGROUND, minimum)
+
+
 PALETTE = [
-    "#0d0f12", "#ff5f5f", "#22e07a", "#e5c07b",
-    "#2d7bff", "#a855f7", "#00b8d4", "#9aa4ad",
-    "#3a3f47", "#ff8a8a", "#5eff9f", "#ffd479",
-    "#6fa8ff", "#c583ff", "#00e5ff", "#f2f5f7",
+    SURFACE_RAISED, _readable("#ff6a65"), _readable("#5edb81"), _readable("#fabb41"),
+    _readable("#5b9bff"), _readable("#b57aff"), _readable("#2fd0e0"), TEXT_MUTED,
+    _readable("#7c8793", 3.0), _readable("#ff8f8a"), _readable("#86efac"), _readable("#ffd479"),
+    _readable("#8dbbff"), _readable("#d0a2ff"), _readable("#67e8f9"), TEXT,
 ]
-FOREGROUND = "#f2f5f7"
-BACKGROUND = "#0a0c0f"
 
 
 def add_class(widget, class_name):
@@ -75,6 +90,7 @@ class TerminalPage(Gtk.Box):
         self._apply_font()
         self.vte.set_colors(_rgba(FOREGROUND), _rgba(BACKGROUND),
                              [_rgba(c) for c in PALETTE])
+        self.vte.set_color_cursor(_rgba(ACCENT))
 
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -97,7 +113,7 @@ class TerminalPage(Gtk.Box):
         )
 
     def _apply_font(self):
-        self.vte.set_font(Pango.FontDescription(f"JetBrains Mono {self.font_size}"))
+        self.vte.set_font(Pango.FontDescription(f"{FONT_MONO_PANGO} {self.font_size}"))
 
     def zoom(self, delta=0, reset=False):
         self.font_size = 11 if reset else max(6, min(32, self.font_size + delta))
@@ -121,6 +137,10 @@ class TabLabel(Gtk.Box):
     def __init__(self, text, on_close):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.label = Gtk.Label(label=text)
+        # width_chars is the *minimum*: an ellipsized label with only a max
+        # collapses to "..." in a Gtk.Notebook tab, which is how every tab
+        # ended up unreadable.
+        self.label.set_width_chars(10)
         self.label.set_max_width_chars(18)
         self.label.set_ellipsize(Pango.EllipsizeMode.END)
         close_btn = Gtk.Button()

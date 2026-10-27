@@ -418,16 +418,22 @@ root = Path(sys.argv[1])
 waybar = json.loads((root / "etc/xdg/waybar/config").read_text(encoding="utf-8"))
 required_modules = {
     "tray",
-    "backlight",
     "custom/bluetooth",
     "network",
     "pulseaudio",
     "battery",
-    "custom/avatar",
+    "custom/control",
+    "custom/power",
 }
 missing_modules = required_modules.difference(waybar["modules-right"])
 if missing_modules:
     raise SystemExit(f"Waybar is missing required top-bar modules: {sorted(missing_modules)}")
+# Calm Dark status bar: no placeholder modules (a brightness icon with no
+# click action, an avatar that said "future Settings app", a text logo).
+all_modules = waybar["modules-left"] + waybar["modules-center"] + waybar["modules-right"]
+stubs = {"backlight", "custom/avatar", "custom/logo"}.intersection(all_modules)
+if stubs:
+    raise SystemExit(f"Waybar still lists placeholder modules: {sorted(stubs)}")
 if "timeout 2 bluetoothctl show" not in waybar["custom/bluetooth"].get("exec", ""):
     raise SystemExit("Waybar Bluetooth status query is not time-bounded")
 

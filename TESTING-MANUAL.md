@@ -21,6 +21,38 @@ Nothing below needs the desktop to be usable; run it in a terminal.
 | 0b.6 | `grep -c darkos/env /usr/local/bin/start-hyprland` | `0` |
 | 0b.7 | `hyprctl configerrors` | empty. If not, send the output: it is the single most useful line |
 
+## 0c. Checks specific to the 2026-10-22 Calm Dark pass (after 0b)
+
+Build under test: branch `calm-dark` (merge it, push to `main`, let CI build). What
+changed: one dock and one slim status bar instead of rail + dock + bar, one
+Command Center instead of two panels, a generated palette, solid windows, shorter
+animations, a grouped Settings sidebar, and The Void's colours and tabs.
+**None of this has been seen on Hyprland or booted**; the sandbox used headless
+sway (no blur, no `hyprctl`). Judge the glass, the border and the animations here.
+
+| # | Do this | Expected |
+|---|---|---|
+| 0c.1 | Log in and look | Three things only: a slim bar at the top (logo, window title, clock in the middle, status icons), one dock at the bottom (Apps, divider, Files, Terminal, Browser, Notes, Store, Settings). No left icon rail, no second clock, no avatar button, no wide "DARK OS" text |
+| 0c.2 | Click **Apps** in the dock | The same search overlay as `Super+E` |
+| 0c.3 | Click the control icon at the right end of the bar, or `Super+H` | One panel at the top right: five toggles, volume and brightness sliders, Notifications, System rows, Calendar. No weather, no rings, no "not connected" text. `Esc` closes it |
+| 0c.4 | Run `notify-send Hi test`, let the pop-up fade, open the panel | "Hi" is listed. **Clear all** empties the list and it stays empty until a new one arrives |
+| 0c.5 | Drag the volume slider, then `pamixer --get-volume` | Matches where you let go. Sliders for a missing backend (no backlight in a VM) are simply absent |
+| 0c.6 | Play audio in a player, open the panel; quit the player | "Now playing" appears, then disappears. Nothing shows when no player runs |
+| 0c.7 | Leave the panel closed, run `top` | `darkos-shell.py` is near 0% CPU: its timers stop while the panel is hidden |
+| 0c.8 | Open Files, Settings and The Void | One title bar style, blue-grey surfaces (not pure black), windows solid (nothing see-through), only the focused window has a thin cyan border |
+| 0c.9 | Open Settings | Sidebar has headings Appearance / System / Access & privacy; no blank placeholder icons; opens on Themes |
+| 0c.10 | `Super+E`, type `dock`, Enter | Settings opens on **Dock & panels** (the page the search entry names) |
+| 0c.11 | In The Void open three tabs | Each tab title is readable, not "..." |
+| 0c.12 | Press `Tab` through Settings | A visible cyan ring follows keyboard focus; nothing else glows |
+| 0c.13 | Settings > Themes: pick red, restart the shell (`pkill -f darkos-shell.py; python /usr/local/bin/darkos-shell.py &`) | Accent turns red in the shell and apps and text stays readable. Waybar and notification borders stay cyan (known: static files use the default accent) |
+| 0c.14 | Settings > Accessibility > High contrast, restart the shell | Opaque black and white, 2 px borders, no translucency |
+| 0c.15 | Open/close a window, switch workspace | About 0.2 s, no bounce, nothing loops |
+| 0c.16 | `hyprctl configerrors` | Empty. `animation = layers` and the single-colour `col.active_border` are new |
+
+Automated, on any dev machine with GTK3 (see CLAUDE.md for the packages):
+`python ci/test-design-tokens.py`, `test-command-center.py`, `test-ui-consistency.py`,
+`test-void.py`, `python tools/gen-theme.py --check`, `bash ci/headless/run-all.sh`.
+
 ## 0. What was and was not verified before you got this
 
 Verified in a Linux sandbox (Python/GTK/headless sway):

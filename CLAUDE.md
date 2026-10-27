@@ -100,18 +100,19 @@ Runtime scripts are in `airootfs/usr/local/bin/`, three `.desktop` launchers in 
 
 ## Architecture
 
-### Shell surface (Phase 2)
+### Shell surface (Calm Dark)
 
-The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) owned by a single `Gtk.Application` instance. A fresh instance is created on the first `activate()` call; subsequent calls return immediately — this is why command-line flags like `--toggle-command-center` work on an already-running process. The application owns shared toggle state (`wifi`, `bluetooth`, `dark_mode`, `night_light`, `focus`, `airplane`) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
+The shell is a single GTK3 + gtk-layer-shell Python process (`darkos-shell.py`) owned by a single `Gtk.Application` instance. A fresh instance is created on the first `activate()` call; subsequent calls return immediately, which is why command-line flags like `--toggle-command-center` work on an already-running process. The application owns shared toggle state (`wifi`, `bluetooth`, `night_light`, `focus`, `airplane`; every one has a real backend) and propagates it to registered listeners via `register_state_listener` / `notify_state_listeners`.
 
-Four independent layer-shell windows are anchored separately to compositor edges:
+Two layer-shell windows, plus Waybar as the status bar:
 
-- `darkos-dock` — floating bottom dock (Files, Terminal, Browser, live clock, Notes, Store, Settings, Logout via wlogout). Exclusive zone is computed from the measured dock thickness (`tokens.dock_exclusive_zone`).
-- `darkos-rail` — left-side vertical icon rail (10 actions: Search, Files, Terminal, Settings, Browser, Gallery, Store, Notes, Music, Gaming).
-- `darkos-left` — left-of-center panels (weather stub, system overview with live CPU/GPU/RAM/Disk gauges). Refreshes every 2s via `SystemSampler` reading `/proc/stat`, `/proc/meminfo`, `/sys/class/drm`, and `/proc/net/dev`.
-- `darkos-right` — right-of-center panels (notifications, connectivity toggles, media widget reading `playerctl`, calendar).
+- `darkos-dock` (`DarkOSDockWindow`): floating dock on any edge. An **Apps** button (runs `darkos-window-fx.py --search`, the same overlay as `Super+E`), a divider, then Files, Terminal, Browser, Notes, Store, Settings. No clock (it is in Waybar). Exclusive zone is computed from the measured dock thickness (`tokens.dock_exclusive_zone`). The only surface that is frosted (blurred by the compositor).
+- `darkos-center` (`DarkOSCommandCenter`): one solid panel at the top right, closed at start. Five toggles, volume and brightness sliders (read from `pamixer` / `brightnessctl`; a slider with no backend is hidden), notifications (parsed from `makoctl list` + `makoctl history` JSON; "Clear all" remembers the newest id because mako cannot clear history), a media section that exists only while a player does, compact `ResourceRow`s for CPU / memory / disk / GPU (GPU hidden when unavailable) and a calendar. Timers start on map and stop on unmap. `--toggle-side-panels`, `--toggle-command-center` and `--toggle-control` all toggle it.
+- Waybar (`etc/xdg/waybar/`): the slim top bar. Its `style.css` is generated, see below.
 
-`set_installer_mode(on)` hides all four surfaces and records their visibility; `set_installer_mode(off)` restores them. This is the mechanism `darkos-installer` uses to suspend the shell while Calamares runs.
+Gotchas that already cost time: a layer-shell window is sized to its *minimum* request, so the panel pins its scroller's `min_content_height` to the content (`_fit_height`); `show_all()` does nothing on a `no_show_all` widget, so use `reveal()`; a `Gtk.Stack` only switches to a child that is itself visible.
+
+`set_installer_mode(on)` hides both surfaces and records their visibility; `set_installer_mode(off)` restores them. This is the mechanism `darkos-installer` uses to suspend the shell while Calamares runs.
 
 ### Installer flow
 
@@ -192,7 +193,9 @@ Changes that work on bare metal may fail silently in VMware. Test inside the QEM
 
 ## Shell CSS and Design Tokens
 
-`darkos-shell.py` defines color constants in two forms: hex strings for CSS injection and `(r, g, b)` tuples for Cairo rendering. Both derive from `darkos_shell/tokens.py`, the source of truth. When changing a token, update both the hex constant and the Cairo tuple, and the corresponding CSS `alpha()` call if the alpha changes. The glow system uses three layered strokes (sharp core, mid glow, outer haze) — this applies to all Cairo-drawn elements (gauges). GTK widget glow uses CSS `box-shadow` with `alpha(color, 0.20)`.
+`darkos_shell/palette.py` (pure Python, no GTK) generates the colours: three tonal surfaces (base, raised, overlay), text, one accent and semantic colours, from the accent seed (default `#00E5FF`), and validates them (`validate()`: 4.5:1 text, 3:1 control borders, surface steps of at least 1.15:1, any accent). `tokens.py` reads settings once at import and exposes the palette, the type scale (12/14/16/20/28), spacing (4/8/16/32/48), radii (8/16/24) and motion targets; the old `COLOR_*` / `CAIRO_*` names are kept as aliases (one accent: blue and purple are gone). `css.py` renders the stylesheet from a `string.Template` (no doubled braces); it may only use scale font sizes and palette colours, no transitions, and a glow ring only on `:focus` (all enforced by `ci/test-design-tokens.py`).
+
+Static files cannot read tokens, so `tools/gen-theme.py` renders them from the same palette: `waybar/style.css`, `mako/config` and `regreet.css` whole, and only the colour lines of `hyprlock.conf`, `hyprland.conf`, Calamares `branding.desc`/`show.qml` and `wallpapers.FALLBACK_COLOR`. Run `python3 tools/gen-theme.py` after changing the palette; CI runs `--check`. Known limit: they use the default accent, so a custom accent recolours the shell and apps (after a shell restart) but not these. Appearance settings say "Applies after restart" unless they really apply live.
 
 ## CI
 
@@ -210,7 +213,7 @@ GitHub Actions (`.github/workflows/build-iso.yml`) runs on every push to `main` 
 
 ## Design System Reference
 
-Visual design tokens live in `darkos_shell/tokens.py`, the source of truth; `css.py` and the Cairo drawing code derive from it. Design direction and rules are in `docs/MASTER-PLAN.md`.
+Colours come from `darkos_shell/palette.py`, exposed through `darkos_shell/tokens.py` (the source of truth for the shell and apps); `css.py` and `tools/gen-theme.py` derive from them. Design direction and rules are in `docs/MASTER-PLAN.md` section 5.
 
 ## Multi-Agent Instructions
 
@@ -228,3 +231,26 @@ The AI assistant was removed on 2026-10-17 (and its leftovers on 2026-10-19). Ea
 - **Nothing blocks the GTK main thread.** The dock polls `hyprctl` on a worker thread, and hidden panels do not poll. Keep it that way; new periodic work needs the same.
 - **Adding a file** still means registering it in `build-iso.sh`, `profiledef.sh` and `ci/verify-iso.sh`.
 
+## Running the tests in an Ubuntu 24.04 sandbox
+
+```
+apt-get install -y --no-install-recommends python3-gi python3-gi-cairo gir1.2-gtk-3.0 \
+  gir1.2-vte-2.91 gir1.2-gtklayershell-0.1 gir1.2-poppler-0.18 xvfb dbus-x11 \
+  fonts-inter fonts-jetbrains-mono adwaita-icon-theme sway grim mako-notifier \
+  libnotify-bin waybar
+export PYTHONDONTWRITEBYTECODE=1
+python3 ci/test-app-kit.py        # plain ones
+xvfb-run -a dbus-run-session -- python3 ci/test-design-tokens.py   # GTK ones
+bash ci/headless/run-all.sh       # real shell on headless sway
+python3 tools/gen-theme.py --check
+```
+
+Screenshots on headless sway (no blur, no Hyprland) are a layout check, not a look check. `__pycache__` must not end up in the repo or a zip handed to the user.
+
+## Where we left off (2026-10-22)
+
+Branch `calm-dark` holds the Calm Dark pass (see `docs/STATUS.md`). The user's order of work is: redesign the UI/UX (shell, tokens, CSS and Settings are done; the other apps pick the design up through the shared stylesheet and are unchecked), then **The Void** (the terminal, `darkos-terminal.py`) made more powerful than a normal terminal with BlackArch abilities, then make every app and package work, then the backlog. The user asked for implementation, not coaching, for this work.
+
+**The Void v2, not started.** Today it is 273 lines of GTK3 + VTE: tabs, zoom, copy/paste. The generic app test instantiates the first `Gtk.ApplicationWindow` subclass in the module with only `app`, and `ci/test-native-apps-linux.py` drives `--cwd DIR` and `-e CMD ARGS`; keep both contracts. Plan: put the logic in a GTK-free package (`darkos_void/`: engagement workspace, tool catalogue, link classification) so it is unit-testable, with the window in `darkos-terminal.py`. Features, in value order: (1) split panes and a pane/tab model with focus and close rules; (2) search in scrollback (`Vte.Regex`, next/previous); (3) an **engagement workspace**: a name, a target and a notes folder (`~/engagements/<name>/{scans,loot,notes,logs}` plus `engagement.json`), exported as `TARGET` / `ENGAGEMENT_DIR` to new shells; (4) session logging per tab (wrap the shell in `script -qf`) and "save scrollback as text"; (5) a **tool launcher** over the BlackArch groups already defined in `airootfs/usr/local/bin/darkos-tool-groups` (installed state via `pacman -Qq`, insert a command template with `$TARGET` expanded, never auto-run), installing through the existing group installer; (6) clickable URLs, IPs, CIDRs, hashes and CVE ids via `match_add_regex`, with a context menu ("set as target", copy, open); (7) a command palette. Do not reimplement security tools; make them discoverable and context-aware. Tests: `ci/test-void.py` already pins the theme and tab fixes; add pure tests for the package and VTE tests under xvfb. Register every new `ci/test-*.py` in `.github/workflows/build-iso.yml` or `ci/test-ci-coverage.py` fails.
+
+**App audit, not started.** For each `.desktop` in `airootfs/usr/share/applications`: `Exec` resolves, `Icon` exists (standard names only; the `darkos-*` window ids are not icons), `Categories` valid. For each `darkos-*.py`: imports and external commands against `packages.x86_64`, then start it on headless sway and read stderr. Check `pacman.conf` has `[multilib]` and `[blackarch]` for the packages that need them. Not checkable here: Arch package existence and versions.

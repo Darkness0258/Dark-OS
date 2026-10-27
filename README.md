@@ -34,7 +34,7 @@ GTK startup checks are not a claim of full daily-driver or hardware acceptance.
   <img src="preview.webp" alt="DarkOS desktop preview" width="720">
 </p>
 
-*Top bar, floating glass panels, left icon rail, and dock — running on Hyprland.*
+*Preview of the previous design (top bar, floating panels, left icon rail and dock). The Calm Dark redesign has one slim top bar, one dock and one Command Center panel; see docs/STATUS.md.*
 
 ## Quick Start
 
@@ -121,14 +121,9 @@ The shipped Phase 2 login stack and shell chrome were validated on a fresh erase
 1. **Plymouth Boot Splash**: The DarkOS `CONTROL EVERYTHING` boot animation loads cleanly during initramfs kernel execution.
 2. **ReGreet Login Display Manager**: The `greetd` + `cage` + `regreet` stack starts on boot with the default DarkOS wallpaper, session selector (Hyprland), and user authentication.
 3. **Desktop Shell Chrome**: Post-login Hyprland launches the verified shell surface:
-   - **Top Bar & Left Rail**: Status indicators, workspace switcher, and quick launcher rail.
-   - **System Gauges**: live CPU, RAM, and Disk telemetry gauges in the left panel.
-   - **Floating Dock**: pinned core application shortcuts around a live clock.
-   - **Right Column Panels**: Fully populated and rendered in standard production order:
-     - `Notifications` (System feed, Recent Mako popups, and Clear All action)
-     - `Now Playing` (Album art tile, track metadata, progress bar, and media transport controls)
-     - `Connectivity` (3×2 grid of 6 toggles: Wi-Fi, Bluetooth, Dark Mode, Night Light, Focus, Airplane, plus real Audio Volume and Display Brightness sliders)
-     - `Calendar` (Fixed bottom panel with monthly date grid and month navigation)
+   - **Top Bar**: slim Waybar with the logo, workspaces, window title, a centred clock and status icons.
+   - **Floating Dock**: an Apps button (the `Super+E` search overlay) and the pinned core applications.
+   - **Command Center**: one solid panel (control icon in the bar, or `Super+H`): Wi-Fi, Bluetooth, Night Light, Focus and Airplane toggles, real volume and brightness sliders, notifications from mako with Clear all, Now Playing (only while a player runs), compact CPU / memory / disk rows and a calendar.
 4. **The Void & BlackArch First-Boot Flow**: `darkos-firstboot-tools` prompts on initial desktop entry, launching the VTE-backed The Void wrapper (`darkos-terminal.py`) to execute `darkos-tool-groups`, which performs live pacman database synchronization and presents the interactive BlackArch tool group selector.
 
 ## Project Structure
@@ -178,7 +173,7 @@ Tokens live in [tokens.py](airootfs/usr/local/bin/darkos_shell/tokens.py); the d
 
 See [CLAUDE.md](CLAUDE.md) for the build invariants and [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) for the plan. Key principles:
 
-- A single GTK3 + gtk-layer-shell shell process draws the dock, rail and panels
+- A single GTK3 + gtk-layer-shell shell process draws the dock and the Command Center; Waybar is the status bar
 - Hosted apps (browser, media player, containers) are never modified — visual consistency comes from Hyprland's compositor-level decorations
 - The AI assistant (Iras) and the HUD were removed on 2026-10-17, and nothing in the session polls for AI context. Nine wallpapers ship in `/usr/share/backgrounds/darkos/` (default: Midnight Silk); Settings > Wallpaper switches between them or takes your own image
 

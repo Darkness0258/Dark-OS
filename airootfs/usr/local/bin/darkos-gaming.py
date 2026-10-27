@@ -500,7 +500,7 @@ class GamingWindow(Gtk.ApplicationWindow):
         for key, name, icon_name in (
             ("wine", "Wine", "wine"),
             ("proton", "Proton", "applications-games-symbolic"),
-            ("waydroid", "Waydroid", "smartphone-symbolic"),
+            ("waydroid", "Waydroid", "phone-symbolic"),
         ):
             root.pack_start(self._build_status_row(key, name, icon_name), False, False, 0)
 

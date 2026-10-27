@@ -1,6 +1,6 @@
 # DarkOS status
 
-Updated 2026-10-19 (P0 "repo truth" pass). Tags are the ones defined in
+Updated 2026-10-22 (Calm Dark pass on top of the P0 "repo truth" pass). Tags are the ones defined in
 [MASTER-PLAN.md](MASTER-PLAN.md): **[C]** checked in the repo or a sandbox, never on a
 booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgment.
 
@@ -20,10 +20,46 @@ booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgme
   `v193` to `v194` are consecutive, so no run happened between them. The AI-free tree has
   not been built by CI yet.
 
+## What changed in the Calm Dark pass (branch `calm-dark`) [C]
+
+- **One palette, generated and checked.** `darkos_shell/palette.py` builds three tonal
+  surfaces, text, one accent and semantic colours in OKLCH and validates them against
+  the contrast rules for any accent. `tokens.py` and `css.py` are built on it; the old
+  token names are aliases. `tools/gen-theme.py` renders Waybar, mako, the login screen
+  and the colour lines of hyprlock, Hyprland and Calamares from the same palette, and
+  `--check` fails CI on drift.
+- **Chrome reduced to a bar, a dock and a panel.** The icon rail, the weather panel,
+  the ring gauges, the dock clock, the fake Dark Mode toggle, the Waybar logo text and
+  avatar stub are gone. The dock has an Apps button (the `Super+E` overlay). The
+  Command Center is one solid panel; sliders read the real volume and brightness,
+  notifications come from real `makoctl` output, media only shows while a player runs,
+  and its timers stop while it is hidden.
+- **Hyprland:** solid app windows, 200-250 ms animations, one accent focus border.
+- **Settings:** grouped sidebar, five icons the theme lacked replaced, and a bug fixed
+  where the sidebar could highlight one page while another was displayed.
+- **The Void:** colours, cursor and font from tokens; tab labels no longer collapse.
+- **New tests, all in CI:** `test-design-tokens.py` (46), `test-command-center.py` (20),
+  `test-ui-consistency.py` (8), `test-void.py` (7). The headless-sway suite passes
+  (dock matrix 32/32, zero main-loop stalls). Writing the tests found three real bugs
+  in the new code (sliders and media could never appear; the panel collapsed to a
+  sliver; the Settings stack ignored page switches).
+
+## Not done yet (next session, in this order)
+
+1. **The Void v2** (see CLAUDE.md "Where we left off"). Only its theme and tab bug are fixed.
+2. **App audit:** every launcher's `Exec`/`Icon`, every dependency against
+   `packages.x86_64`, every app started on headless sway with its stderr read.
+3. Welcome app, task manager, display settings, AC/battery timings, mirror ranking,
+   opt-in Store, packaging, Update Center, base diet (the backlog; plan P5+).
+
 ## What is not verified
 
 - **Boot, login, lag, install, every keybind, every new setting [U].** Nothing has been
   booted since the removal. This is P1 in the plan, and it needs you.
+- **How the redesign looks on Hyprland [U].** Screenshots were taken on headless sway: no
+  blur, no `hyprctl`, no Nerd Font (status-bar glyphs showed as boxes there). Also
+  unchecked: Waybar's `image` module (the logo) and `makoctl` JSON on Arch's versions
+  (tested on Waybar 0.9.24 and mako 1.8 from Ubuntu 24.04).
 - **That Hyprland accepts `hyprland.conf` on the shipped version [U].** Run
   `hyprctl configerrors` first (plan Appendix B).
 - **The new CI test lines on Arch's package versions [U].** They only import packages the

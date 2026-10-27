@@ -193,7 +193,7 @@ class FileExplorerWindow(Gtk.ApplicationWindow):
         copy_btn = make_icon_button("edit-copy-symbolic", "Copy", self._copy_selected)
         cut_btn = make_icon_button("edit-cut-symbolic", "Cut", self._cut_selected)
         paste_btn = make_icon_button("edit-paste-symbolic", "Paste", self._paste)
-        rename_btn = make_icon_button("edit-symbolic", "Rename", self._rename_selected)
+        rename_btn = make_icon_button("document-edit-symbolic", "Rename", self._rename_selected)
         delete_btn = make_icon_button("user-trash-symbolic", "Move to Trash", self._delete_selected)
         compress_btn = make_icon_button("package-x-generic-symbolic", "Compress selection", self._compress_selected)
         terminal_btn = make_icon_button("utilities-terminal-symbolic", "Open Terminal Here", self._open_terminal_here)

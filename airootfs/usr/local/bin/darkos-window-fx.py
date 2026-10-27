@@ -105,7 +105,7 @@ SETTINGS_CATALOG = (
     ("wallpaper", "Wallpaper", "Desktop background"),
     ("motion", "Motion", "Reduce motion, animations"),
     ("updates", "Updates", "Check and install system updates"),
-    ("designer", "Designer", "Corner radius, dock position, dock size"),
+    ("designer", "Dock & panels", "Corner radius, dock position, dock size"),
     ("permissions", "Permissions", "App permissions"),
     ("accessibility", "Accessibility", "Magnifier, high contrast, captions, sticky keys"),
 )
