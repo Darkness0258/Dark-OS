@@ -1,6 +1,6 @@
 # DarkOS status
 
-Updated 2026-10-22 (Calm Dark pass on top of the P0 "repo truth" pass). Tags are the ones defined in
+Updated 2026-11-02 (The Void v2 + app audit pass on top of Calm Dark). Tags are the ones defined in
 [MASTER-PLAN.md](MASTER-PLAN.md): **[C]** checked in the repo or a sandbox, never on a
 booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgment.
 
@@ -44,12 +44,35 @@ booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgme
   in the new code (sliders and media could never appear; the panel collapsed to a
   sliver; the Settings stack ignored page switches).
 
+## What changed in the Void v2 + app audit pass [C]
+
+- **The Void v2:** split panes, scrollback search, the engagement workspace, session
+  logging + save-scrollback, a BlackArch tool launcher, clickable links, a command
+  palette. Logic moved into a new GTK-free `darkos_void/` package; `darkos-terminal.py`
+  grew from 273 to ~1,020 lines of GTK/VTE chrome. Full detail, including the one real
+  bug a test caught (a `child-exited` race during window teardown) and the one thing
+  that's a manual spot-check item (the live button-click → context-menu hop), is in
+  CLAUDE.md "Where we left off".
+- **`ci/test-void.py`: 7 tests -> 55.** Pure-Python coverage for the whole `darkos_void`
+  package needs no display; the GTK classes drive real spawned shells under xvfb.
+- **App audit, see `docs/APP-AUDIT.md`:** `.desktop` files, imports/external commands
+  vs. `packages.x86_64`, every `darkos-*.py` on headless sway with stderr read,
+  `pacman.conf`'s `[multilib]`/`[blackarch]`. One real bug found and fixed:
+  `darkos-integrity-check.py` crashed outright (not a graceful message) when
+  `aide`/`rkhunter` aren't on PATH. New, kept: `ci/headless/app_launch_check.sh`
+  (the `launch` check in `run-all.sh`) is what found it, and now guards against it
+  coming back.
+- **Reported, not fixed this pass:** most of the app icons are legacy
+  (non-symbolic) names that the real `adwaita-icon-theme` only ships `-symbolic`
+  forms of (15 of 21 distinct `Icon=` values) — see `docs/APP-AUDIT.md` part 1 for
+  the per-app table and the one Arch-only confirmation it's still missing.
+
 ## Not done yet (next session, in this order)
 
-1. **The Void v2** (see CLAUDE.md "Where we left off"). Only its theme and tab bug are fixed.
-2. **App audit:** every launcher's `Exec`/`Icon`, every dependency against
-   `packages.x86_64`, every app started on headless sway with its stderr read.
-3. Welcome app, task manager, display settings, AC/battery timings, mirror ranking,
+1. **App icons:** rename 15 `.desktop` `Icon=` values per `docs/APP-AUDIT.md` part 1
+   (append `-symbolic`, except `clock` and `devhub`/`applications-development`, which
+   need a different name entirely).
+2. Welcome app, task manager, display settings, AC/battery timings, mirror ranking,
    opt-in Store, packaging, Update Center, base diet (the backlog; plan P5+).
 
 ## What is not verified
@@ -65,6 +88,14 @@ booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgme
 - **The new CI test lines on Arch's package versions [U].** They only import packages the
   build container already installs, but they have not run there.
 - **Installer, Btrfs snapshots, ClamAV, firewall on real hardware [U].**
+- **The Void v2's live button-click -> context-menu hop on a real pointer [U].** Every
+  other part of split panes/engagement/tool launcher/logging/palette/link-matching ran
+  against real spawned shells and real VTE under xvfb; only this one interaction (not
+  the regex matching behind it, confirmed separately) needs a human with a mouse —
+  see `TESTING-MANUAL.md`.
+- **Whether real Arch's `adwaita-icon-theme` has the same symbolic-only gaps found on
+  Ubuntu 24.04's [U].** Same upstream GNOME project, so likely, but not the same distro
+  packaging; see `docs/APP-AUDIT.md` part 1.
 
 ## Hardware on record [R]
 

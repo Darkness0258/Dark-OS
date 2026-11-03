@@ -2,7 +2,8 @@
 
 Build under test: the 2026-10-17/18 change set (AI assistant removed, nine
 wallpapers restored with a Settings picker, Lite/Full effects profile, new
-features, lag fixes) as cleaned up by the 2026-10-19 P0 pass. This file lists
+features, lag fixes) as cleaned up by the 2026-10-19 P0 pass, the 2026-10-22
+Calm Dark pass, and the 2026-11-02 Void v2 + app audit pass. This file lists
 feature checks; the boot-truth record to fill in is Appendix B of
 `docs/MASTER-PLAN.md`. Run on **both** the VMware VM and the laptop, and log
 the commit hash (`cat /etc/darkos-build-sha`) and `hyprctl version` every time.
@@ -53,6 +54,43 @@ Automated, on any dev machine with GTK3 (see CLAUDE.md for the packages):
 `python ci/test-design-tokens.py`, `test-command-center.py`, `test-ui-consistency.py`,
 `test-void.py`, `python tools/gen-theme.py --check`, `bash ci/headless/run-all.sh`.
 
+## 0d. Checks specific to The Void v2 + app audit pass (after 0c)
+
+Build under test: branch `calm-dark`. What changed: The Void (`darkos-terminal.py`)
+gained split panes, scrollback search, an engagement workspace, session logging,
+save-scrollback, a BlackArch tool launcher, clickable scrollback links and a command
+palette; one real bug was found and fixed in `darkos-integrity-check.py`. Everything
+below except 0d.14 ran against real spawned shells and real VTE under headless Xvfb —
+**this is the first time any of it has been seen on Hyprland or with a real pointer**.
+
+| # | Do this | Expected |
+|---|---|---|
+| 0d.1 | Open The Void, `Ctrl+Shift+E` | Window splits left/right; focus moves to the new (right) pane, a fresh shell prompt |
+| 0d.2 | In the new pane, `Ctrl+Shift+O` | That pane splits top/bottom; three panes total, independent prompts |
+| 0d.3 | Click into the top-left pane, `Ctrl+Shift+W` | Only that pane closes; its sibling takes its place (no gap, no empty split); the other two panes are untouched |
+| 0d.4 | Keep closing panes with `Ctrl+Shift+W` until one is left, then once more | The tab itself closes (or the window, if it was the only tab) |
+| 0d.5 | Type something, `Ctrl+F`, type a word that's on screen | A find bar slides in at the top of the pane; the match is highlighted |
+| 0d.6 | Press Enter / click the down arrow a few times, then the up arrow | Jumps to the next / previous match, wrapping around at the ends |
+| 0d.7 | `Esc` in the find bar | Bar closes, focus returns to the terminal (typing resumes in the shell, not the search box) |
+| 0d.8 | Click the engagement icon in the tab bar's top-right corner, create one (name + target) | Dialog shows it as "Active: <name> (target: ...)"; `ls ~/engagements/<slug>/` shows `scans/ loot/ notes/ logs/` and `engagement.json` |
+| 0d.9 | Open a new tab (`Ctrl+Shift+T`), run `echo $TARGET $ENGAGEMENT_DIR` | Both are set, matching what you entered in 0d.8 |
+| 0d.10 | Command palette (`Ctrl+Shift+P`), type "target", run **Set Target** with a new value | A dialog asks for the value; after confirming, `echo $TARGET` in the current pane shows the new value immediately |
+| 0d.11 | Command palette, "Start Session Log" | The pane's shell restarts in place (same prompt, same cwd) with a one-line banner naming the log file; run a command, then `cat` that file from another pane — the command and its output are both in it |
+| 0d.12 | Command palette, "Save Scrollback As..." | A normal GTK save dialog; the saved `.txt` file's content matches what's on screen |
+| 0d.13 | Tool launcher icon, pick the **scanner** group, double-click **nmap** | Dialog closes; `nmap -sV -Pn <your target>` (or `nmap -sV -Pn $TARGET` with no engagement active) appears on the pane's current line, **not run** — you have to press Enter yourself |
+| 0d.14 | Same dialog, **Install Group** on any group | Opens a new tab running `sudo darkos-tool-groups install blackarch-<group>`, same as the existing `darkos-tool-groups` launcher |
+| 0d.15 | `printf 'see https://example.com and 203.0.113.9 and CVE-2024-1234\n'` in a pane, then **right-click** each one | **This one needs a human with a real pointer — not run here, see 0d note above.** Expect: a small context menu per kind (URL: Open/Copy; IP: Set as Target/Copy; CVE: Copy only); also try `Ctrl+click` on the URL, which should open it in the default browser directly |
+| 0d.16 | Command palette, type "zoom", run **Zoom In** a couple of times, then **Reset Zoom** | Font grows, then returns to the starting size |
+| 0d.17 | Open Files, right-click a folder, "Open Terminal Here" (or whatever the existing action is called) | Still opens The Void in that folder — the `--cwd` contract is unchanged |
+
+Automated: `python ci/test-void.py` (pure-Python `darkos_void` checks, no display
+needed) and `xvfb-run -a dbus-run-session -- python ci/test-void.py` (adds the GTK
+classes: real split/close-merge, real engagement env injection, real tool-launcher
+insert, real command-palette dispatch, real session-log file, real linkify matches
+on live content) — 55 tests total. `bash ci/headless/run-all.sh launch` starts every
+`darkos-*.py` bare and checks stderr for a traceback (this is what caught the
+`darkos-integrity-check.py` bug).
+
 ## 0. What was and was not verified before you got this
 
 Verified in a Linux sandbox (Python/GTK/headless sway):
@@ -68,12 +106,32 @@ Verified in a Linux sandbox (Python/GTK/headless sway):
   `settings.json` falls back to the default.
 - Screenshots of the Settings Wallpaper, Performance and Updates tabs were
   checked by eye (this found and fixed three layout/legibility bugs).
+- **The Void v2** (split panes, search, engagement workspace, tool launcher,
+  session logging, save-scrollback, command palette, and the regex-matching
+  half of clickable links) against real spawned `/bin/bash` children and real
+  VTE under headless Xvfb — 55 tests in `ci/test-void.py`, plus every
+  pre-existing `ci/test-*.py` re-run clean afterward. Two specifics were
+  checked empirically rather than assumed, since getting either wrong would
+  have broken something real: VTE's `spawn_async` `envv` adds to the
+  inherited environment instead of replacing it (so `TARGET`/`ENGAGEMENT_DIR`
+  don't clobber PATH/HOME), and `Vte.Regex`'s PCRE2 flag values, read from
+  `/usr/include/pcre2.h` rather than typed from memory.
+- **App audit** (`docs/APP-AUDIT.md`): every `.desktop`'s `Exec`/`Icon`/
+  `Categories`, every `darkos-*.py`'s imports/external commands against
+  `packages.x86_64`, every `darkos-*.py` started on headless sway with
+  stderr read (new: `ci/headless/app_launch_check.sh`, the `launch` check),
+  `pacman.conf`'s `[multilib]`/`[blackarch]`.
 
 **NOT verified (needs you, on the ISO):** the ISO build itself, boot, login,
 Hyprland config parsing, every new keybind, Night Light, Focus, Orca, swappy,
 PiP, the Updates tab, the wallpaper on the real greeter and lock screen, and
 above all **whether the lag is actually fixed** (the working theory is that the
-AI assistant caused it; that is untested).
+AI assistant caused it; that is untested). Also not verified: The Void v2's
+live button-click -> context-menu hop on a real pointer (0d.15 — the regex
+matching and the menu actions on either side of that one interaction are both
+covered; only the click itself needs a human), and whether real Arch's
+`adwaita-icon-theme` has the same symbolic-only icon gaps found on Ubuntu's
+(`docs/APP-AUDIT.md` part 1).
 Nothing here replaces testing on the VM.
 
 ## 1. Build
@@ -290,6 +348,9 @@ and a `source` line that I could not check against a real Hyprland.
   (they are in history at `2b149a1`). A small new harness belongs in plan phase P1.
 - The installed-system checks (Btrfs snapshots, ClamAV, firewall) are
   unchanged and still unverified on real hardware.
+- 15 of 21 distinct app icons are legacy (non-symbolic) freedesktop names that
+  the installed `adwaita-icon-theme` only ships `-symbolic` forms of (reported
+  in `docs/APP-AUDIT.md` part 1, not renamed in this pass).
 
 ## 11. Results table (copy per run; plan Appendix B)
 
@@ -307,4 +368,8 @@ Commit: ________   `hyprctl version`: ________
 | 8 Effects level and renderer (Settings > Performance) | | | |
 | 9 Wallpaper picker (5.17-5.22) | | | |
 | 10 Design check (3 screenshots) | | | needs the UI references |
+| 11 The Void: split panes, search, close/merge (0d.1-0d.7) | | | |
+| 12 The Void: engagement workspace, set target, tool launcher (0d.8-0d.10, 0d.13-0d.14) | | | |
+| 13 The Void: session logging, save scrollback, command palette (0d.11-0d.12, 0d.16) | | | |
+| 14 The Void: clickable links, right-click menu, Ctrl+click (0d.15) | | | the one item not run in this pass at all |
 
