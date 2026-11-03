@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run every headless check, each in its own fresh compositor session.
-#   bash ci/headless/run-all.sh [dock|stall|snip ...]     (default: all)
+#   bash ci/headless/run-all.sh [dock|stall|snip|launch ...]  (default: all)
 # Not wired into CI: it needs sway, which the CI container does not install.
 set -u
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -9,7 +9,7 @@ headless_need sway grim wl-copy wl-paste dbus-run-session python3 || {
 python3 -c "import gi; gi.require_version('Gtk','3.0'); gi.require_version('GtkLayerShell','0.1'); from PIL import Image" 2>/dev/null || {
   echo "Need python3 with PyGObject, Gtk 3, gtk-layer-shell and Pillow (see README.md)." >&2; exit 2; }
 
-want=("$@"); [ ${#want[@]} -eq 0 ] && want=(dock stall snip)
+want=("$@"); [ ${#want[@]} -eq 0 ] && want=(dock stall snip launch)
 failed=()
 
 session() {  # session <name> <fresh-compositor commands...>
@@ -34,7 +34,8 @@ for check in "${want[@]}"; do
            session "main-loop stalls, no hyprctl at all" bash -c "dbus-run-session -- python3 '$HEADLESS_DIR/stall_check.py' 2>&1 | grep -v 'dbus-daemon\|SpiRegistry'; exit \${PIPESTATUS[0]}"
            rm -rf "$stub" ;;
     snip)  session "screenshot snip" bash "$HEADLESS_DIR/snip_check.sh" ;;
-    *) echo "unknown check: $check (dock|stall|snip)" >&2; exit 2 ;;
+    launch) session "every darkos-*.py launches without a traceback" bash "$HEADLESS_DIR/app_launch_check.sh" ;;
+    *) echo "unknown check: $check (dock|stall|snip|launch)" >&2; exit 2 ;;
   esac
 done
 
