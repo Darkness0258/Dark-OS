@@ -53,6 +53,83 @@ class IconTests(unittest.TestCase):
         )
 
 
+APPS_DIR = ROOT / "airootfs/usr/share/applications"
+# Icons that belong to another package and so cannot be checked where the
+# tests run (docs/APP-AUDIT.md part 1 lists calamares as unverified).
+EXTERNAL_ICONS = {"darkos-installer.desktop": "calamares"}
+
+
+def launcher_icons():
+    """{desktop file name: Icon= value} for every shipped launcher."""
+    found = {}
+    for path in sorted(APPS_DIR.glob("*.desktop")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("Icon="):
+                found[path.name] = line.split("=", 1)[1].strip()
+                break
+    return found
+
+
+@unittest.skipUnless(GTK_AVAILABLE, "GTK not available")
+class LauncherIconTests(unittest.TestCase):
+    """The dock, the Apps overlay and search take each app's icon from its
+    .desktop `Icon=`. Adwaita 46 ships most legacy names (`system-file-manager`,
+    `preferences-system`, ...) only as `-symbolic`, so the old names drew the
+    generic missing-image placeholder (docs/APP-AUDIT.md part 1).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        # A private theme object: setting gtk-icon-theme-name would leak into
+        # the other tests in this file, and the default depends on the host
+        # (this sandbox's default is Yaru, which is not what the ISO uses).
+        cls.theme = Gtk.IconTheme.new()
+        cls.theme.set_custom_theme("Adwaita")
+        cls.icons = launcher_icons()
+
+    def setUp(self):
+        if not self.theme.has_icon("drive-harddisk-symbolic"):
+            self.skipTest("the Adwaita icon theme is not installed here")
+
+    def test_there_is_a_launcher_to_check(self):
+        self.assertGreaterEqual(len(self.icons), 20, self.icons)
+
+    def test_every_launcher_icon_exists_in_the_theme(self):
+        missing = {}
+        for desktop, name in self.icons.items():
+            if EXTERNAL_ICONS.get(desktop) == name:
+                continue
+            if name.startswith("/"):
+                ok = (ROOT / "airootfs" / name.lstrip("/")).is_file()
+            else:
+                ok = self.theme.has_icon(name)
+            if not ok:
+                missing[desktop] = name
+        self.assertEqual(missing, {}, "these launchers draw a placeholder icon")
+
+    def test_every_launcher_icon_is_the_symbolic_variant(self):
+        # Rule 6: one icon family. A bare name is the legacy colour icon, or
+        # nothing at all.
+        bare = {
+            d: n for d, n in self.icons.items()
+            if EXTERNAL_ICONS.get(d) != n and not n.startswith("/") and not n.endswith("-symbolic")
+        }
+        self.assertEqual(bare, {}, "launchers using a non-symbolic icon name")
+
+    def test_icons_actually_load_when_an_svg_loader_is_present(self):
+        from gi.repository import GdkPixbuf
+
+        if not any("svg" in fmt.get_name() for fmt in GdkPixbuf.Pixbuf.get_formats()):
+            self.skipTest("no SVG pixbuf loader (librsvg) here, so lookup cannot load symbolic icons")
+        unloadable = {}
+        for desktop, name in self.icons.items():
+            if EXTERNAL_ICONS.get(desktop) == name or name.startswith("/"):
+                continue
+            if self.theme.lookup_icon(name, 32, 0) is None:
+                unloadable[desktop] = name
+        self.assertEqual(unloadable, {})
+
+
 @unittest.skipUnless(GTK_AVAILABLE, "GTK not available")
 class SettingsSidebarTests(unittest.TestCase):
     @classmethod
