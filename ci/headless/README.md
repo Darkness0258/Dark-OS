@@ -6,8 +6,8 @@ because the shell is GTK layer-shell code, and nearly all of it used to be
 verified only by `py_compile`.
 
 ```bash
-bash ci/headless/run-all.sh            # all checks, ~2 minutes
-bash ci/headless/run-all.sh dock       # or: dock | stall | snip
+bash ci/headless/run-all.sh            # all checks, ~3 minutes
+bash ci/headless/run-all.sh dock       # or: dock | stall | snip | launch
 ```
 
 | check | what it proves |
@@ -15,6 +15,7 @@ bash ci/headless/run-all.sh dock       # or: dock | stall | snip
 | `dock` (`dock_matrix.py`) | Every dock position x size lays out correctly; the space sway gives a tiled window matches the exclusive zone the dock claims; a change written to `settings.json` reaches the running shell; bad values fall back. Screenshots + `contact-sheet.png` are written to the directory it prints. |
 | `stall` (`stall_check.py`) | The shell's GTK main loop is never blocked for long (a 20 ms heartbeat). Run against an emulated empty Hyprland desktop and against no `hyprctl` at all. This is what found `ActivityDetector` freezing the shell for seconds at a time. |
 | `snip` (`snip_check.sh`) | `--snip-screen` / `--snip` with real `grim`, `wl-copy`, `wl-paste`: file location, clipboard bytes, a region crop that is pixel-identical to the same crop of a full capture, Esc cancels quietly, hostile selector output is rejected. Only the interactive `slurp` picker is replaced by a shim (it needs a pointer). |
+| `launch` (`app_launch_check.sh`) | Every `darkos-*.py` starts (bare, no args), runs 3s, and is killed, with stderr checked for an unhandled Python traceback. A daemon looping forever or a CLI tool printing a usage error and exiting is expected and not a failure; this is what found `darkos-integrity-check.py` crashing outright (not a graceful "not installed" message) when `aide`/`rkhunter` aren't on PATH. The full log is written to the path it prints, for anything worth a closer look beyond the pass/fail count. |
 
 ## What this is not
 
@@ -45,3 +46,6 @@ Not wired into CI: the CI container does not install sway.
   Uses an isolated `$HOME` and `$XDG_RUNTIME_DIR`, so it never touches your
   real settings.
 - `run-all.sh` -- one fresh compositor per check.
+- `app_launch_check.sh` -- the `launch` check; standalone-runnable the same
+  way as `snip_check.sh` (through `run-all.sh`, or inside a session started
+  with `lib.sh` directly).

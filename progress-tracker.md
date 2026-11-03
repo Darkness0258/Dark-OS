@@ -337,3 +337,47 @@ replaced `darkos-update-plan.md` (v2) with `docs/MASTER-PLAN.md` (v5).
 actionlint clean; `start-hyprland` run against a stub Hyprland (old script exported
 `LD_PRELOAD` from the user env file, new one does not). **Not verified:** ISO build of
 this tree, boot, Hyprland config parsing, lag, install.
+
+## 2026-11-02 — The Void v2 + app audit (plan: CLAUDE.md "Where we left off")
+
+**Done:** The Void v2 — split panes (`Ctrl+Shift+E`/`O`, merge-up on close), scrollback
+search (`Ctrl+F`), an engagement workspace (`~/engagements/<name>/{scans,loot,notes,logs}`
++ `engagement.json`, `TARGET`/`ENGAGEMENT_DIR` exported to new panes), session logging
+(`exec script -qfe` fed into a running pane) and save-scrollback-as-text, a BlackArch tool
+launcher (9 groups, 23 tools, `$TARGET`-expanded commands inserted unexecuted), clickable
+URLs/IPv4/CIDR/hashes/CVE ids with a context menu, and a command palette. Logic split into
+a new GTK-free `darkos_void/` package (`engagement.py`, `catalogue.py`, `linkify.py`,
+`commands.py`, `session_log.py`); `darkos-terminal.py` grew from 273 to ~1,020 lines.
+Registered in `build-iso.sh`/`profiledef.sh`/`ci/verify-iso.sh` the same way
+`darkos_shell/*.py` is. App audit — every `.desktop`'s `Exec`/`Icon`/`Categories`, every
+`darkos-*.py`'s imports/external commands against `packages.x86_64`, every `darkos-*.py`
+started on headless sway with stderr read, `pacman.conf`'s `[multilib]`/`[blackarch]` —
+written up in `docs/APP-AUDIT.md`. Found and fixed one real bug it turned up:
+`darkos-integrity-check.py` crashed outright (unhandled `FileNotFoundError`, not a graceful
+message) when `aide`/`rkhunter` aren't on PATH; now matches the `try/except` pattern already
+used elsewhere in the same file. New, kept: `ci/headless/app_launch_check.sh` (the `launch`
+check in `ci/headless/run-all.sh`) is what found it.
+
+**Fixed while testing:** a `child-exited` signal firing after a pane's widget was already
+unparented mid window-destroy (GTK's destroy cascade can reach a leaf before VTE's own
+child-exit notification does) — found by `ci/test-native-apps-linux.py`'s generic smoke
+test, which destroys the window shortly after creating it; two other small GTK-API misses
+(`self.window = ...` colliding with `Gtk.Dialog`'s own read-only `window` field;
+`Gtk.ListBox.append()`, which is GTK4, not GTK3's `.add()`) — both only surfaced by actually
+running the new dialogs, not by reading the code.
+
+**Verified here:** `ci/test-void.py` 7 -> 55 tests (pure-Python package tests need no
+display; GTK tests drive real spawned `/bin/bash` children and real VTE under xvfb) — all
+pass, plus every pre-existing `ci/test-*.py` re-run clean afterward, plus the full
+`ci/headless/run-all.sh` (`dock`+`stall`+`snip`+new `launch`). Two things were checked
+empirically rather than assumed because getting them wrong would have broken something
+real: `Vte.Terminal.spawn_async`'s `envv` *adds* to the inherited environment rather than
+replacing it (confirmed against a real spawned shell before relying on it for
+`TARGET`/`ENGAGEMENT_DIR`, since a replace instead of an add would have broken every pane's
+PATH); and `Vte.Regex`'s PCRE2 flag values (`0x400`/`0x8`), read from
+`/usr/include/pcre2.h` rather than typed from memory, since `Vte.Regex` exposes no named
+constants for them through the GI binding. **Not verified:** the live button-click ->
+context-menu hop on a real pointer device (the regex-matching and action-dispatch either
+side of it are both covered; only that one interaction is a manual spot-check item, in
+`TESTING-MANUAL.md`); whether real Arch's `adwaita-icon-theme` has the same symbolic-only
+icon gaps found here on Ubuntu's; ISO build, boot, real BlackArch tool availability.

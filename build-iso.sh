@@ -140,6 +140,12 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_void/__init__.py
+    usr/local/bin/darkos_void/catalogue.py
+    usr/local/bin/darkos_void/commands.py
+    usr/local/bin/darkos_void/engagement.py
+    usr/local/bin/darkos_void/linkify.py
+    usr/local/bin/darkos_void/session_log.py
 )
 
 # Library modules (not mode-755 executables) that must be byte-identical
@@ -156,6 +162,12 @@ readonly cmp_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_void/__init__.py
+    usr/local/bin/darkos_void/catalogue.py
+    usr/local/bin/darkos_void/commands.py
+    usr/local/bin/darkos_void/engagement.py
+    usr/local/bin/darkos_void/linkify.py
+    usr/local/bin/darkos_void/session_log.py
 )
 
 readonly archiso_hook_packages=(

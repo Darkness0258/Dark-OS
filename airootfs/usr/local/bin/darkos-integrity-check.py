@@ -97,12 +97,23 @@ def _notify(summary: str, body: str, urgency: str = "normal") -> None:
 
 
 def run_aide() -> None:
+    # Same reasoning as _notify()'s try/except: aide ships in packages.x86_64
+    # so it's expected to be there, but "expected" isn't "guaranteed" (a
+    # partial install, an interrupted update, a package someone removed) --
+    # and an unhandled crash here means run_rkhunter() below never runs
+    # either, silently disabling the other half of the integrity check too.
+    # Found by actually running this script and watching it crash when aide
+    # wasn't on PATH, not a hypothetical.
     if not AIDE_DB.exists():
         log.info("no AIDE baseline yet -- initializing (this run establishes it, doesn't check against it)")
-        result = subprocess.run(
-            ["aide", "--config", str(AIDE_CONFIG), "--init"],
-            capture_output=True, text=True, timeout=1800,
-        )
+        try:
+            result = subprocess.run(
+                ["aide", "--config", str(AIDE_CONFIG), "--init"],
+                capture_output=True, text=True, timeout=1800,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            log.error("aide --init could not run (%s) -- skipping AIDE this pass", error)
+            return
         if result.returncode == 0 and AIDE_DB_NEW.exists():
             AIDE_DB_NEW.rename(AIDE_DB)
             log.info("AIDE baseline established")
@@ -110,10 +121,14 @@ def run_aide() -> None:
             log.error("AIDE --init failed (exit %s): %s", result.returncode, result.stderr[:2000])
         return
 
-    result = subprocess.run(
-        ["aide", "--config", str(AIDE_CONFIG), "--check"],
-        capture_output=True, text=True, timeout=1800,
-    )
+    try:
+        result = subprocess.run(
+            ["aide", "--config", str(AIDE_CONFIG), "--check"],
+            capture_output=True, text=True, timeout=1800,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        log.error("aide --check could not run (%s) -- skipping AIDE this pass", error)
+        return
     if result.returncode == 0:
         log.info("AIDE: clean, no changes since baseline")
         return
@@ -127,10 +142,14 @@ def run_aide() -> None:
 
 
 def run_rkhunter() -> None:
-    result = subprocess.run(
-        ["rkhunter", "--cronjob", "--rwo"],
-        capture_output=True, text=True, timeout=1800,
-    )
+    try:
+        result = subprocess.run(
+            ["rkhunter", "--cronjob", "--rwo"],
+            capture_output=True, text=True, timeout=1800,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        log.error("rkhunter could not run (%s) -- skipping rkhunter this pass", error)
+        return
     warnings = [line for line in result.stdout.splitlines() if re.match(r"^Warning:", line)]
     if not warnings:
         log.info("rkhunter: clean, no warnings")
