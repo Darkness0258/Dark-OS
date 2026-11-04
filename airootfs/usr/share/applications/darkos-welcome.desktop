@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome
+Comment=A short tour of DarkOS: look, power, optional tools
+TryExec=/usr/local/bin/darkos-welcome.py
+Exec=/usr/local/bin/darkos-welcome.py
+Icon=help-about-symbolic
+Categories=System;Utility;
+StartupNotify=true
+StartupWMClass=darkos-welcome
+Terminal=false

@@ -81,6 +81,8 @@ jobs:
           python ci/test-integrity-check.py
           python ci/test-store-gated-install.py
           python ci/test-store-gated-aur-install.py
+          xvfb-run -a dbus-run-session -- python ci/test-welcome.py
+          python ci/test-registration.py
           python ci/test-ci-coverage.py
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
