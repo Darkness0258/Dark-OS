@@ -31,6 +31,7 @@ TIPS = (
     ("Super + Q  or  Super + Enter", "Open the Void (terminal)"),
     ("Super + H", "Command center: notifications and quick toggles"),
     ("Super + Tab", "Overview of every window"),
+    ("Ctrl + Shift + Esc", "Task Manager"),
 )
 
 DOCK_POSITIONS = (("bottom", "Bottom"), ("left", "Left"), ("right", "Right"), ("top", "Top"))
@@ -44,6 +45,7 @@ QUICK_LAUNCH = (
     ("Settings", "/usr/local/bin/darkos-settings.py"),
     ("Store", "/usr/local/bin/darkos-store.py"),
     ("Files", "/usr/local/bin/darkos-files.py"),
+    ("Task Manager", "/usr/local/bin/darkos-taskmgr.py"),
 )
 
 

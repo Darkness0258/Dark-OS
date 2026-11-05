@@ -20,7 +20,8 @@ BIN = ROOT / "airootfs/usr/local/bin"
 APPS = (
     "backup", "calculator", "calendar", "clipboard", "clock", "dashboard",
     "devhub", "downloads", "emoji", "files", "gallery", "gaming", "mail", "mission",
-    "network", "notes", "reader", "security", "settings", "store", "terminal",
+    "network", "notes", "reader", "security", "settings", "store", "taskmgr", "terminal",
+    "welcome",
 )
 
 
