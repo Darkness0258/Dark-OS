@@ -47,6 +47,7 @@ POWER_PROFILE_SET_TIMEOUT = 45
 CATEGORIES = [
     ("system", "System", "computer-symbolic"),
     ("display", "Display", "video-display-symbolic"),
+    ("power", "Power & sleep", "battery-symbolic"),
     ("performance", "Performance", "power-profile-performance-symbolic"),
     ("updates", "Updates", "software-update-available-symbolic"),
     ("config", "Config", "text-x-generic-symbolic"),
@@ -71,7 +72,7 @@ CATEGORIES = [
 # under "More" so a page can never silently vanish from the sidebar.
 CATEGORY_GROUPS = (
     ("Appearance", ("themes", "wallpaper", "fonts", "icons", "designer")),
-    ("System", ("system", "display", "performance", "updates", "storage", "devices", "config",
+    ("System", ("system", "display", "power", "performance", "updates", "storage", "devices", "config",
                 "startup", "services", "users")),
     ("Access & privacy", ("accessibility", "motion", "permissions")),
 )
@@ -282,6 +283,7 @@ class SettingsWindow(Gtk.ApplicationWindow):
         builders = {
             "system": self._build_system_tab,
             "display": self._build_display_tab,
+            "power": self._build_power_tab,
             "performance": self._build_performance_tab,
             "updates": self._build_updates_tab,
             "config": self._build_config_tab,
@@ -330,6 +332,8 @@ class SettingsWindow(Gtk.ApplicationWindow):
                 self._refresh_power_profiles()
             elif row.category_id == "display":
                 self.display_page.refresh()
+            elif row.category_id == "power":
+                self.power_page.refresh()
 
     def _on_destroy(self, *_):
         self._closed = True
@@ -563,6 +567,11 @@ class SettingsWindow(Gtk.ApplicationWindow):
         from darkos_shell.display_page import DisplayPage
         self.display_page = DisplayPage()
         return self.display_page
+
+    def _build_power_tab(self):
+        from darkos_shell.power_page import PowerPage
+        self.power_page = PowerPage()
+        return self.power_page
 
     def _build_performance_tab(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)

@@ -85,6 +85,7 @@ jobs:
           python ci/test-registration.py
           xvfb-run -a dbus-run-session -- python ci/test-taskmgr.py
           xvfb-run -a dbus-run-session -- python ci/test-display.py
+          xvfb-run -a dbus-run-session -- python ci/test-power.py
           python ci/test-ci-coverage.py
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |
