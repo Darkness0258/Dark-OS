@@ -142,6 +142,8 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_shell/display_page.py
+    usr/local/bin/darkos_shell/display.py
     usr/local/bin/darkos_shell/procinfo.py
     usr/local/bin/darkos_shell/welcome.py
     usr/local/bin/darkos_void/__init__.py
@@ -166,6 +168,8 @@ readonly cmp_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_shell/display_page.py
+    usr/local/bin/darkos_shell/display.py
     usr/local/bin/darkos_shell/procinfo.py
     usr/local/bin/darkos_shell/welcome.py
     usr/local/bin/darkos_void/__init__.py

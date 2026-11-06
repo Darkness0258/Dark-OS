@@ -46,6 +46,7 @@ POWER_PROFILE_SET_TIMEOUT = 45
 
 CATEGORIES = [
     ("system", "System", "computer-symbolic"),
+    ("display", "Display", "video-display-symbolic"),
     ("performance", "Performance", "power-profile-performance-symbolic"),
     ("updates", "Updates", "software-update-available-symbolic"),
     ("config", "Config", "text-x-generic-symbolic"),
@@ -70,7 +71,7 @@ CATEGORIES = [
 # under "More" so a page can never silently vanish from the sidebar.
 CATEGORY_GROUPS = (
     ("Appearance", ("themes", "wallpaper", "fonts", "icons", "designer")),
-    ("System", ("system", "performance", "updates", "storage", "devices", "config",
+    ("System", ("system", "display", "performance", "updates", "storage", "devices", "config",
                 "startup", "services", "users")),
     ("Access & privacy", ("accessibility", "motion", "permissions")),
 )
@@ -280,6 +281,7 @@ class SettingsWindow(Gtk.ApplicationWindow):
         add_class(self.stack, "app-window")
         builders = {
             "system": self._build_system_tab,
+            "display": self._build_display_tab,
             "performance": self._build_performance_tab,
             "updates": self._build_updates_tab,
             "config": self._build_config_tab,
@@ -326,6 +328,8 @@ class SettingsWindow(Gtk.ApplicationWindow):
             self.stack.set_visible_child_name(row.category_id)
             if row.category_id == "performance":
                 self._refresh_power_profiles()
+            elif row.category_id == "display":
+                self.display_page.refresh()
 
     def _on_destroy(self, *_):
         self._closed = True
@@ -551,6 +555,14 @@ class SettingsWindow(Gtk.ApplicationWindow):
         if renderer_changed:
             message += " Log out and back in to switch the renderer."
         self.effects_feedback.set_text(message)
+
+    def _build_display_tab(self):
+        # Imported here, not at the top: it pulls in GTK widgets the unit tests
+        # that load this file with stubbed modules do not need. Built now,
+        # filled lazily: hyprctl is only asked when the page is opened.
+        from darkos_shell.display_page import DisplayPage
+        self.display_page = DisplayPage()
+        return self.display_page
 
     def _build_performance_tab(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)

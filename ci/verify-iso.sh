@@ -243,6 +243,8 @@ payload=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_shell/display_page.py
+    usr/local/bin/darkos_shell/display.py
     usr/local/bin/darkos_shell/procinfo.py
     usr/local/bin/darkos_shell/welcome.py
     usr/local/bin/darkos_void/__init__.py
@@ -329,6 +331,8 @@ required_files=(
     usr/local/bin/darkos_shell/shield.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_shell/display_page.py
+    usr/local/bin/darkos_shell/display.py
     usr/local/bin/darkos_shell/procinfo.py
     usr/local/bin/darkos_shell/welcome.py
     "${native_desktop_entries[@]}"
@@ -616,6 +620,8 @@ readonly library_modules=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_shell/display_page.py
+    usr/local/bin/darkos_shell/display.py
     usr/local/bin/darkos_shell/procinfo.py
     usr/local/bin/darkos_shell/welcome.py
     usr/local/bin/darkos_void/__init__.py
