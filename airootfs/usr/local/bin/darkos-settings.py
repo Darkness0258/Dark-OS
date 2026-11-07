@@ -334,6 +334,8 @@ class SettingsWindow(Gtk.ApplicationWindow):
                 self.display_page.refresh()
             elif row.category_id == "power":
                 self.power_page.refresh()
+            elif row.category_id == "updates":
+                self.mirror_card.refresh()
 
     def _on_destroy(self, *_):
         self._closed = True
@@ -431,6 +433,9 @@ class SettingsWindow(Gtk.ApplicationWindow):
         box.pack_start(row, False, False, 0)
         self.updates_status = Gtk.Label(label="Not checked yet.", xalign=0, wrap=True)
         box.pack_start(self.updates_status, False, False, 0)
+        from darkos_shell.mirror_card import MirrorCard   # lazy: see _build_display_tab
+        self.mirror_card = MirrorCard(live=live)
+        box.pack_start(self.mirror_card, False, False, 8)
         self.updates_view = Gtk.TextView()
         self.updates_view.set_editable(False)
         self.updates_view.set_monospace(True)

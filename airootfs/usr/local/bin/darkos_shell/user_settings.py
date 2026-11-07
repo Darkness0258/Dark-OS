@@ -36,6 +36,7 @@ DEFAULTS = {
     "idle_ac_suspend": 30,
     "idle_battery_lock": 3,
     "idle_battery_suspend": 15,
+    "mirror_country": "",       # ISO code for Settings > Updates > mirrors; "" = anywhere
 }
 
 # Settings whose value must come from a fixed set. settings.json is

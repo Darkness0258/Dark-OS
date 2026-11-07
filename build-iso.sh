@@ -61,6 +61,7 @@ readonly native_app_scripts=(
     usr/local/bin/darkos-clipboard.py
     usr/local/bin/darkos-clock.py
     usr/local/bin/darkos-dashboard.py
+    usr/local/bin/darkos-mirrors.py
     usr/local/bin/darkos-power-watch.py
     usr/local/bin/darkos-taskmgr.py
     usr/local/bin/darkos-welcome.py
@@ -143,6 +144,8 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_shell/mirror_card.py
+    usr/local/bin/darkos_shell/mirrors.py
     usr/local/bin/darkos_shell/power_page.py
     usr/local/bin/darkos_shell/power.py
     usr/local/bin/darkos_shell/display_page.py
@@ -171,6 +174,8 @@ readonly cmp_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
+    usr/local/bin/darkos_shell/mirror_card.py
+    usr/local/bin/darkos_shell/mirrors.py
     usr/local/bin/darkos_shell/power_page.py
     usr/local/bin/darkos_shell/power.py
     usr/local/bin/darkos_shell/display_page.py

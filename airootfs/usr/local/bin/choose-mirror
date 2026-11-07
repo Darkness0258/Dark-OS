@@ -1,10 +1,7 @@
 #!/bin/bash
-# DarkOS live ISO — choose the fastest pacman mirror.
-# Minimal stub that refreshes the mirrorlist.
-
-set -euo pipefail
-reflector --country 'United States,Canada,Germany,France,UK' \
-    --protocol https --sort rate --latest 20 \
-    --save /etc/pacman.d/mirrorlist 2>/dev/null || {
-    echo "Mirror selection unavailable; using default mirrorlist." >&2
-}
+# choose-mirror -- the old entry point, kept so scripts and habits still work.
+# It used to pipe reflector straight into /etc/pacman.d/mirrorlist with the errors
+# thrown away. The real work is darkos-mirrors.py, which validates the result,
+# backs up the current list, and leaves it untouched on any failure.
+# Usage: choose-mirror [--country DE,FR] [--number 10]   (run as root)
+exec /usr/local/bin/darkos-mirrors.py rank "$@"
