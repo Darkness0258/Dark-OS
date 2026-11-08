@@ -380,7 +380,9 @@ class MirrorCardTests(unittest.TestCase):
             self.threads.add(threading.current_thread())
             if self.gate:
                 self.gate.wait(3)
-            self.info = mirrors.Status(True, 10, "fast.example", NOW, True)
+            # "Now", not the fixed NOW: the card describes age against the real clock,
+            # so a fixed date turns this test into a failure the day after it was written.
+            self.info = mirrors.Status(True, 10, "fast.example", datetime.now(timezone.utc), True)
             return self.reply
 
         c = self.mc.MirrorCard(load=lambda: dict(self.settings),
@@ -401,7 +403,7 @@ class MirrorCardTests(unittest.TestCase):
         self.assertIn("Not ranked by DarkOS yet", c.summary.get_text())
         self.assertTrue(c.rank_btn.get_sensitive())
         self.assertFalse(c.restore_btn.get_sensitive())
-        self.info = mirrors.Status(True, 10, "fast.example", NOW, True)
+        self.info = mirrors.Status(True, 10, "fast.example", datetime.now(timezone.utc), True)
         c.refresh()
         self.assertTrue(c.restore_btn.get_sensitive())
 
@@ -461,7 +463,7 @@ class MirrorCardTests(unittest.TestCase):
         self.assertTrue(pump(lambda: "Cancelled" in c.result.get_text()))
 
     def test_restore_calls_the_restore_command(self):
-        self.info = mirrors.Status(True, 10, "fast.example", NOW, True)
+        self.info = mirrors.Status(True, 10, "fast.example", datetime.now(timezone.utc), True)
         self.reply = (0, json.dumps({"ok": True, "message": "Restored the earlier mirror list (1 mirrors)."}), "")
         c = self.card()
         c.restore_btn.clicked()
