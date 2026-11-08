@@ -132,16 +132,20 @@ class WelcomeWindow(Gtk.ApplicationWindow):
         footer = Gtk.Box(spacing=8)
         footer.set_border_width(14)
         add_class(footer, "toolbar")
-        root.pack_end(footer, False, False, 0)
+        self.footer = footer
+        if len(self.pages) > 1:          # the live page is one page: no empty navigation bar
+            root.pack_end(footer, False, False, 0)
         self.progress = _label("", "caption", wrap=False)
         footer.pack_start(self.progress, False, False, 0)
         self.skip_btn = Gtk.Button(label="Skip tour")
+        add_class(self.skip_btn, "action-button")
         self.skip_btn.connect("clicked", lambda *_: self.finish())
         self.next_btn = Gtk.Button(label="Next")
         add_class(self.next_btn, "action-button")
         add_class(self.next_btn, "primary")
         self.next_btn.connect("clicked", lambda *_: self.go(1))
         self.back_btn = Gtk.Button(label="Back")
+        add_class(self.back_btn, "action-button")
         self.back_btn.connect("clicked", lambda *_: self.go(-1))
         for button in (self.next_btn, self.back_btn, self.skip_btn):
             # run_app() calls show_all() after build_window(); without this it would
@@ -151,6 +155,9 @@ class WelcomeWindow(Gtk.ApplicationWindow):
         self.next_btn.set_can_default(True)
         self.set_default(self.next_btn)
         self.connect("destroy", self._on_destroy)
+        # Focus the button Enter/Space should press. Without this the first
+        # focusable widget wins, and that is "Skip tour".
+        self.connect("map", lambda *_: self._focus_primary())
         self._sync()
 
     # -- navigation ---------------------------------------------------------
@@ -163,6 +170,11 @@ class WelcomeWindow(Gtk.ApplicationWindow):
             if not welcome.tools_pending(self.svc.cfg):
                 pages.remove("tools")
         return pages
+
+    def _focus_primary(self):
+        target = getattr(self, "install_btn", None) if self.live else self.next_btn
+        if target is not None:
+            target.grab_focus()
 
     def current(self):
         return self.pages[self.index]
@@ -213,6 +225,7 @@ class WelcomeWindow(Gtk.ApplicationWindow):
             add_class(install, "primary")
             install.connect("clicked", self._on_install)
             keep = Gtk.Button(label="Keep trying it")
+            add_class(keep, "action-button")
             keep.connect("clicked", lambda *_: self.finish())
             row.pack_start(install, False, False, 0)
             row.pack_start(keep, False, False, 0)
@@ -248,6 +261,7 @@ class WelcomeWindow(Gtk.ApplicationWindow):
             button = Gtk.RadioButton.new_from_widget(group) if group else Gtk.RadioButton()
             group = group or button
             button.set_mode(False)  # looks like a tile, behaves like a radio
+            add_class(button, "toggle-button")
             button.set_tooltip_text(entry["name"])
             button.get_accessible().set_name(entry["name"])
             try:
@@ -375,6 +389,7 @@ class WelcomeWindow(Gtk.ApplicationWindow):
         add_class(choose, "action-button")
         choose.connect("clicked", self._on_choose_tools)
         decline = Gtk.Button(label="Don't ask again")
+        add_class(decline, "action-button")
         decline.connect("clicked", self._on_decline_tools)
         row.pack_start(choose, False, False, 0)
         row.pack_start(decline, False, False, 0)
@@ -406,6 +421,7 @@ class WelcomeWindow(Gtk.ApplicationWindow):
         self.launch_buttons = {}
         for name, path in QUICK_LAUNCH:
             button = Gtk.Button(label=name)
+            add_class(button, "action-button")
             button.connect("clicked", lambda _b, p=path: self.svc.spawn(["python", p]))
             row.pack_start(button, False, False, 0)
             self.launch_buttons[name] = button

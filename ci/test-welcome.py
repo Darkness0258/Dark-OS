@@ -216,6 +216,21 @@ class WelcomeWindowTests(unittest.TestCase):
         self.assertTrue(welcome.is_done(self.cfg))
         self.assertNotIn(win, self.app.get_windows())
 
+    def test_the_primary_button_has_focus_so_enter_does_not_skip_the_tour(self):
+        win = self.window()
+        pump(lambda: win.next_btn.has_focus(), 1.0)
+        self.assertTrue(win.next_btn.has_focus(), "Enter/Space must press Next, not Skip tour")
+        live = self.window(svc=FakeServices(self.cfg, live=True))
+        pump(lambda: live.install_btn.has_focus(), 1.0)
+        self.assertTrue(live.install_btn.has_focus())
+
+    def test_the_footer_and_its_page_counter_are_really_on_screen(self):
+        win = self.window()
+        for widget in (win.progress, win.next_btn, win.skip_btn):
+            self.assertTrue(widget.is_visible())
+        self.assertFalse(win.back_btn.get_sensitive())
+        self.assertTrue(win.back_btn.is_visible())
+
     def test_back_walks_backwards_and_stops_at_the_first_page(self):
         win = self.window()
         win.next_btn.clicked()
@@ -251,6 +266,7 @@ class WelcomeWindowTests(unittest.TestCase):
         self.assertFalse(win.back_btn.get_visible())
         self.assertFalse(win.skip_btn.get_visible())
         self.assertFalse(win.next_btn.get_visible())
+        self.assertFalse(win.footer.get_visible(), "no empty navigation bar on the one-page live session")
         win.install_btn.clicked()
         self.assertEqual(svc.spawned, [[welcome.INSTALLER_BIN]])
         self.assertNotIn(win, self.app.get_windows())

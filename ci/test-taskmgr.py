@@ -329,6 +329,11 @@ class TaskManagerWindowTests(unittest.TestCase):
                 return
         self.fail(f"pid {pid} is not listed")
 
+    def test_the_table_uses_the_design_system_list_style(self):
+        win = self.window()
+        self.assertTrue(win.tree.get_style_context().has_class("darkos-list"),
+                        "an unstyled TreeView is a white grid with near-white text on Calm Dark")
+
     def test_default_view_is_my_processes_sorted_by_cpu_descending(self):
         win = self.window()
         win.apply_snapshot(self.base)

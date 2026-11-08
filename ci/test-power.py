@@ -363,8 +363,9 @@ class PowerPageTests(unittest.TestCase):
         page.show_all()
         page.refresh()
         self.assertTrue(pump(lambda: page.state is not None))
-        self.assertTrue(page.sections["ac"].get_visible())
+        self.assertTrue(page.sections["ac"].lock_combo.is_visible())
         self.assertFalse(page.sections["battery"].get_visible())
+        self.assertFalse(page.sections["battery"].lock_combo.is_visible())
         self.assertIn("no battery", page.current.get_text())
 
     def test_a_laptop_shows_both_and_says_which_is_in_use(self):
@@ -375,6 +376,11 @@ class PowerPageTests(unittest.TestCase):
         self.assertTrue(pump(lambda: page.state is not None))
         self.assertTrue(page.sections["battery"].get_visible())
         self.assertIn("on battery", page.current.get_text())
+        for source in ("ac", "battery"):
+            section = page.sections[source]
+            for child in (section.lock_combo, section.suspend_combo):
+                self.assertTrue(child.is_visible(), f"{source}: a dropdown inside the card is not on screen")
+        self.assertFalse(page.sections["ac"].note.is_visible(), "an empty note takes no space")
 
     def test_changing_a_timing_saves_it_and_applies_it_off_the_main_thread(self):
         page = self.page()

@@ -130,6 +130,43 @@ class LauncherIconTests(unittest.TestCase):
         self.assertEqual(unloadable, {})
 
 
+NEW_UI_FILES = (
+    "darkos-welcome.py", "darkos-taskmgr.py", "darkos_shell/display_page.py",
+    "darkos_shell/power_page.py", "darkos_shell/mirror_card.py",
+)
+BUTTON_CLASSES = {"action-button", "toggle-button", "icon-button", "dock-icon-button"}
+
+
+class ButtonStyleTests(unittest.TestCase):
+    """A plain Gtk.Button falls back to GTK's own look: light grey with white text,
+    unreadable on Calm Dark (found by screenshotting the new apps). The stylesheet
+    only styles buttons that carry one of its classes."""
+
+    def test_every_button_in_the_new_apps_has_a_design_system_class(self):
+        import ast
+
+        unstyled = {}
+        for rel in NEW_UI_FILES:
+            tree = ast.parse((ROOT / "airootfs/usr/local/bin" / rel).read_text(encoding="utf-8"))
+            made, styled = {}, set()
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+                        and ast.unparse(node.value.func) in ("Gtk.Button", "Gtk.ToggleButton")):
+                    for target in node.targets:
+                        made[ast.unparse(target)] = node.lineno
+                elif (isinstance(node, ast.Call) and ast.unparse(node.func) == "add_class" and len(node.args) == 2
+                      and isinstance(node.args[1], ast.Constant) and node.args[1].value in BUTTON_CLASSES):
+                    styled.add(ast.unparse(node.args[0]))
+            missing = {name: line for name, line in made.items() if name not in styled}
+            if missing:
+                unstyled[rel] = missing
+        self.assertEqual(unstyled, {}, "buttons without action-button/toggle-button/icon-button")
+
+    def test_the_wallpaper_tiles_are_styled_tiles_not_grey_boxes(self):
+        source = (ROOT / "airootfs/usr/local/bin/darkos-welcome.py").read_text(encoding="utf-8")
+        self.assertIn('add_class(button, "toggle-button")', source)
+
+
 @unittest.skipUnless(GTK_AVAILABLE, "GTK not available")
 class SettingsSidebarTests(unittest.TestCase):
     @classmethod

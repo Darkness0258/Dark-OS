@@ -61,6 +61,18 @@ class _Section(Gtk.Box):
         self.pack_start(row, False, False, 0)
         return combo
 
+    def reveal(self, visible):
+        """Show or hide the whole card. show_all() skips a no_show_all widget AND everything
+        inside it, so showing it takes a deliberate show_all() with the flag lifted."""
+        if visible:
+            self.set_no_show_all(False)
+            self.show_all()
+            self.set_no_show_all(True)
+            if not self.note.get_text():
+                self.note.hide()
+        else:
+            self.hide()
+
     def load(self, lock, suspend, note=""):
         self._loading = True
         try:
@@ -119,8 +131,8 @@ class PowerPage(Gtk.Box):
         for source, section in self.sections.items():
             lock, suspend, notes = power.normalize(*power.timings_for(settings, source))
             section.load(lock, suspend, notes[0] if notes else "")
-            section.show()
-        self.sections["battery"].hide()   # until we know this computer has one
+            section.reveal(True)
+        self.sections["battery"].reveal(False)   # until we know this computer has one
 
     def refresh(self):
         self._generation += 1
@@ -139,11 +151,11 @@ class PowerPage(Gtk.Box):
         self.state = state
         self._fill()
         if state.has_battery:
-            self.sections["battery"].show()
+            self.sections["battery"].reveal(True)
             self.current.set_text("Right now: on AC power." if state.source == "ac"
                                   else "Right now: running on battery.")
         else:
-            self.sections["battery"].hide()
+            self.sections["battery"].reveal(False)
             self.current.set_text("This computer has no battery, so only the AC timings apply.")
         return False
 

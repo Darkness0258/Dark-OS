@@ -90,6 +90,7 @@ class MirrorCard(Gtk.Box):
         add_class(self.rank_btn, "action-button")
         self.rank_btn.connect("clicked", lambda *_: self.rank())
         self.restore_btn = Gtk.Button(label="Restore previous list")
+        add_class(self.restore_btn, "action-button")
         self.restore_btn.connect("clicked", lambda *_: self.restore())
         buttons.pack_start(self.rank_btn, False, False, 0)
         buttons.pack_start(self.restore_btn, False, False, 0)

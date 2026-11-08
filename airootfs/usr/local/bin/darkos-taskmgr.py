@@ -101,9 +101,12 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
         self.all_users_check = Gtk.CheckButton(label="All users")
         self.all_users_check.connect("toggled", self._on_all_users)
         self.pause_btn = Gtk.ToggleButton(label="Pause")
+        add_class(self.pause_btn, "toggle-button")
         self.pause_btn.set_tooltip_text("Stop updating so you can read the list")
         self.pause_btn.connect("toggled", self._on_pause)
         self.force_btn = Gtk.Button(label="Force quit")
+        add_class(self.force_btn, "action-button")
+        add_class(self.force_btn, "destructive")
         self.force_btn.set_tooltip_text("Stops it immediately. Unsaved work in it is lost.")
         self.force_btn.connect("clicked", lambda *_: self.end_selected(force=True))
         self.end_btn = Gtk.Button(label="End task")
@@ -124,6 +127,8 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
         self.sorted = Gtk.TreeModelSort(model=self.filter)
         self.tree = Gtk.TreeView(model=self.sorted)
         self.tree.get_accessible().set_name("Processes")
+        add_class(self.tree, "darkos-list")  # the design system's table look (Files uses it too);
+        # without it GTK draws a white grid with near-white text on Calm Dark
         self.tree.set_enable_search(False)   # we have a real search box
         self.tree.set_tooltip_column(COL_CMD)
         self.tree.set_headers_clickable(True)
