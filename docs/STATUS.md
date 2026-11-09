@@ -1,11 +1,34 @@
 # DarkOS status
 
-Updated 2026-11-02 (The Void v2 + app audit pass on top of Calm Dark). Tags are the ones defined in
+Updated 2026-11-07 (backlog pass: icons, Welcome, Task Manager, Display, Power & sleep, mirror
+ranking, on top of The Void v2 + app audit). Tags are the ones defined in
 [MASTER-PLAN.md](MASTER-PLAN.md): **[C]** checked in the repo or a sandbox, never on a
 booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgment.
 
 ## What is true now
 
+- **Backlog pass, 2026-11-07 [C] (branch `calm-dark`, tests 429 -> 607, all green).** In the order asked:
+  - **App icons fixed.** Every launcher now uses a symbolic Adwaita name that exists
+    (`ci/test-ui-consistency.py` `LauncherIconTests`). Two of the audit's guesses were
+    wrong and are corrected in `docs/APP-AUDIT.md` part 1: `utilities-system-monitor` and
+    `image-viewer` have no `-symbolic` form either.
+  - **Welcome app** (`darkos-welcome.py`): first-run tour on the installed system, install
+    entry on the live ISO. It replaces the old wofi first-boot prompts and reuses their
+    marker files, so nobody is asked twice.
+  - **Task Manager** (`darkos-taskmgr.py`, `Ctrl+Shift+Esc`): reads `/proc` on a worker
+    thread, stops sampling while hidden, End task / Force quit with the safety rules.
+  - **Settings > Display**: resolution, refresh rate, scale, rotation with a 15 s
+    Keep/Revert banner; read back from `hyprctl`, saved only once kept.
+  - **Settings > Power & sleep**: separate lock/suspend timings for AC and battery,
+    applied to hypridle; `darkos-power-watch.py` switches them when the source changes.
+  - **Mirror ranking**: `darkos-mirrors.py` + a Settings > Updates card. Validated,
+    backed up, atomic; every failure leaves the current list alone. `choose-mirror` is now
+    a wrapper onto it.
+  - **`ci/test-registration.py`**: a new app or module must be in `build-iso.sh`,
+    `profiledef.sh` and `ci/verify-iso.sh`. It found seven older files in none of them
+    (grandfathered by name; the list can only shrink).
+  - Every new window was screenshotted under xvfb with the real stylesheet, which found
+    six defects the behaviour tests could not see (see `progress-tracker.md`).
 - **The AI assistant is gone [C].** Commit `a08bc81` had put 13 removed files back; the
   P0 pass reverted it and removed the leftovers (the `~/.config/darkos/env` loader in
   `start-hyprland`, the AI-era VMware scripts, the dead `.ai-entry` and `.orb-button`
@@ -62,18 +85,21 @@ booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgme
   `aide`/`rkhunter` aren't on PATH. New, kept: `ci/headless/app_launch_check.sh`
   (the `launch` check in `run-all.sh`) is what found it, and now guards against it
   coming back.
-- **Reported, not fixed this pass:** most of the app icons are legacy
-  (non-symbolic) names that the real `adwaita-icon-theme` only ships `-symbolic`
-  forms of (15 of 21 distinct `Icon=` values) — see `docs/APP-AUDIT.md` part 1 for
-  the per-app table and the one Arch-only confirmation it's still missing.
+- **Fixed since:** the app icons (see the backlog pass above). The one thing still unchecked is
+  whether Arch's `adwaita-icon-theme` has every name used; `TESTING-MANUAL.md` 0e.3 is a
+  one-line check for it.
 
 ## Not done yet (next session, in this order)
 
-1. **App icons:** rename 15 `.desktop` `Icon=` values per `docs/APP-AUDIT.md` part 1
-   (append `-symbolic`, except `clock` and `devhub`/`applications-development`, which
-   need a different name entirely).
-2. Welcome app, task manager, display settings, AC/battery timings, mirror ranking,
-   opt-in Store, packaging, Update Center, base diet (the backlog; plan P5+).
+1. **Opt-in Store** (starter packs, first-run "pick your extras"; plan P8).
+2. **Packaging** (PKGBUILDs + signed repo; plan P5). Needs `makepkg` on Arch.
+3. **Update Center** (snapshot before update, bootable rollback; plan P6).
+4. **Base diet** (move Steam, Wine, Mail, etc. out of the base ISO; plan P4). Its exit test
+   is idle RAM and ISO size before/after plus both kernels booting, so it needs an ISO build.
+   Do it after the Store has the packs those apps move into.
+
+Items 2-4 can only be verified by building and booting an ISO, which this sandbox cannot do.
+They were left alone rather than done blind.
 
 ## What is not verified
 
@@ -93,9 +119,17 @@ booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgme
   against real spawned shells and real VTE under xvfb; only this one interaction (not
   the regex matching behind it, confirmed separately) needs a human with a mouse —
   see `TESTING-MANUAL.md`.
-- **Whether real Arch's `adwaita-icon-theme` has the same symbolic-only gaps found on
-  Ubuntu 24.04's [U].** Same upstream GNOME project, so likely, but not the same distro
-  packaging; see `docs/APP-AUDIT.md` part 1.
+- **Whether real Arch's `adwaita-icon-theme` has every icon name now used [U].** Names were
+  checked against Ubuntu 24.04's Adwaita 46 with the SVG loader present. Same upstream, but
+  not the same package or version; `TESTING-MANUAL.md` 0e.3 checks it on the real image.
+- **Everything the backlog pass added, on a real Hyprland session [U].** The tests use fake
+  `hyprctl`, `reflector`, `pkexec`, `powerprofilesctl`, sysfs and `/proc` trees. None of
+  the real tools ran: not `hyprctl keyword monitor` (see MASTER-PLAN H1), not `reflector`,
+  not `hypridle -c`, not the polkit prompt, not the swaybg wallpaper apply. The windows
+  were screenshotted without a compositor, so blur, rounding and the real title bar were
+  not seen. `TESTING-MANUAL.md` 0e lists the checks.
+- **Battery behaviour [U].** No battery exists here; AC/battery switching was tested only
+  against fake `/sys/class/power_supply` trees.
 
 ## Hardware on record [R]
 

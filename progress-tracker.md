@@ -381,3 +381,33 @@ context-menu hop on a real pointer device (the regex-matching and action-dispatc
 side of it are both covered; only that one interaction is a manual spot-check item, in
 `TESTING-MANUAL.md`); whether real Arch's `adwaita-icon-theme` has the same symbolic-only
 icon gaps found here on Ubuntu's; ISO build, boot, real BlackArch tool availability.
+
+## 2026-11-07 - Backlog pass: icons, Welcome, Task Manager, Display, Power & sleep, mirror ranking
+
+Asked for: fix the icons first, then work `docs/STATUS.md`'s backlog in order, as much as could be made solid and
+tested, implement it, run the tests, return a zip and update the testing manual. Tests 429 -> 607, all green;
+headless sway suite green. Nine commits on `calm-dark`.
+
+- **Icons.** The audit's `has_icon` check misled it twice: `utilities-system-monitor` and `image-viewer` have no
+  `-symbolic` form. Found only by `lookup_icon` with the SVG loader installed and Adwaita set explicitly (the sandbox
+  default theme is Yaru). `LauncherIconTests` fails on the old files, passes now.
+- **Welcome, Task Manager, Display, Power & sleep, mirrors**: each has a GTK-free logic module plus a UI, tests against
+  fakes, and a mutation check (break the behaviour, watch a test fail, restore). Design choices worth knowing:
+  Display saves only after the user presses Keep and reads `hyprctl` back instead of trusting its exit code;
+  Power offers lock and suspend only (verify-iso forbids screen-off); `darkos-mirrors.py` runs as root so it takes
+  no file paths.
+- **Bugs the tests caught while writing them:** the Welcome live page re-showed hidden buttons (`run_app` calls
+  `show_all`); `display_name` mistook `shotwell photo.jpg` for a shell script (prefix match on "sh"); GTK 3.24
+  segfaults when rows are inserted into an UNSORTED `TreeModelSort`; the Task Manager's quick-sample timer survived
+  hide/pause; the Display Keep banner never appeared (`show_all` on a `no_show_all` widget) and the re-read
+  overwrote the Saved/Reverted message.
+- **Bugs the tests missed and screenshots found:** plain buttons light grey with white text everywhere; wallpaper
+  tiles grey; focus starting on "Skip tour"; a white Task Manager table; the Power page's two cards empty (same
+  `no_show_all` trap, and my test checked the card, not what was inside it); an empty bar on the live page.
+  Rule added to CLAUDE.md: screenshot new windows.
+- **A test I wrote broke the next day** (a fixed "ranked today" date). Caught when the sandbox clock rolled past
+  midnight; now uses the real clock.
+- **Registration.** `ci/test-registration.py` found seven older files in none of build-iso.sh, profiledef.sh or
+  verify-iso.sh. Grandfathered by name rather than silently registered.
+- **Not done:** opt-in Store, packaging, Update Center, base diet (the last three need an ISO build to verify).
+- **Not verified:** nothing ran on Hyprland or real hardware. See `TESTING-MANUAL.md` 0e.

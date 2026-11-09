@@ -17,6 +17,7 @@ import threading
 import gi
 
 gi.require_version("Gtk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import GdkPixbuf, GLib, Gtk  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
