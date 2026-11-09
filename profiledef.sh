@@ -88,6 +88,7 @@ file_permissions=(
   ["/usr/local/bin/darkos_shell/tokens.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/user_settings.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/wallpapers.py"]="0:0:644"
+<<<<<<< HEAD
   ["/usr/local/bin/darkos_shell/mirror_card.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/mirrors.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/power_page.py"]="0:0:644"
@@ -96,6 +97,8 @@ file_permissions=(
   ["/usr/local/bin/darkos_shell/display.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/procinfo.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/welcome.py"]="0:0:644"
+=======
+>>>>>>> origin/main
   ["/usr/local/bin/darkos_void/__init__.py"]="0:0:644"
   ["/usr/local/bin/darkos_void/catalogue.py"]="0:0:644"
   ["/usr/local/bin/darkos_void/commands.py"]="0:0:644"

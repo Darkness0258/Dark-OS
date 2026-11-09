@@ -3,9 +3,13 @@
 Build under test: the 2026-10-17/18 change set (AI assistant removed, nine
 wallpapers restored with a Settings picker, Lite/Full effects profile, new
 features, lag fixes) as cleaned up by the 2026-10-19 P0 pass, the 2026-10-22
+<<<<<<< HEAD
 Calm Dark pass, the 2026-11-02 Void v2 + app audit pass, and the 2026-11-07
 backlog pass (icons, Welcome, Task Manager, Display, Power & sleep, mirror
 ranking). This file lists
+=======
+Calm Dark pass, and the 2026-11-02 Void v2 + app audit pass. This file lists
+>>>>>>> origin/main
 feature checks; the boot-truth record to fill in is Appendix B of
 `docs/MASTER-PLAN.md`. Run on **both** the VMware VM and the laptop, and log
 the commit hash (`cat /etc/darkos-build-sha`) and `hyprctl version` every time.
@@ -93,6 +97,7 @@ on live content) — 55 tests total. `bash ci/headless/run-all.sh launch` starts
 `darkos-*.py` bare and checks stderr for a traceback (this is what caught the
 `darkos-integrity-check.py` bug).
 
+<<<<<<< HEAD
 ## 0e. Checks specific to the 2026-11-07 backlog pass (after 0d)
 
 Build under test: branch `calm-dark`. What changed: the app icons were fixed, and there is a new Welcome app, a
@@ -147,6 +152,8 @@ Not run by me, so assume nothing about them: the real `hyprctl keyword monitor`,
 prompt, `hypridle -c`, `powerprofilesctl`, swaybg applying a wallpaper, a battery, the Task Manager on a busy
 machine, and how any of the new windows look with blur and rounded corners.
 
+=======
+>>>>>>> origin/main
 ## 0. What was and was not verified before you got this
 
 Verified in a Linux sandbox (Python/GTK/headless sway):
@@ -409,12 +416,15 @@ and a `source` line that I could not check against a real Hyprland.
 - 15 of 21 distinct app icons are legacy (non-symbolic) freedesktop names that
   the installed `adwaita-icon-theme` only ships `-symbolic` forms of (reported
   in `docs/APP-AUDIT.md` part 1, not renamed in this pass).
+<<<<<<< HEAD
 
 Not done in the 2026-11-07 pass, in `docs/STATUS.md` order: the opt-in Store (starter packs, first-run "pick
 your extras"), packaging (PKGBUILDs and a signed repo), the Update Center, and the base diet. The last three can only
 be verified by building and booting an ISO. Also not done: screen-off timeouts (`ci/verify-iso.sh` forbids
 `dpms off` under hyprlock), multi-monitor arrangement and mirroring in Settings > Display (positions are kept as they
 are), and giving Notes and Reader different icons.
+=======
+>>>>>>> origin/main
 
 ## 11. Results table (copy per run; plan Appendix B)
 
@@ -436,9 +446,12 @@ Commit: ________   `hyprctl version`: ________
 | 12 The Void: engagement workspace, set target, tool launcher (0d.8-0d.10, 0d.13-0d.14) | | | |
 | 13 The Void: session logging, save scrollback, command palette (0d.11-0d.12, 0d.16) | | | |
 | 14 The Void: clickable links, right-click menu, Ctrl+click (0d.15) | | | the one item not run in this pass at all |
+<<<<<<< HEAD
 | 15 Icons and Welcome (0e.1-0e.11) | | | |
 | 16 Task Manager (0e.12-0e.18) | | | |
 | 17 Display settings (0e.19-0e.24) | | | 0e.22 is the H1 check |
 | 18 Power & sleep (0e.25-0e.30) | | | needs a laptop for 0e.27 |
 | 19 Mirror ranking (0e.31-0e.37) | | | |
+=======
+>>>>>>> origin/main
 

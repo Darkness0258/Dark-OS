@@ -10,6 +10,7 @@ read, and `pacman.conf`'s `[multilib]`/`[blackarch]` sections.
 
 ## 1. `.desktop` files (23, in `airootfs/usr/share/applications/`)
 
+<<<<<<< HEAD
 **Resolution (2026-11-07): the icon findings below are fixed.** Two corrections to the
 table, found by checking each replacement with `Gtk.IconTheme.lookup_icon` (with the SVG
 pixbuf loader installed and the theme set to Adwaita explicitly) instead of `has_icon`
@@ -29,6 +30,8 @@ the theme lacks or a non-symbolic one (it failed on the old files: 3 failures). 
 Reader still share one glyph; that was not part of the list. The original findings follow
 unchanged.
 
+=======
+>>>>>>> origin/main
 A script (`/tmp` during the audit, not shipped) parsed every file's `Exec=`,
 `Icon=` and `Categories=` and checked each mechanically: `Exec=`'s first token
 against the file actually existing and being executable in `airootfs/`;
