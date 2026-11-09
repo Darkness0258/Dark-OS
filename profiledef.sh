@@ -54,6 +54,10 @@ file_permissions=(
   ["/usr/local/bin/darkos-clipboard.py"]="0:0:755"
   ["/usr/local/bin/darkos-clock.py"]="0:0:755"
   ["/usr/local/bin/darkos-dashboard.py"]="0:0:755"
+  ["/usr/local/bin/darkos-mirrors.py"]="0:0:755"
+  ["/usr/local/bin/darkos-power-watch.py"]="0:0:755"
+  ["/usr/local/bin/darkos-taskmgr.py"]="0:0:755"
+  ["/usr/local/bin/darkos-welcome.py"]="0:0:755"
   ["/usr/local/bin/darkos-devhub.py"]="0:0:755"
   ["/usr/local/bin/darkos-downloads.py"]="0:0:755"
   ["/usr/local/bin/darkos-emoji.py"]="0:0:755"
@@ -84,6 +88,17 @@ file_permissions=(
   ["/usr/local/bin/darkos_shell/tokens.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/user_settings.py"]="0:0:644"
   ["/usr/local/bin/darkos_shell/wallpapers.py"]="0:0:644"
+<<<<<<< HEAD
+  ["/usr/local/bin/darkos_shell/mirror_card.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/mirrors.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/power_page.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/power.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/display_page.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/display.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/procinfo.py"]="0:0:644"
+  ["/usr/local/bin/darkos_shell/welcome.py"]="0:0:644"
+=======
+>>>>>>> origin/main
   ["/usr/local/bin/darkos_void/__init__.py"]="0:0:644"
   ["/usr/local/bin/darkos_void/catalogue.py"]="0:0:644"
   ["/usr/local/bin/darkos_void/commands.py"]="0:0:644"

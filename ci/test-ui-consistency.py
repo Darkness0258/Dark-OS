@@ -53,6 +53,120 @@ class IconTests(unittest.TestCase):
         )
 
 
+APPS_DIR = ROOT / "airootfs/usr/share/applications"
+# Icons that belong to another package and so cannot be checked where the
+# tests run (docs/APP-AUDIT.md part 1 lists calamares as unverified).
+EXTERNAL_ICONS = {"darkos-installer.desktop": "calamares"}
+
+
+def launcher_icons():
+    """{desktop file name: Icon= value} for every shipped launcher."""
+    found = {}
+    for path in sorted(APPS_DIR.glob("*.desktop")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("Icon="):
+                found[path.name] = line.split("=", 1)[1].strip()
+                break
+    return found
+
+
+@unittest.skipUnless(GTK_AVAILABLE, "GTK not available")
+class LauncherIconTests(unittest.TestCase):
+    """The dock, the Apps overlay and search take each app's icon from its
+    .desktop `Icon=`. Adwaita 46 ships most legacy names (`system-file-manager`,
+    `preferences-system`, ...) only as `-symbolic`, so the old names drew the
+    generic missing-image placeholder (docs/APP-AUDIT.md part 1).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        # A private theme object: setting gtk-icon-theme-name would leak into
+        # the other tests in this file, and the default depends on the host
+        # (this sandbox's default is Yaru, which is not what the ISO uses).
+        cls.theme = Gtk.IconTheme.new()
+        cls.theme.set_custom_theme("Adwaita")
+        cls.icons = launcher_icons()
+
+    def setUp(self):
+        if not self.theme.has_icon("drive-harddisk-symbolic"):
+            self.skipTest("the Adwaita icon theme is not installed here")
+
+    def test_there_is_a_launcher_to_check(self):
+        self.assertGreaterEqual(len(self.icons), 20, self.icons)
+
+    def test_every_launcher_icon_exists_in_the_theme(self):
+        missing = {}
+        for desktop, name in self.icons.items():
+            if EXTERNAL_ICONS.get(desktop) == name:
+                continue
+            if name.startswith("/"):
+                ok = (ROOT / "airootfs" / name.lstrip("/")).is_file()
+            else:
+                ok = self.theme.has_icon(name)
+            if not ok:
+                missing[desktop] = name
+        self.assertEqual(missing, {}, "these launchers draw a placeholder icon")
+
+    def test_every_launcher_icon_is_the_symbolic_variant(self):
+        # Rule 6: one icon family. A bare name is the legacy colour icon, or
+        # nothing at all.
+        bare = {
+            d: n for d, n in self.icons.items()
+            if EXTERNAL_ICONS.get(d) != n and not n.startswith("/") and not n.endswith("-symbolic")
+        }
+        self.assertEqual(bare, {}, "launchers using a non-symbolic icon name")
+
+    def test_icons_actually_load_when_an_svg_loader_is_present(self):
+        from gi.repository import GdkPixbuf
+
+        if not any("svg" in fmt.get_name() for fmt in GdkPixbuf.Pixbuf.get_formats()):
+            self.skipTest("no SVG pixbuf loader (librsvg) here, so lookup cannot load symbolic icons")
+        unloadable = {}
+        for desktop, name in self.icons.items():
+            if EXTERNAL_ICONS.get(desktop) == name or name.startswith("/"):
+                continue
+            if self.theme.lookup_icon(name, 32, 0) is None:
+                unloadable[desktop] = name
+        self.assertEqual(unloadable, {})
+
+
+NEW_UI_FILES = (
+    "darkos-welcome.py", "darkos-taskmgr.py", "darkos_shell/display_page.py",
+    "darkos_shell/power_page.py", "darkos_shell/mirror_card.py",
+)
+BUTTON_CLASSES = {"action-button", "toggle-button", "icon-button", "dock-icon-button"}
+
+
+class ButtonStyleTests(unittest.TestCase):
+    """A plain Gtk.Button falls back to GTK's own look: light grey with white text,
+    unreadable on Calm Dark (found by screenshotting the new apps). The stylesheet
+    only styles buttons that carry one of its classes."""
+
+    def test_every_button_in_the_new_apps_has_a_design_system_class(self):
+        import ast
+
+        unstyled = {}
+        for rel in NEW_UI_FILES:
+            tree = ast.parse((ROOT / "airootfs/usr/local/bin" / rel).read_text(encoding="utf-8"))
+            made, styled = {}, set()
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+                        and ast.unparse(node.value.func) in ("Gtk.Button", "Gtk.ToggleButton")):
+                    for target in node.targets:
+                        made[ast.unparse(target)] = node.lineno
+                elif (isinstance(node, ast.Call) and ast.unparse(node.func) == "add_class" and len(node.args) == 2
+                      and isinstance(node.args[1], ast.Constant) and node.args[1].value in BUTTON_CLASSES):
+                    styled.add(ast.unparse(node.args[0]))
+            missing = {name: line for name, line in made.items() if name not in styled}
+            if missing:
+                unstyled[rel] = missing
+        self.assertEqual(unstyled, {}, "buttons without action-button/toggle-button/icon-button")
+
+    def test_the_wallpaper_tiles_are_styled_tiles_not_grey_boxes(self):
+        source = (ROOT / "airootfs/usr/local/bin/darkos-welcome.py").read_text(encoding="utf-8")
+        self.assertIn('add_class(button, "toggle-button")', source)
+
+
 @unittest.skipUnless(GTK_AVAILABLE, "GTK not available")
 class SettingsSidebarTests(unittest.TestCase):
     @classmethod

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Task Manager
+Comment=See what is running and end what is stuck
+TryExec=/usr/local/bin/darkos-taskmgr.py
+Exec=/usr/local/bin/darkos-taskmgr.py
+Icon=view-list-symbolic
+Categories=System;Monitor;
+Keywords=processes;kill;end task;cpu;memory;
+StartupNotify=true
+StartupWMClass=darkos-taskmgr
+Terminal=false

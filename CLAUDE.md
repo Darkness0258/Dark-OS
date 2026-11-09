@@ -61,6 +61,38 @@ When in doubt, run the full build and boot the ISO in QEMU.
   `user_settings.CHOICES` so bad values fall back instead of reaching GTK.
 - **Only claim what was verified.** Say where it was verified (headless
   sway, xvfb, unit test, VM) and what was not.
+- **Screenshot every new window before calling it done.** Behaviour tests passed while six
+  defects were visible on screen (unstyled buttons, a white table, empty cards, a focus
+  trap). Harness: build the window on fake data, `apply_css()`, `show_all()`, pump the main
+  loop, `Gdk.pixbuf_get_from_window()`, all under `xvfb-run`. Navigate *after* `show_all()`
+  (a never-shown `Gtk.Stack` page cannot be selected). Park the pointer, or a tooltip draws a
+  black box over the capture. The title bar is light there for every app: that is the
+  no-compositor case, not a bug.
+- **Every `Gtk.Button` needs a design-system class** (`action-button`, `.primary`,
+  `.destructive`, `toggle-button`): a plain one is light grey with white text. A
+  `Gtk.TreeView` needs `darkos-list`. `ButtonStyleTests` checks the new apps.
+- **`set_no_show_all(True)` also stops `show_all()` from showing everything *inside* that
+  widget**, and `run_app()` calls `show_all()` after `build_window()`. Reveal such a widget
+  deliberately (lift the flag, `show_all()`, restore it) and test `child.is_visible()`, not
+  `parent.get_visible()`.
+- **GTK 3.24 segfaults if rows are inserted while a `Gtk.TreeModelSort` is set to
+  `UNSORTED_SORT_COLUMN_ID`** (a `fill_sort_data` assertion, then a crash). Update rows in place.
+- **Do not trust `hyprctl keyword`'s exit code** (MASTER-PLAN H1). Apply, then read
+  `hyprctl -j monitors` back, as Settings > Display does.
+- **A program root runs on a user's behalf takes no file paths.** `darkos-mirrors.py`
+  (run by `pkexec`) only ever touches `/etc/pacman.d/mirrorlist` and its one backup, and
+  countries come from a fixed table; `ci/test-mirrors.py` fails if the CLI grows a path
+  option. Library functions do take paths so tests can use temp dirs. The Ubuntu sandbox
+  runs as root, so a test that forgets to inject paths would touch the real `/etc`.
+- **Check icon names with `Gtk.IconTheme.lookup_icon`**, the SVG loader installed
+  (`librsvg2-common`) and the theme set to Adwaita explicitly. `has_icon` only says a name
+  is in the index, and this sandbox's default theme is Yaru. Two guesses in APP-AUDIT were
+  wrong because nobody looked them up.
+- **Never put today's date in a test's expectations.** A "ranked today" check against a fixed
+  stamp passed on the day it was written and failed on the next.
+- **New apps and modules must be registered** in `build-iso.sh`, `profiledef.sh` and
+  `ci/verify-iso.sh`. `ci/test-registration.py` enforces it (seven older files are
+  grandfathered by name in that test, and the list can only shrink).
 
 ## Windows Developer Host
 
@@ -128,6 +160,13 @@ The `darkos-grub-repair.service` retries on first installed boot only when the c
 
 `darkos-firstboot-tools` runs via Hyprland `exec-once` on every session start but acts only once: it skips on the live ISO (`/run/archiso`), skips if a completion or decline marker exists in `~/.config/darkos/`, otherwise shows a wofi dialog. If the user accepts, it launches `darkos-tool-groups` in a terminal for interactive sudo-authenticated group selection.
 
+
+**Since 2026-11-07** the Hyprland `exec-once` is `darkos-welcome.py --first-run`, not `darkos-firstboot-tools`.
+The Welcome app (`darkos_shell/welcome.py` holds its decisions) shows once on the installed system, offers the
+same performance-profile and tool-group choices as pages, and reads and writes the same `firstboot-*.done` /
+`.declined` markers, so anyone who answered the old wofi prompts is not asked again (those pages are dropped).
+On the live ISO it is one page with an Install button. `darkos-firstboot-tools` is still shipped but no longer started.
+
 ### Boot and login
 
 Live ISO: `autologin.conf` overrides `getty@tty1.service` to run `darkos-tty1-login`, which autologins as `darkos` only on the live ISO and falls back to a looping getty otherwise. The installed system uses `greetd` + `ReGreet` under `cage` with `GDK_DISABLE=dmabuf,vulkan` and `GSK_RENDERER=cairo` for VMware-safe software rendering.
@@ -139,6 +178,15 @@ Live ISO: `autologin.conf` overrides `getty@tty1.service` to run `darkos-tty1-lo
 `hypridle` handles idle timeout (locks via `darkos-lock`) and before-sleep. `darkos-lock` is a thin wrapper that selects `LIBGL_ALWAYS_SOFTWARE=1` on VMware automatically (via `/sys/module/vmwgfx` or DMI check) to avoid `wl_surface` invalidation, then delegates to `hyprlock`. It accepts `DARKOS_HYPRLOCK_RENDERER=auto|software|hardware` to override the detection. `hyprlock` uses `screencopy_mode = 1` for CPU-based screencopy on the same VMware path. `hypridle` must not dispatch `dpms off` while `hyprlock` owns the session lock.
 
 Hyprlock's config parser treats `#` as a comment delimiter. Any literal `#` inside a string value must be escaped as `##` (e.g. `<span foreground="##9aa4ad">`). This is required for Pango markup color values in `input-field` `placeholder_text` and `fail_text`, and is the same convention catppuccin and other production hyprlock themes use.
+
+
+**AC/battery timings (2026-11-07).** Settings > Power & sleep stores `idle_{ac,battery}_{lock,suspend}` (minutes, 0 = never)
+in `settings.json`. `darkos_shell/power.py` writes the active source's timings to `~/.config/hypr/hypridle.conf`
+(hypridle prefers it over `/etc/xdg/hypr/hypridle.conf`) and restarts `hypridle -c <file>` only when the text changed.
+`darkos-power-watch.py` (exec-once, `flock` single instance, GTK-free, polls `/sys/class/power_supply` every 10 s)
+re-applies when the source changes. Lock and suspend only: **no screen-off**, because `ci/verify-iso.sh` forbids
+`hyprctl dispatch dpms off` (it left VMware guests black under hyprlock) and the generated file keeps that rule.
+AC defaults reproduce the shipped 5 / 30 minutes (test-enforced); battery defaults are 3 / 15.
 
 ### Calamares modules
 
@@ -237,7 +285,11 @@ The AI assistant was removed on 2026-10-17 (and its leftovers on 2026-10-19). Ea
 apt-get install -y --no-install-recommends python3-gi python3-gi-cairo gir1.2-gtk-3.0 \
   gir1.2-vte-2.91 gir1.2-gtklayershell-0.1 gir1.2-poppler-0.18 xvfb dbus-x11 \
   fonts-inter fonts-jetbrains-mono adwaita-icon-theme sway grim mako-notifier \
+<<<<<<< HEAD
+  libnotify-bin waybar wl-clipboard librsvg2-common desktop-file-utils zip
+=======
   libnotify-bin waybar wl-clipboard
+>>>>>>> origin/main
 export PYTHONDONTWRITEBYTECODE=1
 python3 ci/test-app-kit.py        # plain ones
 xvfb-run -a dbus-run-session -- python3 ci/test-design-tokens.py   # GTK ones
@@ -247,7 +299,46 @@ python3 tools/gen-theme.py --check
 
 Screenshots on headless sway (no blur, no Hyprland) are a layout check, not a look check. `__pycache__` must not end up in the repo or a zip handed to the user.
 
+<<<<<<< HEAD
+## Where we left off (2026-11-07)
+
+Branch `calm-dark`: nine commits on top of `0df2946`. The full suite is green at **607 tests** (429 at the start) and
+the headless-sway suite passes (34 scripts launched, 0 tracebacks). The ask was: fix the icons, then work the
+`docs/STATUS.md` backlog in order, as far as it could be made solid and tested.
+
+**Done**, one commit each (narrative in `progress-tracker.md`, steps for you in `TESTING-MANUAL.md` 0e):
+1. App icons, per `docs/APP-AUDIT.md` part 1 (two of its guesses were wrong and are corrected there).
+2. Welcome app. 3. Task Manager (`Ctrl+Shift+Esc`). 4. Settings > Display. 5. Settings > Power & sleep.
+6. Mirror ranking (Settings > Updates card, `darkos-mirrors.py`).
+7. A screenshot pass that fixed six defects the tests could not see, and `ci/test-registration.py`.
+
+**Not done**, in STATUS.md's order: opt-in Store, packaging, Update Center, base diet. Packaging, Update Center
+and the base diet can only be verified by building and booting an ISO, which the sandbox cannot do, so they were
+left alone rather than done blind. The base diet should follow the Store: the starter packs are where Steam, Wine,
+Mail and the rest move to, and its exit test is idle RAM and ISO size before/after.
+
+**Decisions you may want to revisit**
+- No screen-off timeout (see "Lock and idle"). Battery defaults are lock 3 / suspend 15; AC keeps 5 / 30.
+- Welcome replaces the wofi first-boot prompts; `darkos-firstboot-tools` stays shipped but is not started.
+- The Dashboard still runs `ps` on the GTK thread every 2 s while open (an old violation of the first rule above).
+  The Task Manager reads `/proc` on a worker thread. The Dashboard was not touched.
+- Notes and Reader share one icon glyph; it was not on the audit's list.
+- Seven older files are in no ISO registry (`darkos-protect.py`, `darkos-netwatch.py`, `darkos-snapshot.py`,
+  `darkos-integrity-check.py`, and the `continuous_watch`, `palette`, `quarantine` modules). They are grandfathered in
+  `ci/test-registration.py`; registering them is a small separate job.
+
+**Unverified, needs your machine:** all of `TESTING-MANUAL.md` 0e on a real Hyprland session. Most likely to fail:
+`hyprctl keyword monitor` being a silent no-op (the Display card says so if it is), `reflector` + `pkexec` end to
+end, `hypridle -c` picking up the generated file, and Arch's Adwaita having every icon name (0e.3 checks it).
+The new windows were screenshotted without a compositor, so blur and rounding were not seen.
+
+**Next:** run 0e and send back anything that fails; then the Store (starter packs, plus a "pick your extras" page
+in Welcome), then packaging, the Update Center, and the base diet.
+
+## Earlier handoff: 2026-11-02 (Void v2 + app audit)
+=======
 ## Where we left off (2026-11-02)
+>>>>>>> origin/main
 
 Branch `calm-dark` holds the Calm Dark pass (see `docs/STATUS.md`). The user's order of work is: redesign the UI/UX (shell, tokens, CSS and Settings are done; the other apps pick the design up through the shared stylesheet and are unchecked), then **The Void** (the terminal, `darkos-terminal.py`) made more powerful than a normal terminal with BlackArch abilities, then make every app and package work, then the backlog. The user asked for implementation, not coaching, for this work.
 

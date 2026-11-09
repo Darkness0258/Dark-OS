@@ -60,6 +60,13 @@ if [[ -x /usr/local/bin/darkos-perf-apply ]]; then
     /usr/local/bin/darkos-perf-apply --no-reload || true
 fi
 
+# Saved display settings (Settings > Display) live in conf.d/monitors.conf and
+# hyprland.conf sources it. Hyprland reports an error for a missing source
+# file, so make sure it exists, empty on a fresh account.
+mkdir -p "${HOME:-/root}/.config/hypr/conf.d" 2>/dev/null || true
+[[ -e "${HOME:-/root}/.config/hypr/conf.d/monitors.conf" ]] \
+    || : > "${HOME:-/root}/.config/hypr/conf.d/monitors.conf" 2>/dev/null || true
+
 if [[ -x /usr/bin/start-hyprland ]]; then
     exec /usr/bin/start-hyprland "$@"
 fi

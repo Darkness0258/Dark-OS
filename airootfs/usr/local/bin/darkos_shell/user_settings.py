@@ -30,6 +30,13 @@ DEFAULTS = {
     "dock_size": "default",
     "effects": "auto",
     "renderer": "auto",
+    # Idle timings in minutes, 0 = never. AC matches the shipped hypridle.conf
+    # (lock 5, suspend 30); battery is shorter. See darkos_shell/power.py.
+    "idle_ac_lock": 5,
+    "idle_ac_suspend": 30,
+    "idle_battery_lock": 3,
+    "idle_battery_suspend": 15,
+    "mirror_country": "",       # ISO code for Settings > Updates > mirrors; "" = anywhere
 }
 
 # Settings whose value must come from a fixed set. settings.json is
@@ -40,6 +47,10 @@ CHOICES = {
     "dock_size": ("compact", "default", "large"),
     "effects": ("auto", "lite", "full"),
     "renderer": ("auto", "software", "hardware"),
+    "idle_ac_lock": (0, 1, 2, 3, 5, 10, 15, 30),
+    "idle_battery_lock": (0, 1, 2, 3, 5, 10, 15, 30),
+    "idle_ac_suspend": (0, 5, 10, 15, 20, 30, 45, 60, 120),
+    "idle_battery_suspend": (0, 5, 10, 15, 20, 30, 45, 60, 120),
 }
 
 

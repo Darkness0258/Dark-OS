@@ -10,6 +10,28 @@ read, and `pacman.conf`'s `[multilib]`/`[blackarch]` sections.
 
 ## 1. `.desktop` files (23, in `airootfs/usr/share/applications/`)
 
+<<<<<<< HEAD
+**Resolution (2026-11-07): the icon findings below are fixed.** Two corrections to the
+table, found by checking each replacement with `Gtk.IconTheme.lookup_icon` (with the SVG
+pixbuf loader installed and the theme set to Adwaita explicitly) instead of `has_icon`
+alone, which only says a name exists in the index:
+
+- `dashboard`: `utilities-system-monitor-symbolic` does **not** exist either. Now
+  `power-profile-balanced-symbolic` (a gauge).
+- `gallery`: `image-viewer` has no `-symbolic` form. Now `image-x-generic-symbolic`.
+- `clock` -> `alarm-symbolic`, `mail` -> `mail-unread-symbolic`, `devhub` ->
+  `applications-engineering-symbolic`, as proposed. `folder-download` and `edit-paste`
+  resolved bare but are colour/legacy icons in a symbolic family, so they moved too.
+- `calamares` is unchanged: it belongs to the Calamares package, which isn't installed
+  where this was checked **[U]**.
+
+`ci/test-ui-consistency.py` `LauncherIconTests` now fails if any launcher names an icon
+the theme lacks or a non-symbolic one (it failed on the old files: 3 failures). Notes and
+Reader still share one glyph; that was not part of the list. The original findings follow
+unchanged.
+
+=======
+>>>>>>> origin/main
 A script (`/tmp` during the audit, not shipped) parsed every file's `Exec=`,
 `Icon=` and `Categories=` and checked each mechanically: `Exec=`'s first token
 against the file actually existing and being executable in `airootfs/`;

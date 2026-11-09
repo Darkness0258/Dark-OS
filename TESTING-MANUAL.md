@@ -3,7 +3,13 @@
 Build under test: the 2026-10-17/18 change set (AI assistant removed, nine
 wallpapers restored with a Settings picker, Lite/Full effects profile, new
 features, lag fixes) as cleaned up by the 2026-10-19 P0 pass, the 2026-10-22
+<<<<<<< HEAD
+Calm Dark pass, the 2026-11-02 Void v2 + app audit pass, and the 2026-11-07
+backlog pass (icons, Welcome, Task Manager, Display, Power & sleep, mirror
+ranking). This file lists
+=======
 Calm Dark pass, and the 2026-11-02 Void v2 + app audit pass. This file lists
+>>>>>>> origin/main
 feature checks; the boot-truth record to fill in is Appendix B of
 `docs/MASTER-PLAN.md`. Run on **both** the VMware VM and the laptop, and log
 the commit hash (`cat /etc/darkos-build-sha`) and `hyprctl version` every time.
@@ -91,6 +97,63 @@ on live content) — 55 tests total. `bash ci/headless/run-all.sh launch` starts
 `darkos-*.py` bare and checks stderr for a traceback (this is what caught the
 `darkos-integrity-check.py` bug).
 
+<<<<<<< HEAD
+## 0e. Checks specific to the 2026-11-07 backlog pass (after 0d)
+
+Build under test: branch `calm-dark`. What changed: the app icons were fixed, and there is a new Welcome app, a
+Task Manager (`Ctrl+Shift+Esc`), Settings > Display, Settings > Power & sleep, and a "Download mirrors" card in
+Settings > Updates. All of it was tested under headless Xvfb against **fakes** (`hyprctl`, `reflector`, `pkexec`,
+`powerprofilesctl`, `/sys/class/power_supply` and `/proc` trees), and the windows were screenshotted with the real
+stylesheet but no compositor. **None of it has run on Hyprland, on real hardware, or against the real tools.**
+Most likely to fail for environmental reasons: 0e.20-0e.22 (Hyprland's monitor keyword), 0e.26 (hypridle reading
+the generated file) and 0e.32 (reflector + polkit).
+
+| # | Do this | Expected |
+|---|---|---|
+| 0e.1 | Open the Apps overlay (`Super+E`, Apps) and look at the dock | Every app has a real glyph, no grey "missing image" squares. The installer entry (live ISO only) uses `calamares`, which comes from the Calamares package and could not be checked here: tell me if it is a placeholder |
+| 0e.2 | `grep -h '^Icon=' /usr/share/applications/darkos-*.desktop /usr/share/applications/the-void.desktop \| sort -u` | Every line ends in `-symbolic`, except `calamares` |
+| 0e.3 | `for n in $(grep -h '^Icon=' /usr/share/applications/darkos-*.desktop /usr/share/applications/the-void.desktop \| cut -d= -f2 \| grep -- -symbolic \| sort -u); do find /usr/share/icons/Adwaita -name "$n.svg" \| grep -q . \|\| echo "MISSING $n"; done` | Prints nothing. (The names were checked on Ubuntu's Adwaita 46; this checks Arch's.) |
+| 0e.4 | Delete `~/.config/darkos/welcome.done`, log out and in | After about 10 s "Welcome to DarkOS" opens once. No wofi prompt about performance or tools appears |
+| 0e.5 | Press Enter straight away | It goes to the next page. It must not skip the tour |
+| 0e.6 | Look page: click a wallpaper tile | The tile gets a cyan frame and the desktop wallpaper changes within a second or two |
+| 0e.7 | Look page: Effects = Lite, Dock position = Left | `grep -E 'effects\|dock_position' ~/.config/darkos/settings.json` shows both. The dock moves at once; the effects change applies after the next login |
+| 0e.8 | Power page | Lists exactly the profiles in `powerprofilesctl list` (a VM may offer none, and it then says so). Choosing one is reflected by `powerprofilesctl get` |
+| 0e.9 | Tools page: "Choose tool groups..." | The Void opens running the tool-group picker after a sudo prompt. "Don't ask again" creates `~/.config/darkos/firstboot-tools.declined` |
+| 0e.10 | Finish page: Done, then log out and in | The tour does not come back. "Welcome" in the Apps overlay opens it again |
+| 0e.11 | Live ISO | One page: "Install DarkOS" and "Keep trying it", no Back/Skip/Next bar. Install DarkOS starts the installer |
+| 0e.12 | `Ctrl+Shift+Esc` | Task Manager opens: dark table sorted by CPU; DarkOS apps are named like `darkos-files.py`, not `python3`; the CPU and memory bars move |
+| 0e.13 | In the Void: `yes > /dev/null &` | It appears near the top at about 100% CPU within 2-3 s. Select it, End task: it disappears within a second or two |
+| 0e.14 | `sleep 1000 &`, select it, Force quit | A dialog asks first (Cancel is the default button); confirming ends it |
+| 0e.15 | Tick "All users", select a root process | End task and Force quit go dim and the status line says who owns it |
+| 0e.16 | Select the Task Manager's own row, End task | "That is this Task Manager. Close its window instead." |
+| 0e.17 | Select `Hyprland`, End task, then press **Cancel** (do not confirm) | A warning says it closes the whole session |
+| 0e.18 | Minimize the Task Manager for 30 s, then `ps -o %cpu,cmd -C python \| grep taskmgr` | About 0.0% CPU: nothing is sampled while it is hidden |
+| 0e.19 | Settings > Display | One card per screen with its current resolution, refresh rate, scale and orientation; Apply is dim. "Hyprland is not running" means you are not in the Hyprland session |
+| 0e.20 | Pick another resolution, Apply, then do nothing | The screen changes and a banner says "Keep these display settings? Reverting in N s". At 0 it reverts by itself. `cat ~/.config/hypr/conf.d/monitors.conf` has no new `monitor =` line |
+| 0e.21 | Set scale to 125%, Apply, press **Keep changes** | `monitors.conf` has one `monitor = ...` line for that screen. After logging out and in the setting persists |
+| 0e.22 | If a card says "Not applied: Hyprland accepted the command but the screen did not change" | That is plan hazard H1: `hyprctl keyword monitor` is a silent no-op on this Hyprland. Send `hyprctl version` and `hyprctl configerrors` |
+| 0e.23 | Apply a change and close Settings while the banner is up | The previous mode comes back within a couple of seconds |
+| 0e.24 | `hyprctl monitors` | Matches what the cards show |
+| 0e.25 | Settings > Power & sleep | Laptop: AC and battery cards plus "Right now: ...". VM or desktop: only the AC card and "no battery" |
+| 0e.26 | Set "Lock the screen after" to 1 minute (the active source) | `grep timeout ~/.config/hypr/hypridle.conf` shows 60. `pgrep -a hypridle` shows `hypridle -c .../hypridle.conf`. Idle for a minute and the lock screen appears |
+| 0e.27 | Laptop: unplug the charger and wait up to 15 s | `hypridle.conf` switches to the battery timings (default 180 and 900). Plug in and it returns to 300 and 1800 |
+| 0e.28 | Set Suspend earlier than Lock | It is moved after Lock and a note explains why |
+| 0e.29 | `pgrep -fc darkos-power-watch` | `1` |
+| 0e.30 | `systemctl suspend`, then wake | The screen is locked on wake and not black |
+| 0e.31 | Settings > Updates | A "Download mirrors" card says "Not ranked by DarkOS yet" (or when it was ranked) |
+| 0e.32 | Rank mirrors, authenticate | Progress text, then within about two minutes "Ranked N mirrors; fastest: ...". `head -1 /etc/pacman.d/mirrorlist` starts `# Ranked by DarkOS on`; `grep -c '^Server' /etc/pacman.d/mirrorlist` is at least 3; `sudo pacman -Sy` works |
+| 0e.33 | Cancel the password prompt | "Not changed: Cancelled..." and the list is unchanged |
+| 0e.34 | Network off, Rank mirrors | "Not changed: reflector failed..." and `/etc/pacman.d/mirrorlist` is unchanged |
+| 0e.35 | Restore previous list | The earlier list returns; `/etc/pacman.d/mirrorlist.darkos-bak` stays |
+| 0e.36 | `sudo choose-mirror --country DE` | Does what the card does, from a terminal |
+| 0e.37 | Live ISO, Settings > Updates | The card says it does nothing on the live ISO and its controls are dim |
+
+Not run by me, so assume nothing about them: the real `hyprctl keyword monitor`, `reflector`, `pkexec` / the polkit
+prompt, `hypridle -c`, `powerprofilesctl`, swaybg applying a wallpaper, a battery, the Task Manager on a busy
+machine, and how any of the new windows look with blur and rounded corners.
+
+=======
+>>>>>>> origin/main
 ## 0. What was and was not verified before you got this
 
 Verified in a Linux sandbox (Python/GTK/headless sway):
@@ -307,7 +370,9 @@ for t in ci/test-*.py; do xvfb-run -a dbus-run-session -- python3 "$t" || echo "
 All should pass. The workflow runs the same files and `ci/test-ci-coverage.py`
 fails if one is left out. Needed typelibs on Debian/Ubuntu: `gir1.2-gtk-3.0
 gir1.2-gtklayershell-0.1 gir1.2-vte-2.91 gir1.2-gtksource-3.0
-gir1.2-poppler-0.18 python3-gi-cairo xvfb dbus-x11`.
+gir1.2-poppler-0.18 python3-gi-cairo xvfb dbus-x11`, plus `librsvg2-common`
+(without it the icon-loading test skips) and `desktop-file-utils`. 607 tests at the 2026-11-07 pass (429 before it).
+Also run `bash ci/headless/run-all.sh` (real shell on headless sway; needs `sway grim mako waybar`).
 
 ## 9. What to send me when something fails
 
@@ -351,6 +416,15 @@ and a `source` line that I could not check against a real Hyprland.
 - 15 of 21 distinct app icons are legacy (non-symbolic) freedesktop names that
   the installed `adwaita-icon-theme` only ships `-symbolic` forms of (reported
   in `docs/APP-AUDIT.md` part 1, not renamed in this pass).
+<<<<<<< HEAD
+
+Not done in the 2026-11-07 pass, in `docs/STATUS.md` order: the opt-in Store (starter packs, first-run "pick
+your extras"), packaging (PKGBUILDs and a signed repo), the Update Center, and the base diet. The last three can only
+be verified by building and booting an ISO. Also not done: screen-off timeouts (`ci/verify-iso.sh` forbids
+`dpms off` under hyprlock), multi-monitor arrangement and mirroring in Settings > Display (positions are kept as they
+are), and giving Notes and Reader different icons.
+=======
+>>>>>>> origin/main
 
 ## 11. Results table (copy per run; plan Appendix B)
 
@@ -372,4 +446,12 @@ Commit: ________   `hyprctl version`: ________
 | 12 The Void: engagement workspace, set target, tool launcher (0d.8-0d.10, 0d.13-0d.14) | | | |
 | 13 The Void: session logging, save scrollback, command palette (0d.11-0d.12, 0d.16) | | | |
 | 14 The Void: clickable links, right-click menu, Ctrl+click (0d.15) | | | the one item not run in this pass at all |
+<<<<<<< HEAD
+| 15 Icons and Welcome (0e.1-0e.11) | | | |
+| 16 Task Manager (0e.12-0e.18) | | | |
+| 17 Display settings (0e.19-0e.24) | | | 0e.22 is the H1 check |
+| 18 Power & sleep (0e.25-0e.30) | | | needs a laptop for 0e.27 |
+| 19 Mirror ranking (0e.31-0e.37) | | | |
+=======
+>>>>>>> origin/main
 
