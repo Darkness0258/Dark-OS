@@ -285,11 +285,7 @@ The AI assistant was removed on 2026-10-17 (and its leftovers on 2026-10-19). Ea
 apt-get install -y --no-install-recommends python3-gi python3-gi-cairo gir1.2-gtk-3.0 \
   gir1.2-vte-2.91 gir1.2-gtklayershell-0.1 gir1.2-poppler-0.18 xvfb dbus-x11 \
   fonts-inter fonts-jetbrains-mono adwaita-icon-theme sway grim mako-notifier \
-<<<<<<< HEAD
   libnotify-bin waybar wl-clipboard librsvg2-common desktop-file-utils zip
-=======
-  libnotify-bin waybar wl-clipboard
->>>>>>> origin/main
 export PYTHONDONTWRITEBYTECODE=1
 python3 ci/test-app-kit.py        # plain ones
 xvfb-run -a dbus-run-session -- python3 ci/test-design-tokens.py   # GTK ones
@@ -299,7 +295,6 @@ python3 tools/gen-theme.py --check
 
 Screenshots on headless sway (no blur, no Hyprland) are a layout check, not a look check. `__pycache__` must not end up in the repo or a zip handed to the user.
 
-<<<<<<< HEAD
 ## Where we left off (2026-11-07)
 
 Branch `calm-dark`: nine commits on top of `0df2946`. The full suite is green at **607 tests** (429 at the start) and
@@ -336,9 +331,6 @@ The new windows were screenshotted without a compositor, so blur and rounding we
 in Welcome), then packaging, the Update Center, and the base diet.
 
 ## Earlier handoff: 2026-11-02 (Void v2 + app audit)
-=======
-## Where we left off (2026-11-02)
->>>>>>> origin/main
 
 Branch `calm-dark` holds the Calm Dark pass (see `docs/STATUS.md`). The user's order of work is: redesign the UI/UX (shell, tokens, CSS and Settings are done; the other apps pick the design up through the shared stylesheet and are unchecked), then **The Void** (the terminal, `darkos-terminal.py`) made more powerful than a normal terminal with BlackArch abilities, then make every app and package work, then the backlog. The user asked for implementation, not coaching, for this work.
 

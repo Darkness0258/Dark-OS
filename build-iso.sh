@@ -144,7 +144,6 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
-<<<<<<< HEAD
     usr/local/bin/darkos_shell/mirror_card.py
     usr/local/bin/darkos_shell/mirrors.py
     usr/local/bin/darkos_shell/power_page.py
@@ -153,8 +152,6 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/display.py
     usr/local/bin/darkos_shell/procinfo.py
     usr/local/bin/darkos_shell/welcome.py
-=======
->>>>>>> origin/main
     usr/local/bin/darkos_void/__init__.py
     usr/local/bin/darkos_void/catalogue.py
     usr/local/bin/darkos_void/commands.py
@@ -177,7 +174,6 @@ readonly cmp_scripts=(
     usr/local/bin/darkos_shell/tokens.py
     usr/local/bin/darkos_shell/user_settings.py
     usr/local/bin/darkos_shell/wallpapers.py
-<<<<<<< HEAD
     usr/local/bin/darkos_shell/mirror_card.py
     usr/local/bin/darkos_shell/mirrors.py
     usr/local/bin/darkos_shell/power_page.py
@@ -186,8 +182,6 @@ readonly cmp_scripts=(
     usr/local/bin/darkos_shell/display.py
     usr/local/bin/darkos_shell/procinfo.py
     usr/local/bin/darkos_shell/welcome.py
-=======
->>>>>>> origin/main
     usr/local/bin/darkos_void/__init__.py
     usr/local/bin/darkos_void/catalogue.py
     usr/local/bin/darkos_void/commands.py

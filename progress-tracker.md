@@ -381,7 +381,6 @@ context-menu hop on a real pointer device (the regex-matching and action-dispatc
 side of it are both covered; only that one interaction is a manual spot-check item, in
 `TESTING-MANUAL.md`); whether real Arch's `adwaita-icon-theme` has the same symbolic-only
 icon gaps found here on Ubuntu's; ISO build, boot, real BlackArch tool availability.
-<<<<<<< HEAD
 
 ## 2026-11-07 - Backlog pass: icons, Welcome, Task Manager, Display, Power & sleep, mirror ranking
 
@@ -412,5 +411,3 @@ headless sway suite green. Nine commits on `calm-dark`.
   verify-iso.sh. Grandfathered by name rather than silently registered.
 - **Not done:** opt-in Store, packaging, Update Center, base diet (the last three need an ISO build to verify).
 - **Not verified:** nothing ran on Hyprland or real hardware. See `TESTING-MANUAL.md` 0e.
-=======
->>>>>>> origin/main
