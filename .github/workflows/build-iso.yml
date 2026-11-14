@@ -31,6 +31,7 @@ jobs:
       - name: Validate profile sources
         run: |
           set -euo pipefail
+          python ci/test-no-conflict-markers.py
           for script in build-iso.sh profiledef.sh ci/*.sh; do
             bash -n "$script"
           done
