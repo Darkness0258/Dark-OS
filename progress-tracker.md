@@ -411,3 +411,35 @@ headless sway suite green. Nine commits on `calm-dark`.
   verify-iso.sh. Grandfathered by name rather than silently registered.
 - **Not done:** opt-in Store, packaging, Update Center, base diet (the last three need an ISO build to verify).
 - **Not verified:** nothing ran on Hyprland or real hardware. See `TESTING-MANUAL.md` 0e.
+
+## 2026-11-24 - CI crash fix and the opt-in Store
+
+Asked for: read CI for `7bb3a98`, then build the opt-in Store (plan P8) with starter packs and a "pick your extras"
+page. Implement it, run the tests, say what was and was not verified, hand back a patch on top of `origin/main`.
+Tests 607 -> 691, all green on Ubuntu 24.04 (the CI step's 32 commands replayed one by one).
+
+- **CI was red.** The run page is readable without a login but its logs are not, so only the step and the exit code
+  were visible: run 199, "Run Linux backend and native app regressions", exit 139. Runs 196-197 had failed in the same
+  step with exit 1, 198 earlier. The Nov 7 tests had never run on Arch before 199, so nothing says which one crashed.
+- **Finding the crash by fuzzing the Task Manager** (the table most exposed to GTK's model code): random typing,
+  selecting, sorting and re-sampling on the real window aborted in `_gtk_rbtree_*` in 5 of 6 seeds. My first
+  explanation (the filter-then-sort chain itself) was wrong: a standalone harness showed the chain survives, because
+  I had called `refilter()` on the wrong model and counted a Python error as a crash. Corrected, the trigger was the
+  search box's delayed `search-changed` against a visible function reading live text. Comparing four designs over 24
+  seeds x 1500 steps: current chain 5 crashes; committed query string, manual filtering with a sort model, and manual
+  filtering with a self-sorting store, none. Chose the last (fewest GTK layers). Fixed app: 0 of 8 seeds.
+  `ModelStressTests` runs the same load in a child process so a crash is a failing test, not a dead runner.
+- **Not confirmed:** that this is what run 199 hit. The step now has `PYTHONFAULTHANDLER=1` and `set -x`.
+- **Store.** GTK-free `store_catalog` (38 apps, six packs, static `recommend`) and `store_actions` (install/remove
+  terminal scripts with positional arguments, safe app-data deletion, parsers); GTK `store_browse` and `pack_picker`.
+  The scripts are tested by running them for real against fake `sudo`/`flatpak`; deletion only inside a temp HOME.
+  Four deliberate bugs (pre-tick an app, skip the blocked-source check, always delete data, drop "Unscanned") were each
+  caught by a test. Screenshots found four layout defects the tests could not (search row left on the detail page, no
+  padding, stretched permission chips, a stale "Installed" caption).
+- **Mistakes worth keeping:** a mutation of an untracked file was "restored" with `git checkout`, which does nothing
+  for a file git has never seen (found by grepping, fixed by hand); a `pkill -f` matched its own shell; `-P 6` on a
+  one-core sandbox made a 4 minute job time out.
+- **Found and fixed on the way:** the Store's Search-tab notice said AUR and Flatpak installs "stay disabled" while the
+  code enables both.
+- **Not done:** packaging, Update Center, base diet, Remove on the Installed/Updates tabs, README, orphans.
+- **Not verified:** nothing ran against real pacman, flatpak, sudo, the terminal or Hyprland. See `TESTING-MANUAL.md` 0f.

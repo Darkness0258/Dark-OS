@@ -59,7 +59,7 @@ class WelcomeLogicTests(unittest.TestCase):
 
     def test_live_gets_one_page_and_installed_gets_the_tour(self):
         self.assertEqual(welcome.pages_for(True), ("welcome",))
-        self.assertEqual(welcome.pages_for(False), ("welcome", "look", "power", "tools", "finish"))
+        self.assertEqual(welcome.pages_for(False), ("welcome", "look", "power", "extras", "tools", "finish"))
 
     def test_markers_round_trip_and_report_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -75,10 +75,16 @@ class WelcomeLogicTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertTrue(welcome.performance_pending(tmp))
             self.assertTrue(welcome.tools_pending(tmp))
+            self.assertTrue(welcome.extras_pending(tmp))
             welcome.write_marker("firstboot-performance.declined", tmp)
             welcome.write_marker("firstboot-tools.done", tmp)
+            welcome.write_marker("firstboot-extras.declined", tmp)
             self.assertFalse(welcome.performance_pending(tmp))
             self.assertFalse(welcome.tools_pending(tmp))
+            self.assertFalse(welcome.extras_pending(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            welcome.write_marker("firstboot-extras.done", tmp)
+            self.assertFalse(welcome.extras_pending(tmp), "an install that finished is an answer too")
 
     def test_profiles_are_parsed_from_real_powerprofilesctl_output(self):
         self.assertEqual(welcome.parse_profiles(PROFILES),
@@ -131,6 +137,7 @@ class FakeServices:
         self.settings = {"wallpaper_path": "", "effects": "auto", "dock_position": "bottom"}
         self.saved = []
         self.spawned = []
+        self.spawn_ok = True
         self.profile_calls = []
         self.wallpaper_calls = []
         self.profile_done = threading.Event()
@@ -151,7 +158,7 @@ class FakeServices:
 
     def spawn(self, argv):
         self.spawned.append(list(argv))
-        return True
+        return self.spawn_ok
 
     def load_settings(self):
         return dict(self.settings)
@@ -200,13 +207,13 @@ class WelcomeWindowTests(unittest.TestCase):
         win.show_all()
         return win
 
-    def test_installed_tour_has_five_pages_and_walks_to_done(self):
+    def test_installed_tour_has_six_pages_and_walks_to_done(self):
         win = self.window()
-        self.assertEqual(win.pages, ["welcome", "look", "power", "tools", "finish"])
+        self.assertEqual(win.pages, ["welcome", "look", "power", "extras", "tools", "finish"])
         self.assertFalse(win.back_btn.get_sensitive())
         self.assertEqual(win.next_btn.get_label(), "Next")
         seen = [win.current()]
-        for _ in range(4):
+        for _ in range(5):
             win.next_btn.clicked()
             seen.append(win.current())
         self.assertEqual(seen, win.pages)
@@ -240,7 +247,7 @@ class WelcomeWindowTests(unittest.TestCase):
         win.back_btn.clicked()
         self.assertEqual(win.current(), "welcome")
         self.assertFalse(win.back_btn.get_sensitive())
-        self.assertEqual(win.progress.get_text(), "1 of 5")
+        self.assertEqual(win.progress.get_text(), "1 of 6")
 
     def test_skip_marks_it_seen_and_closes(self):
         win = self.window()
@@ -256,6 +263,7 @@ class WelcomeWindowTests(unittest.TestCase):
     def test_old_first_boot_answers_remove_those_pages(self):
         welcome.write_marker("firstboot-performance.done", self.cfg)
         welcome.write_marker("firstboot-tools.declined", self.cfg)
+        welcome.write_marker("firstboot-extras.done", self.cfg)
         win = self.window()
         self.assertEqual(win.pages, ["welcome", "look", "finish"])
 
@@ -317,9 +325,70 @@ class WelcomeWindowTests(unittest.TestCase):
         self.assertTrue(pump(lambda: "nothing to choose" in win.profile_status.get_text()))
         self.assertEqual(win.profile_buttons, {})
 
-    def test_tools_page_opens_the_picker_or_declines_for_good(self):
+    def go_to_extras(self):
         win = self.window()
         for _ in range(3):
+            win.next_btn.clicked()
+        self.assertEqual(win.current(), "extras")
+        return win
+
+    def test_extras_page_opens_with_nothing_ticked_and_changes_nothing(self):
+        win = self.go_to_extras()
+        self.assertEqual(win.extras_picker.selected_count(), 0)
+        self.assertFalse(win.install_extras_btn.get_sensitive(), "nothing ticked: nothing to install")
+        self.assertEqual(self.svc.spawned, [], "opening the page must not start anything")
+        self.assertFalse(welcome.marker_exists(welcome.EXTRAS_DECLINED, self.cfg))
+        self.assertFalse(welcome.marker_exists(welcome.EXTRAS_DONE, self.cfg))
+        self.assertTrue(welcome.extras_pending(self.cfg), "walking past the page is not an answer")
+        win.next_btn.clicked()
+        win.next_btn.clicked()
+        self.assertEqual(self.svc.spawned, [])
+        self.assertTrue(welcome.extras_pending(self.cfg))
+
+    def test_extras_skip_and_install_carry_the_same_weight(self):
+        win = self.go_to_extras()
+        skip = set(win.skip_extras_btn.get_style_context().list_classes())
+        install = set(win.install_extras_btn.get_style_context().list_classes())
+        self.assertEqual(skip, install)
+        self.assertNotIn("primary", skip | install, "neither answer is the highlighted one")
+
+    def test_extras_install_spawns_exactly_what_was_ticked(self):
+        from darkos_shell import store_catalog
+        win = self.go_to_extras()
+        picker = win.extras_picker
+        picker._checks["gimp"][0].set_active(True)
+        picker._checks["anki"][0].set_active(True)
+        self.assertEqual(win.install_extras_btn.get_label(), "Install selected (2)")
+        self.assertTrue(win.install_extras_btn.get_sensitive())
+        win.install_extras_btn.clicked()
+        wanted = [store_catalog.get("gimp"), store_catalog.get("anki")]
+        self.assertEqual(self.svc.spawned[-1], welcome.extras_argv(wanted, self.cfg))
+        self.assertEqual(picker.selected_count(), 0, "a second click cannot start a second install")
+        self.assertFalse(win.install_extras_btn.get_sensitive())
+        self.assertFalse(welcome.marker_exists(welcome.EXTRAS_DONE, self.cfg),
+                         "only the terminal script writes the done marker, and only if everything installed")
+        self.assertTrue(welcome.extras_pending(self.cfg))
+
+    def test_extras_skip_is_remembered_and_the_page_is_gone_next_time(self):
+        win = self.go_to_extras()
+        win.skip_extras_btn.clicked()
+        self.assertTrue(welcome.marker_exists(welcome.EXTRAS_DECLINED, self.cfg))
+        self.assertEqual(self.svc.spawned, [])
+        self.assertFalse(welcome.extras_pending(self.cfg))
+        again = self.window()
+        self.assertNotIn("extras", again.pages)
+
+    def test_extras_install_that_cannot_start_says_so(self):
+        win = self.go_to_extras()
+        self.svc.spawn_ok = False
+        win.extras_picker._checks["gimp"][0].set_active(True)
+        win.install_extras_btn.clicked()
+        self.assertIn("Could not open the installer", win.extras_status.get_text())
+        self.assertEqual(win.extras_picker.selected_count(), 1, "the picks stay so they can try again")
+
+    def test_tools_page_opens_the_picker_or_declines_for_good(self):
+        win = self.window()
+        for _ in range(4):
             win.next_btn.clicked()
         self.assertEqual(win.current(), "tools")
         win.choose_tools_btn.clicked()
@@ -331,7 +400,7 @@ class WelcomeWindowTests(unittest.TestCase):
 
     def test_finish_page_launchers_point_at_scripts_that_exist(self):
         win = self.window()
-        for _ in range(4):
+        for _ in range(5):
             win.next_btn.clicked()
         for name, path in self.mod.QUICK_LAUNCH:
             self.assertTrue((ROOT / "airootfs" / path.lstrip("/")).is_file(), f"{name}: {path}")

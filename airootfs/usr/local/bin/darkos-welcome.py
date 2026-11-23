@@ -23,6 +23,7 @@ from gi.repository import GdkPixbuf, GLib, Gtk  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from darkos_shell import user_settings, wallpapers, welcome  # noqa: E402
 from darkos_shell.app_kit import add_class, run_app  # noqa: E402
+from darkos_shell.pack_picker import PackPicker  # noqa: E402
 
 APP_ID = "org.darkos.Welcome"
 WM_CLASS = "darkos-welcome"
@@ -125,7 +126,7 @@ class WelcomeWindow(Gtk.ApplicationWindow):
 
         builders = {
             "welcome": self._page_welcome, "look": self._page_look, "power": self._page_power,
-            "tools": self._page_tools, "finish": self._page_finish,
+            "extras": self._page_extras, "tools": self._page_tools, "finish": self._page_finish,
         }
         for name in self.pages:
             self.stack.add_named(builders[name](), name)
@@ -168,6 +169,8 @@ class WelcomeWindow(Gtk.ApplicationWindow):
             # Someone who already answered the old first-boot prompts is not asked twice.
             if not welcome.performance_pending(self.svc.cfg):
                 pages.remove("power")
+            if not welcome.extras_pending(self.svc.cfg):
+                pages.remove("extras")
             if not welcome.tools_pending(self.svc.cfg):
                 pages.remove("tools")
         return pages
@@ -234,9 +237,9 @@ class WelcomeWindow(Gtk.ApplicationWindow):
             self.install_btn = install
         else:
             box.pack_start(_label(
-                "A quick tour: pick a look, choose how it uses power, and decide about the "
-                "optional security tools. Everything is optional, and you can reopen this "
-                "any time from the Apps overlay.", "lead"), False, False, 0)
+                "A quick tour: pick a look, choose how it uses power, pick any extra apps, and "
+                "decide about the optional security tools. Everything is optional, and you can "
+                "reopen this any time from the Apps overlay.", "lead"), False, False, 0)
         box.pack_start(_label("Handy shortcuts", "section-title"), False, False, 8)
         grid = Gtk.Grid(column_spacing=18, row_spacing=6)
         for row, (keys, what) in enumerate(TIPS):
@@ -376,6 +379,57 @@ class WelcomeWindow(Gtk.ApplicationWindow):
                           "Profile set." if ok else "Could not change the profile.")
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _page_extras(self):
+        box = _page_box()
+        box.pack_start(_label("Pick your extras", "title"), False, False, 0)
+        box.pack_start(_label(
+            "DarkOS comes without extra apps. If you want some, tick them here. Nothing is ticked, and "
+            "nothing installs until you press Install selected. Arch apps are scanned by Shield before "
+            "they install; Flathub apps are not scanned. You can do this any time from the Store.", "lead"),
+            False, False, 0)
+        self.extras_picker = PackPicker(on_change=self._on_extras_changed)
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(240)
+        scrolled.add(self.extras_picker)
+        box.pack_start(scrolled, True, True, 0)
+        row = Gtk.Box(spacing=10)
+        # Equal weight on purpose: neither answer is the "primary" one.
+        skip = Gtk.Button(label="Skip")
+        add_class(skip, "action-button")
+        skip.connect("clicked", self._on_skip_extras)
+        install = Gtk.Button(label="Install selected")
+        add_class(install, "action-button")
+        install.set_sensitive(False)
+        install.connect("clicked", self._on_install_extras)
+        row.pack_start(skip, False, False, 0)
+        row.pack_start(install, False, False, 0)
+        box.pack_start(row, False, False, 6)
+        self.extras_status = _label("Skipping changes nothing: use Next to carry on.", "body-muted")
+        box.pack_start(self.extras_status, False, False, 0)
+        self.skip_extras_btn = skip
+        self.install_extras_btn = install
+        return box
+
+    def _on_extras_changed(self, count):
+        self.install_extras_btn.set_label("Install selected" if count == 0 else f"Install selected ({count})")
+        self.install_extras_btn.set_sensitive(count > 0)
+
+    def _on_install_extras(self, _button):
+        entries = self.extras_picker.selected_entries()
+        if not entries:
+            return
+        ok = self.svc.spawn(welcome.extras_argv(entries, self.svc.cfg))
+        if ok:
+            self.extras_picker.clear()
+        self.extras_status.set_text(
+            "The installer is open in the Void. Come back here when it finishes." if ok
+            else "Could not open the installer. You can pick apps from the Store instead.")
+
+    def _on_skip_extras(self, _button):
+        welcome.write_marker(welcome.EXTRAS_DECLINED, self.svc.cfg)
+        self.extras_status.set_text("Okay, DarkOS will not ask about this again. The Store has them any time.")
 
     def _page_tools(self):
         box = _page_box()

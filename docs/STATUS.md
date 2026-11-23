@@ -1,11 +1,42 @@
 # DarkOS status
 
-Updated 2026-11-07 (backlog pass: icons, Welcome, Task Manager, Display, Power & sleep, mirror
-ranking, on top of The Void v2 + app audit). Tags are the ones defined in
+Updated 2026-11-24 (a CI crash fix and the opt-in Store, on top of the 2026-11-07 backlog pass:
+icons, Welcome, Task Manager, Display, Power & sleep, mirror ranking). Tags are the ones defined in
 [MASTER-PLAN.md](MASTER-PLAN.md): **[C]** checked in the repo or a sandbox, never on a
 booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgment.
 
 ## What is true now
+
+- **CI crash fix and the opt-in Store, 2026-11-24 [C] (607 -> 691 tests, all green on Ubuntu 24.04).**
+  - **CI was red at `7bb3a98` [C].** Run 199, step "Run Linux backend and native app regressions", exit
+    139 (a segfault). The step's log needs a GitHub login, so which test crashed could not be read [U].
+    Runs 196-197 failed in the same step with exit 1 and 198 in the earlier build-iso.sh step (the conflict
+    markers); run 199 was the first time the Nov 7 tests ran on Arch at all.
+  - **A real crash found in the Task Manager, and fixed [C].** Its table was `ListStore` -> `TreeModelFilter`
+    -> `TreeModelSort`; the filter's visible function read the live search text while the search box fires its
+    signal ~150 ms late. A sample landing in that gap left GTK 3.24's cached filter state stale and corrupted
+    the view's row tree: `_gtk_rbtree_*` assertions abort with asserts on (Ubuntu: exit 134) and would
+    segfault with them off (Arch's build: exit 139). Real window, random typing/selecting/sampling: 5 of 6
+    seeds aborted before, 0 of 8 after. Filtering is now done by hand into one self-sorting `ListStore`
+    (`_sync_rows`). That this is what run 199 hit is [U] until CI is green.
+  - **CI now names the culprit.** That step runs with `PYTHONFAULTHANDLER=1` and `set -x`: the last
+    `+ python ci/test-...` line and the Python stack identify any crash.
+  - **Opt-in Store (plan P8) [C, xvfb + fake pacman/flatpak/sudo].**
+    `darkos_shell/store_catalog.py`: 38 apps (31 Arch, 7 Flathub) and six starter packs (Everyday, Student,
+    Developer, Creator, Gamer, Office); `recommend(profile)` is the one seam and is static. Sizes, permissions
+    and "starts at login" are read live or shown as Unknown, never typed in.
+    `store_actions.py`: the install and remove terminal scripts (arguments positional, never interpolated),
+    safe deletion of an app's own data (only catalogue folders, inside `$HOME`, never through a symlink),
+    parsers for `pacman -Sp/-Si` and Flatpak output.
+    `store_browse.py` + `pack_picker.py`: the Store's **Browse** tab (search, categories, an even grid of equal
+    cards, source badge, a detail page with sizes, permission chips, "Starts at login", Install / Remove...),
+    the **Packs** tab (all unticked; Install selected is the only thing that installs) and the "Keep or
+    delete app data?" dialog. Arch apps say Shield scans them; Flathub apps say **Unscanned**.
+    Welcome has a new page 4 of 6, "Pick your extras": nothing ticked, Skip and Install selected alike.
+    `ci/test-store-catalogue-live.py` checks the 27 catalogue package names that are not already in
+    `packages.x86_64` against real pacman databases; it skips here and runs on the Arch runner only.
+    The Search tab's notice claimed AUR and Flatpak installs "stay disabled" while the code enables them;
+    corrected.
 
 - **Backlog pass, 2026-11-07 [C] (branch `calm-dark`, tests 429 -> 607, all green).** In the order asked:
   - **App icons fixed.** Every launcher now uses a symbolic Adwaita name that exists
@@ -91,14 +122,19 @@ booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgme
 
 ## Not done yet (next session, in this order)
 
-1. **Opt-in Store** (starter packs, first-run "pick your extras"; plan P8).
-2. **Packaging** (PKGBUILDs + signed repo; plan P5). Needs `makepkg` on Arch.
-3. **Update Center** (snapshot before update, bootable rollback; plan P6).
-4. **Base diet** (move Steam, Wine, Mail, etc. out of the base ISO; plan P4). Its exit test
+1. **Packaging** (PKGBUILDs + signed repo; plan P5). Needs `makepkg` on Arch.
+2. **Update Center** (snapshot before update, bootable rollback; plan P6).
+3. **Base diet** (move Steam, Wine, Mail, etc. out of the base ISO; plan P4). Its exit test
    is idle RAM and ISO size before/after plus both kernels booting, so it needs an ISO build.
-   Do it after the Store has the packs those apps move into.
+   The packs it moves apps into now exist: Geary and Kooha are in Everyday; Steam, Lutris, Wine (with
+   gecko, mono, winetricks) and Waydroid are in Gamer. Not in any pack yet: `lib32-vulkan-intel/radeon/nouveau`
+   and `lib32-nvidia-utils` (a GPU-specific choice, and a provider prompt in the gate is unverified).
+   `ci/test-gaming.py` and `ci/test-store.py` still expect the apps in the base list.
+4. **Store follow-ups:** the Installed and Updates tabs have no Remove / data prompt yet (Browse has);
+   README.md is stale (still says "voice assistant", app count 21, now 23); orphans
+   `ci/phase-7-audit.md` and `ci/vmware-calamares-plan.template.json` need a decision.
 
-Items 2-4 can only be verified by building and booting an ISO, which this sandbox cannot do.
+Items 1-3 can only be verified by building and booting an ISO, which this sandbox cannot do.
 They were left alone rather than done blind.
 
 ## What is not verified
@@ -111,8 +147,18 @@ They were left alone rather than done blind.
   (tested on Waybar 0.9.24 and mako 1.8 from Ubuntu 24.04).
 - **That Hyprland accepts `hyprland.conf` on the shipped version [U].** Run
   `hyprctl configerrors` first (plan Appendix B).
-- **The new CI test lines on Arch's package versions [U].** They only import packages the
-  build container already installs, but they have not run there.
+- **Run 199 is red on Arch [C], and its cause is [U].** The Nov 7 tests ran there for the first
+  time and a test exited 139. The Task Manager fix above is the likely cause, found by fuzzing
+  on Ubuntu; it is not confirmed until CI is green. Check the next run's last `+ python ci/test-...`
+  line if it is not.
+- **The Store against the real tools [U].** No real `pacman`, `flatpak`, `sudo` or terminal ran: the
+  tests put fake binaries on a temp PATH and run the real shell scripts against them. Unchecked:
+  `pacman -Sp --print-format %s` on a real system (the live check probes it on CI), the gate chained
+  over several packages (it takes one at a time), a provider prompt inside the gate (Steam's
+  `lib32-vulkan-driver`), `flatpak remote-add --user`, `flatpak remote-info --show-metadata`,
+  `flatpak uninstall --delete-data`, and the Store noticing the terminal closing. The 27 Arch package
+  names are typed from knowledge; CI checks them. The 7 Flathub ids were checked to exist in the Flathub
+  GitHub organisation. TESTING-MANUAL.md 0f lists what to try.
 - **Installer, Btrfs snapshots, ClamAV, firewall on real hardware [U].**
 - **The Void v2's live button-click -> context-menu hop on a real pointer [U].** Every
   other part of split panes/engagement/tool launcher/logging/palette/link-matching ran

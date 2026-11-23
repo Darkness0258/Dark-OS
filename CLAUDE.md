@@ -77,6 +77,21 @@ When in doubt, run the full build and boot the ISO in QEMU.
   `parent.get_visible()`.
 - **GTK 3.24 segfaults if rows are inserted while a `Gtk.TreeModelSort` is set to
   `UNSORTED_SORT_COLUMN_ID`** (a `fill_sort_data` assertion, then a crash). Update rows in place.
+- **Do not put a `Gtk.TreeModelFilter` in front of a view when its visible function reads live
+  state.** The search box fires `search-changed` ~150 ms after the text changes; a row update in that
+  gap leaves the filter's cached state stale and corrupts the view's row tree (`_gtk_rbtree_*`
+  assertions abort, exit 134; a build without asserts, like Arch's, segfaults, exit 139). The Task
+  Manager filters by hand into one self-sorting `ListStore`. `darkos-files.py` still has the old chain;
+  it clears the store before every refill, so it has no stale rows, and it was left alone.
+- **Test a possible GTK crash in a child process.** An abort takes the whole runner with it and says
+  nothing; the child's exit code (134 abort, 139 segfault) and stderr are what the test reports
+  (`ModelStressTests` in `ci/test-taskmgr.py`).
+- **Mutation-check a new test, and back up any untracked file first.** `git checkout` cannot restore a
+  file git has never seen; one mutation of `store_catalog.py` stayed in place until it was noticed.
+- **The Store shows no invented metadata.** Sizes, permissions and "starts at login" are read from
+  pacman/Flatpak or shown as Unknown; a catalogue entry only holds names, source and package ids
+  (`ci/test-store-catalog.py` pins the fields). Scripts that run in the terminal take names as
+  positional arguments, never inside the script text.
 - **Do not trust `hyprctl keyword`'s exit code** (MASTER-PLAN H1). Apply, then read
   `hyprctl -j monitors` back, as Settings > Display does.
 - **A program root runs on a user's behalf takes no file paths.** `darkos-mirrors.py`
@@ -295,7 +310,35 @@ python3 tools/gen-theme.py --check
 
 Screenshots on headless sway (no blur, no Hyprland) are a layout check, not a look check. `__pycache__` must not end up in the repo or a zip handed to the user.
 
-## Where we left off (2026-11-07)
+## Where we left off (2026-11-24)
+
+Branch `calm-dark` was at `7bb3a98`, which also fixed a merge that had committed conflict markers into eight files
+(CI failed on `build-iso.sh`), removed 17 AI-era files that `ci/test-polish.py` `RemovalTests` says must stay gone
+(including a `sudoers.d` rule) and added `ci/test-no-conflict-markers.py`, which runs first in CI. The 2026-11-07
+section below predates that fix; where they differ, this one wins.
+
+**Working on DarkOS from a sandbox.** Clone the public repo and commit on top of `origin/main`; never hand back a zip
+with its own history (that is what caused the merge conflicts). Hand back
+`git format-patch --binary origin/main..HEAD --stdout > fix.mbox` plus the PowerShell commands (`git am`, push), after
+checking the patch applies to a fresh clone and gives the same tree. The user's flow: develop on `calm-dark`,
+`git merge origin/main` into it first, push, then on `main` `git pull --ff-only`, `git merge --no-ff calm-dark`, push both.
+
+**Done this session** (suite 607 -> 691 tests, all green on Ubuntu 24.04; details in `docs/STATUS.md`):
+1. CI run 199 was red (exit 139 in the regression step). Found and fixed a real Task Manager crash, a GTK filter model
+   going stale behind the search box; added `PYTHONFAULTHANDLER` and `set -x` to that step so the next failure names itself.
+2. The opt-in Store: Browse and Packs tabs, a curated catalogue of 38 apps, six starter packs, the data-keep-or-delete
+   dialog, and a "Pick your extras" page in Welcome. New modules `store_catalog`, `store_actions`, `store_browse`,
+   `pack_picker` (registered everywhere `ci/test-registration.py` demands), tests `ci/test-store-catalog.py`,
+   `ci/test-store-browse.py`, `ci/test-store-catalogue-live.py` (runs on the Arch runner only).
+
+**Not done:** packaging, Update Center, base diet (they need an ISO build), the Installed/Updates tabs' Remove, the stale
+README, the two orphan files. **Unverified:** everything that needs real `pacman`/`flatpak`/Hyprland; see
+`TESTING-MANUAL.md` 0f (and 0e, still not run).
+
+**Next:** read CI for the commit after this one. If it is green, run 0e and 0f on the real machine. If it is red, the
+last `+ python ci/test-...` line and the Python stack in that step say which test and where.
+
+## Earlier handoff: 2026-11-07 (backlog pass)
 
 Branch `calm-dark`: nine commits on top of `0df2946`. The full suite is green at **607 tests** (429 at the start) and
 the headless-sway suite passes (34 scripts launched, 0 tracebacks). The ask was: fix the icons, then work the

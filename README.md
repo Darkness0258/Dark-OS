@@ -11,7 +11,7 @@
 
 ---
 
-DarkOS is a real startup product — not a demo, not a theme pack, not a Windows/macOS clone. It combines a daily-drivable Arch Linux base with a cinematic glassmorphism/HUD desktop environment and a voice assistant that can see, hear, and control the whole system.
+DarkOS is a real startup product — not a demo, not a theme pack, not a Windows/macOS clone. It combines a daily-drivable Arch Linux base with a cinematic glassmorphism/HUD desktop environment and a set of native apps built for it.
 
 ## Features
 
@@ -24,7 +24,7 @@ GTK startup checks are not a claim of full daily-driver or hardware acceptance.
 - **Hyprland compositor** — Wayland-native, GPU-accelerated, tiling + floating, spring animations, blur and rounded corners
 - **Cinematic glassmorphism shell** — pure black backgrounds, glass panels with compositor-rendered blur, electric cyan `#00e5ff` primary, neon blue `#2d7bff` secondary
 - **Fast by default** — a Lite effects profile (no blur, shadows or transparency) is the default in virtual machines; Full effects are one setting away (Settings → Performance)
-- **Native and hosted app tiers** — 21 native GTK applications are implemented toward the ~27-app catalog, including Settings, Files, Terminal, Gaming Hub, and basic Mail. The hosted tier includes Firefox, mpv, Geary, GNOME Camera (`snapshot`), Kooha, Wine, Steam, Lutris, and Waydroid. Gaming Hub checks local availability before enabling its launch actions.
+- **Native and hosted app tiers** — 23 native GTK applications are implemented toward the ~27-app catalog, including Settings, Files, Terminal, Gaming Hub, and basic Mail. The hosted tier includes Firefox, mpv, Geary, GNOME Camera (`snapshot`), Kooha, Wine, Steam, Lutris, and Waydroid. Gaming Hub checks local availability before enabling its launch actions.
 - **Calamares graphical installer**
 - **Windows compatibility** via Wine / Bottles / Proton / QEMU/KVM
 
