@@ -58,8 +58,12 @@ jobs:
             desktop-file-validate "$desktop"
           done
       - name: Run Linux backend and native app regressions
+        # PYTHONFAULTHANDLER prints the Python stack when a test dies from a signal (exit 139 = segfault), and
+        # `set -x` echoes each test before it runs, so the last "+ python ci/test-..." line names the culprit.
+        env:
+          PYTHONFAULTHANDLER: "1"
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           python ci/test-app-kit.py
           python ci/test-gaming.py
           python ci/test-network-connect.py
