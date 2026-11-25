@@ -58,8 +58,12 @@ jobs:
             desktop-file-validate "$desktop"
           done
       - name: Run Linux backend and native app regressions
+        # PYTHONFAULTHANDLER prints the Python stack when a test dies from a signal (exit 139 = segfault), and
+        # `set -x` echoes each test before it runs, so the last "+ python ci/test-..." line names the culprit.
+        env:
+          PYTHONFAULTHANDLER: "1"
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           python ci/test-app-kit.py
           python ci/test-gaming.py
           python ci/test-network-connect.py
@@ -88,6 +92,9 @@ jobs:
           xvfb-run -a dbus-run-session -- python ci/test-display.py
           xvfb-run -a dbus-run-session -- python ci/test-power.py
           xvfb-run -a dbus-run-session -- python ci/test-mirrors.py
+          python ci/test-store-catalog.py
+          python ci/test-store-catalogue-live.py
+          xvfb-run -a dbus-run-session -- python ci/test-store-browse.py
           python ci/test-ci-coverage.py
       - name: Seed Chaotic-AUR and BlackArch mirrorlists and keyrings
         run: |

@@ -146,6 +146,10 @@ readonly python_scripts=(
     usr/local/bin/darkos_shell/wallpapers.py
     usr/local/bin/darkos_shell/mirror_card.py
     usr/local/bin/darkos_shell/mirrors.py
+    usr/local/bin/darkos_shell/store_catalog.py
+    usr/local/bin/darkos_shell/store_actions.py
+    usr/local/bin/darkos_shell/pack_picker.py
+    usr/local/bin/darkos_shell/store_browse.py
     usr/local/bin/darkos_shell/power_page.py
     usr/local/bin/darkos_shell/power.py
     usr/local/bin/darkos_shell/display_page.py
@@ -176,6 +180,10 @@ readonly cmp_scripts=(
     usr/local/bin/darkos_shell/wallpapers.py
     usr/local/bin/darkos_shell/mirror_card.py
     usr/local/bin/darkos_shell/mirrors.py
+    usr/local/bin/darkos_shell/store_catalog.py
+    usr/local/bin/darkos_shell/store_actions.py
+    usr/local/bin/darkos_shell/pack_picker.py
+    usr/local/bin/darkos_shell/store_browse.py
     usr/local/bin/darkos_shell/power_page.py
     usr/local/bin/darkos_shell/power.py
     usr/local/bin/darkos_shell/display_page.py

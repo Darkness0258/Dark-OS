@@ -147,6 +147,40 @@ Not run by me, so assume nothing about them: the real `hyprctl keyword monitor`,
 prompt, `hypridle -c`, `powerprofilesctl`, swaybg applying a wallpaper, a battery, the Task Manager on a busy
 machine, and how any of the new windows look with blur and rounded corners.
 
+## 0f. Checks specific to the 2026-11-24 pass: Task Manager fix and the opt-in Store (after 0e)
+
+Build under test: the branch with the Store commit on top of `calm-dark`. What changed: the Task Manager's table no
+longer uses a GTK filter model (CI run 199 had exited 139, a segfault; the cause below is likely, not confirmed), and
+the Store has two new tabs, **Browse** and **Packs**, plus a "Pick your extras" page (4 of 6) in Welcome. All of it
+was tested on Ubuntu 24.04 under Xvfb against **fake** `pacman`, `flatpak` and `sudo`: the real install and remove
+scripts ran, but never against the real tools. **Most likely to fail: 0f.5 (the gate with one package at a time),
+0f.9-0f.10 (Flathub and Flatpak's own commands) and 0f.12 (Steam's provider prompt).**
+
+| # | Do this | Expected |
+|---|---|---|
+| 0f.1 | Task Manager: select a row, then type in the search box for a minute while the list refreshes, clear it, repeat with "All users" on | No crash and no GTK warning in the terminal you started it from. The table always follows the text; if the selected row is filtered out, End task and Force quit go dim |
+| 0f.2 | Open the Store | Opens on **Browse**: 38 cards in an even grid, no banners, nothing featured. Flathub cards say "Flathub · Unscanned" in amber; Arch cards say "Arch repositories". Installed ones (Steam, Geary, Kooha, Lutris, Wine, Waydroid while they are still in the base image) say "Installed". `pacman -Qq \| wc -l` is the same before and after opening it |
+| 0f.3 | Click GIMP (or any Arch app) | Detail page: "Shield scans it before it installs." Download shows a size and "in N packages, dependencies included"; compare with `pacman -Sp --print-format '%s' gimp \| paste -sd+ \| bc`. Disk space is a size or "Unknown". Permissions: "Not sandboxed: runs with your own access". Starts at login: "Known after install" |
+| 0f.4 | Click Install | The Void opens, asks for sudo, Shield downloads, scans and installs. Close it: within a couple of seconds the card says Installed, Remove... replaces Install, and Starts at login says "No autostart entry found" or "Yes: it adds an autostart entry". Compare with `pacman -Ql gimp \| grep xdg/autostart` |
+| 0f.5 | Packs tab: tick Everyday > Geary and Creator > GIMP, then Install selected | One terminal; the gate runs once per package (`darkos-store-gated-install.py`), then it says "Everything you picked is installed". Tell me if any package makes the gate hang or print "choose a provider" |
+| 0f.6 | Same, but turn Wi-Fi off first | "These did not install: ..." naming the packages; the cards still say not installed; no half-state |
+| 0f.7 | Move `clamscan` away (`sudo mv /usr/bin/clamscan /usr/bin/clamscan.off`), reopen the Store | A line in amber says Shield's scanner is not available; Install is dim for Arch apps, with the reason; Flathub apps still install. Move it back afterwards |
+| 0f.8 | Browse: Anki (Flathub) on an account that never added Flathub | Download and Disk space say Unknown, Permissions says Unknown, and a note says Install adds Flathub for your account only |
+| 0f.9 | Install Anki | The Void runs `flatpak remote-add --user --if-not-exists flathub ...` then the install. `flatpak remotes --user` lists flathub. Reopen Anki's page: sizes appear, and the permission chips match `flatpak info --show-permissions net.ankiweb.Anki` (broad ones, like all files, are amber) |
+| 0f.10 | Remove... on Anki, choose "Remove and delete data" | `~/.var/app/net.ankiweb.Anki` is gone. With "Remove, keep my data" it stays. Cancel does nothing at all |
+| 0f.11 | Remove... on an Arch app that has data (Steam, Thunderbird, GIMP) | The dialog lists the real folders with sizes. "Remove, keep my data" leaves them; "Remove and delete data" deletes exactly those folders (nothing else under `~`). If pacman refuses (something depends on it), the data stays even if you chose delete |
+| 0f.12 | Install Steam from Browse | Tell me exactly what the terminal shows. Steam depends on a virtual `lib32-vulkan-driver`; if the gate's `pacman -Sp` stops to ask for a provider, the install will fail or hang and that is a real finding |
+| 0f.13 | Packs tab | Six packs in order: Everyday, Student, Developer, Creator, Gamer, Office. Nothing ticked; Install selected is dim and says "Nothing selected". LibreOffice is in three packs: ticking it in one ticks it in all. "Select all" flips to "Clear". Already-installed apps are dim and say Installed |
+| 0f.14 | `rm ~/.config/darkos/welcome.done ~/.config/darkos/firstboot-extras.*`, log out and in, press Next three times | Page 4 of 6, "Pick your extras": nothing ticked, **Skip** and **Install selected** look the same, Install selected is dim. Walking past it with Next writes nothing |
+| 0f.15 | Tick two apps, Install selected (2) | One terminal. On success `~/.config/darkos/firstboot-extras.done` exists; on any failure it does not |
+| 0f.16 | Skip | `~/.config/darkos/firstboot-extras.declined` exists; run Welcome again and the page is gone |
+| 0f.17 | `diff <(ls /etc/xdg/autostart ~/.config/autostart) <(...)` before and after installing a pack | The Store itself adds nothing. Any new entry belongs to an app you installed, and that app's page says so |
+
+Not run by me, so assume nothing about them: real `pacman -Sp --print-format %s` output (CI probes it), the gate chained
+over several packages, a provider prompt inside the gate, `flatpak remote-add --user`, `flatpak remote-info
+--show-metadata`, `flatpak uninstall --delete-data`, whether the Store notices the terminal closing, and the Store
+window with blur and rounded corners.
+
 ## 0. What was and was not verified before you got this
 
 Verified in a Linux sandbox (Python/GTK/headless sway):

@@ -18,6 +18,9 @@ PERFORMANCE_DONE = "firstboot-performance.done"
 PERFORMANCE_DECLINED = "firstboot-performance.declined"
 TOOLS_DONE = "firstboot-tools.done"
 TOOLS_DECLINED = "firstboot-tools.declined"
+# "Pick your extras" (the starter packs). Same rule as the others: asked once, and never again after an answer.
+EXTRAS_DONE = "firstboot-extras.done"
+EXTRAS_DECLINED = "firstboot-extras.declined"
 
 # power-profiles-daemon names -> what the user reads.
 PROFILE_LABELS = (
@@ -26,7 +29,7 @@ PROFILE_LABELS = (
     ("power-saver", "Power saver"),
 )
 
-PAGES_INSTALLED = ("welcome", "look", "power", "tools", "finish")
+PAGES_INSTALLED = ("welcome", "look", "power", "extras", "tools", "finish")
 # The live session keeps nothing across a reboot, so a tour of settings would
 # only mislead. The live page offers the one thing that matters there.
 PAGES_LIVE = ("welcome",)
@@ -97,6 +100,20 @@ def performance_pending(cfg=None):
 
 def tools_pending(cfg=None):
     return not (marker_exists(TOOLS_DONE, cfg) or marker_exists(TOOLS_DECLINED, cfg))
+
+
+def extras_pending(cfg=None):
+    return not (marker_exists(EXTRAS_DONE, cfg) or marker_exists(EXTRAS_DECLINED, cfg))
+
+
+def extras_argv(entries, cfg=None):
+    """Terminal command that installs the ticked apps and writes the done marker only if every one installed.
+
+    Raises ValueError for an empty pick, so a click with nothing ticked can never open a terminal.
+    """
+    from darkos_shell import store_actions
+    cfg = cfg or config_dir()
+    return store_actions.install_argv(entries, cfg, os.path.join(cfg, EXTRAS_DONE))
 
 
 def parse_profiles(powerprofilesctl_list_output):

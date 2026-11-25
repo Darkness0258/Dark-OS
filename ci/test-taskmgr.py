@@ -3,9 +3,12 @@
 
     xvfb-run -a dbus-run-session -- python3 ci/test-taskmgr.py
 """
+import faulthandler
 import importlib.util
 import os
+import random
 import signal
+import subprocess
 import sys
 import tempfile
 import threading
@@ -238,6 +241,16 @@ class ProcReaderTests(unittest.TestCase):
                     self.fail(f"{name} calls os.{node.attr}: read /proc, do not run `ps`")
             self.assertNotIn("subprocess", imported, f"{name} must read /proc, not run `ps`")
 
+    def test_the_table_is_not_behind_a_gtk_filter_model(self):
+        """A visible function that reads live state, plus a search box that fires its signal ~150 ms late,
+        corrupts GTK 3.24's row tree (abort with asserts, segfault without: CI run 199 exited 139)."""
+        import ast
+        tree = ast.parse((BIN / "darkos-taskmgr.py").read_text(encoding="utf-8"))
+        banned = {"TreeModelFilter", "TreeModelSort", "filter_new", "set_visible_func"}
+        for node in ast.walk(tree):
+            name = node.attr if isinstance(node, ast.Attribute) else node.id if isinstance(node, ast.Name) else None
+            self.assertNotIn(name, banned, f"darkos-taskmgr.py uses {name}: filter by hand in _sync_rows instead")
+
 
 class FakeSampler:
     def __init__(self, snapshots):
@@ -320,10 +333,10 @@ class TaskManagerWindowTests(unittest.TestCase):
         return win
 
     def visible_pids(self, win):
-        return [row[self.mod.COL_PID] for row in win.sorted]
+        return [row[self.mod.COL_PID] for row in win.store]
 
     def select(self, win, pid):
-        for row in win.sorted:
+        for row in win.store:
             if row[self.mod.COL_PID] == pid:
                 win.tree.get_selection().select_iter(row.iter)
                 return
@@ -353,13 +366,13 @@ class TaskManagerWindowTests(unittest.TestCase):
         win.apply_snapshot(self.base)
         win.all_users_check.set_active(True)
         win.search.set_text("fire")
-        win.filter.refilter()
+        win.refilter()
         self.assertEqual(self.visible_pids(win), [100])
         win.search.set_text("201")
-        win.filter.refilter()
+        win.refilter()
         self.assertEqual(self.visible_pids(win), [201])
         win.search.set_text("root")
-        win.filter.refilter()
+        win.refilter()
         self.assertEqual(sorted(self.visible_pids(win)), [200, 201])
 
     def test_my_process_can_be_ended_without_a_dialog(self):
@@ -514,6 +527,46 @@ class TaskManagerWindowTests(unittest.TestCase):
         self.assertTrue(win._on_key(win, Event(Gdk.KEY_Escape)))
         self.assertEqual(win.search.get_text(), "")
 
+    def test_a_sample_landing_before_the_late_search_signal_leaves_a_consistent_table(self):
+        win = self.window()
+        win.apply_snapshot(self.base)
+        self.select(win, 100)
+        win.search.set_text("notes")        # the search box fires its own signal ~150 ms later
+        win.apply_snapshot(snap(P(100, "firefox", cpu=41.0), P(101, "darkos-notes.py", cpu=2.0),
+                                P(102, "Hyprland", cpu=3.0)))      # ...and a sample arrives first
+        self.assertEqual(self.visible_pids(win), [101], "the table follows the text the moment a sample lands")
+        self.assertEqual(sorted(win.iters), [101], "iters only hold rows that are in the table")
+        win.refilter()                      # the late signal changes nothing
+        self.assertEqual(self.visible_pids(win), [101])
+        win.search.set_text("")
+        win.refilter()
+        self.assertEqual(sorted(self.visible_pids(win)), [100, 101, 102])
+
+    def test_hiding_the_selected_row_clears_the_selection_and_the_buttons(self):
+        win = self.window()
+        win.apply_snapshot(self.base)
+        self.select(win, 101)
+        self.assertTrue(win.end_btn.get_sensitive())
+        win.search.set_text("firefox")
+        win.refilter()
+        self.assertIsNone(win.selected_proc())
+        self.assertFalse(win.end_btn.get_sensitive())
+        self.assertFalse(win.force_btn.get_sensitive())
+        win.search.set_text("notes")
+        win.refilter()
+        self.assertEqual(self.visible_pids(win), [101])
+        self.assertIsNone(win.selected_proc(), "a row that comes back is not silently re-selected")
+
+    def test_rows_that_stay_visible_keep_their_iter_and_selection_through_a_filter_change(self):
+        win = self.window()
+        win.apply_snapshot(self.base)
+        self.select(win, 101)
+        before = win.iters[101]
+        win.search.set_text("notes")
+        win.refilter()
+        self.assertIs(win.iters[101], before)
+        self.assertEqual(win.selected_proc().pid, 101)
+
     def test_the_launcher_binding_and_registration_exist(self):
         conf = (ROOT / "airootfs/etc/xdg/hypr/hyprland.conf").read_text(encoding="utf-8")
         self.assertIn("bind = CTRL SHIFT, Escape, exec, python /usr/local/bin/darkos-taskmgr.py", conf)
@@ -521,5 +574,78 @@ class TaskManagerWindowTests(unittest.TestCase):
         self.assertIn("StartupWMClass=darkos-taskmgr", desktop)
 
 
+STRESS_NAMES = ("firefox", "sshd", "Hyprland", "bash", "python3", "kworker", "darkos-notes.py", "mako", "waybar")
+
+
+def stress(seed, seconds=2.5):
+    """Type, select, sort and re-sample at random, the way a person and the 2 s timer do together.
+
+    Runs in a child process (see ModelStressTests): the failure it hunts is GTK aborting or segfaulting, which
+    would take the whole test runner down with it and say nothing about where.
+    """
+    rnd = random.Random(seed)
+    mod = load_module()
+    app = Gtk.Application(application_id="org.darkos.TaskManagerStress", flags=Gio.ApplicationFlags.NON_UNIQUE)
+    app.register(None)
+    ctx = GLib.MainContext.default()
+
+    def random_snap():
+        pids = rnd.sample(range(1, 120), rnd.randint(0, 60))
+        return snap(*[P(pid, rnd.choice(STRESS_NAMES) + str(rnd.randint(0, 3)), cpu=round(rnd.random() * 100, 1),
+                        uid=rnd.choice((0, 1000, 1000)), rss=rnd.randint(0, 2**30)) for pid in pids])
+
+    sort_columns = (mod.COL_NAME, mod.COL_PID, mod.COL_CPU, mod.COL_RSS, mod.COL_USER, mod.COL_THREADS, mod.COL_STATE)
+    deadline = time.monotonic() + seconds
+    rounds = 0
+    while time.monotonic() < deadline:
+        win = mod.TaskManagerWindow(app, sampler=FakeSampler([random_snap()]), my_uid=1000, interval_ms=40,
+                                    killer=lambda pid, force=False: (True, "ok"))
+        win.show_all()
+        for _ in range(300):
+            roll = rnd.random()
+            if roll < 0.40:
+                win.apply_snapshot(random_snap())
+            elif roll < 0.55:
+                win.search.set_text(rnd.choice(("", "fire", "d", "py", "zzz", "1", "bash2")))   # signal comes later
+            elif roll < 0.65:
+                win.all_users_check.set_active(not win.all_users_check.get_active())
+            elif roll < 0.80:
+                win.store.set_sort_column_id(rnd.choice(sort_columns),
+                                             rnd.choice((Gtk.SortType.ASCENDING, Gtk.SortType.DESCENDING)))
+            else:
+                rows = list(win.store)
+                if rows:
+                    win.tree.get_selection().select_iter(rnd.choice(rows).iter)
+            for _ in range(rnd.randint(0, 3)):
+                ctx.iteration(False)
+        win.refilter()
+        text = win.search.get_text()
+        expected = sorted(pid for pid, proc in win.procs.items()
+                          if (win.show_all_users or proc.uid == 1000) and procinfo.matches(proc, text))
+        shown = sorted(row[mod.COL_PID] for row in win.store)
+        if shown != expected:
+            print(f"seed {seed} round {rounds}: table {shown[:10]} != filter {expected[:10]}", file=sys.stderr)
+            return 3
+        win.destroy()
+        rounds += 1
+    print(f"seed {seed}: {rounds} rounds, table matched the filter every time")
+    return 0
+
+
+@unittest.skipUnless(GTK, "no display (run under xvfb-run)")
+class ModelStressTests(unittest.TestCase):
+    def test_typing_selecting_sorting_and_resampling_together_never_crash_gtk(self):
+        for seed in (1, 2, 3):
+            result = subprocess.run(
+                [sys.executable, "-X", "faulthandler", str(Path(__file__).resolve()), "--stress", str(seed)],
+                capture_output=True, text=True, timeout=120)
+            self.assertEqual(result.returncode, 0,
+                             f"seed {seed} exited {result.returncode} (134 = GTK abort, 139 = segfault):\n"
+                             f"{(result.stderr or result.stdout)[-1500:]}")
+
+
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--stress":
+        faulthandler.enable()
+        sys.exit(stress(int(sys.argv[2])))
     sys.exit(unittest.main(verbosity=1))

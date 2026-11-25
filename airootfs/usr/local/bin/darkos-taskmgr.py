@@ -50,8 +50,8 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
         self.killer = killer or procinfo.end_task
         self.my_uid = os.getuid() if my_uid is None else my_uid
         self.interval_ms = interval_ms
-        self.procs = {}       # pid -> procinfo.Proc (the source of truth for rules)
-        self.iters = {}       # pid -> Gtk.TreeIter in the base store (iters persist)
+        self.procs = {}       # pid -> procinfo.Proc, every process in the last snapshot (the rules read this)
+        self.iters = {}       # pid -> Gtk.TreeIter of the rows now in the table (only rows that pass the filter)
         self.snapshot = None
         self.timer_id = None
         self._quick_id = None   # the one-shot second sample after opening
@@ -99,7 +99,7 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
         self.search = Gtk.SearchEntry()
         self.search.set_placeholder_text("Search by name, PID or user  (Ctrl+F)")
         self.search.get_accessible().set_name("Search processes")
-        self.search.connect("search-changed", lambda *_: self.filter.refilter())
+        self.search.connect("search-changed", lambda *_: self.refilter())
         self.all_users_check = Gtk.CheckButton(label="All users")
         self.all_users_check.connect("toggled", self._on_all_users)
         self.pause_btn = Gtk.ToggleButton(label="Pause")
@@ -123,11 +123,14 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
         return bar
 
     def _build_table(self):
+        # One flat ListStore that sorts itself and holds only the rows that pass the filter. Do NOT put a
+        # Gtk.TreeModelFilter (or a TreeModelSort over one) in front of the view: its visible function reads live
+        # state (the search text, the process table), the search box only fires its signal ~150 ms after the text
+        # changes, and a snapshot that lands in between leaves GTK 3.24's cached filter state stale. The view's
+        # row tree is then corrupted: debug builds abort in _gtk_rbtree_*, release builds (Arch's) segfault.
+        # Filtering by hand (_sync_rows) keeps the model the only copy of what is shown.
         self.store = Gtk.ListStore(int, str, float, int, str, int, str, str, str, str)
-        self.filter = self.store.filter_new()
-        self.filter.set_visible_func(self._visible)
-        self.sorted = Gtk.TreeModelSort(model=self.filter)
-        self.tree = Gtk.TreeView(model=self.sorted)
+        self.tree = Gtk.TreeView(model=self.store)
         self.tree.get_accessible().set_name("Processes")
         add_class(self.tree, "darkos-list")  # the design system's table look (Files uses it too);
         # without it GTK draws a white grid with near-white text on Calm Dark
@@ -153,7 +156,7 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
             column.set_resizable(True)
             column.set_expand(expand)
             self.tree.append_column(column)
-        self.sorted.set_sort_column_id(COL_CPU, Gtk.SortType.DESCENDING)
+        self.store.set_sort_column_id(COL_CPU, Gtk.SortType.DESCENDING)
         selection = self.tree.get_selection()
         selection.set_mode(Gtk.SelectionMode.SINGLE)
         selection.connect("changed", lambda *_: self._sync_buttons())
@@ -164,18 +167,19 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
         return scroller
 
     # -- filtering ----------------------------------------------------------
-    def _visible(self, model, it, _data):
-        proc = self.procs.get(model[it][COL_PID])
-        if proc is None:
-            return False
+    def _passes(self, proc):
         if not self.show_all_users and proc.uid != self.my_uid:
             return False
         return procinfo.matches(proc, self.search.get_text())
 
+    def refilter(self):
+        """Apply the search text and the All users switch to the rows now in the table."""
+        self._sync_rows()
+        self._sync_buttons()
+
     def _on_all_users(self, button):
         self.show_all_users = button.get_active()
-        self.filter.refilter()
-        self._sync_buttons()
+        self.refilter()
 
     # -- sampling (worker thread; the timer only runs while on screen) -------
     def _start_timer(self):
@@ -238,29 +242,32 @@ class TaskManagerWindow(Gtk.ApplicationWindow):
                 f"{p.cpu:.1f}%", procinfo.human_bytes(p.rss)]
 
     def apply_snapshot(self, snap):
-        """Update rows in place (no clear/refill), so selection and scroll survive.
+        """Take a new sample and bring the table in line with it.
 
-        Only rows whose text changed are touched, so the sort model re-sorts a
-        handful of rows per tick, not the table. (Do not "freeze" it with
-        UNSORTED_SORT_COLUMN_ID while inserting: GTK 3.24 segfaults in
-        fill_sort_data.)
+        Rows are updated in place (no clear/refill), so selection and scroll survive, and only rows whose text
+        changed are touched, so GTK re-sorts a handful of rows per tick, not the table.
         """
         self.snapshot = snap
-        present = set()
-        for p in snap.procs:
-            present.add(p.pid)
-            self.procs[p.pid] = p
-            row = self._row(p)
-            it = self.iters.get(p.pid)
-            if it is None:
-                self.iters[p.pid] = self.store.append(row)
-            elif list(self.store[it]) != row:
-                self.store.set(it, list(range(len(row))), row)
-        for pid in [pid for pid in self.iters if pid not in present]:
-            self.store.remove(self.iters.pop(pid))
-            self.procs.pop(pid, None)
+        self.procs = {p.pid: p for p in snap.procs}
+        self._sync_rows()
         self._update_summary(snap)
         self._sync_buttons()
+
+    def _sync_rows(self):
+        """Make the table hold exactly the processes that pass the filter, touching only what changed."""
+        for pid, proc in self.procs.items():
+            it = self.iters.get(pid)
+            if not self._passes(proc):
+                if it is not None:
+                    self.store.remove(self.iters.pop(pid))
+                continue
+            row = self._row(proc)
+            if it is None:
+                self.iters[pid] = self.store.append(row)
+            elif list(self.store[it]) != row:
+                self.store.set(it, list(range(len(row))), row)
+        for pid in [pid for pid in self.iters if pid not in self.procs]:
+            self.store.remove(self.iters.pop(pid))
 
     def _update_summary(self, snap):
         self.cpu_label.set_text(f"CPU  {snap.cpu_percent:.0f}%")

@@ -104,20 +104,32 @@ class StoreWindow(Gtk.ApplicationWindow):
         self._flatpak_ready = shutil.which("flatpak") is not None
         self.connect("destroy", self._on_destroy)
 
+        # Browse and Packs are the curated, opt-in front door; Search all is the old pacman/AUR/Flathub search.
+        from darkos_shell import store_browse  # imported here so the backend tests can load this file without GTK
+        self._browse_services = store_browse.Services(shield_ready=self._shield_ready,
+                                                      flatpak_ready=self._flatpak_ready)
+        self.browse_page = store_browse.BrowsePage(self._browse_services)
+        self.packs_page = store_browse.PacksPage(self._browse_services)
         notebook = Gtk.Notebook()
         add_class(notebook, "terminal-tabs")
-        notebook.append_page(self._build_search_tab(), Gtk.Label(label="Search"))
+        notebook.append_page(self.browse_page, Gtk.Label(label="Browse"))
+        notebook.append_page(self.packs_page, Gtk.Label(label="Packs"))
+        notebook.append_page(self._build_search_tab(), Gtk.Label(label="Search all"))
         notebook.append_page(self._build_installed_tab(), Gtk.Label(label="Installed"))
         notebook.append_page(self._build_updates_tab(), Gtk.Label(label="Updates"))
         notebook.append_page(self._build_compat_tab(), Gtk.Label(label="Compatibility"))
         self.add(notebook)
+        self.browse_page.refresh()      # read-only: what is installed
+        self.packs_page.refresh()
 
     def _shield_notice(self):
         if self._shield_ready:
             text = (
                 "Installing a pacman package downloads it, scans it with Shield, and "
                 "installs only if it comes back clean — one sudo prompt in a terminal "
-                "you can watch. AUR and Flatpak installs are not gated yet and stay disabled."
+                "you can watch. AUR packages are cloned for you to review, then built, scanned and "
+                "installed. Flatpak apps are not scanned by Shield: Flatpak checks their signature and "
+                "sandboxes them."
             )
         else:
             text = (
@@ -130,6 +142,7 @@ class StoreWindow(Gtk.ApplicationWindow):
 
     def _on_destroy(self, *_):
         self._closed = True
+        self._browse_services.closed = True
         self._queued_jobs.clear()
 
     def _submit_job(self, key, work, apply_result):
@@ -478,8 +491,8 @@ class StoreWindow(Gtk.ApplicationWindow):
 
         box.pack_start(Gtk.Label(
             label="Status is read from installed commands. Steam, Lutris, Wine, and "
-                  "Waydroid are supplied by the Phase 7 image; use Gaming Hub for their "
-                  "launcher and detailed compatibility status.",
+                  "Waydroid are optional: Browse and the Gamer pack install and remove them. "
+                  "Gaming Hub shows their launcher and detailed compatibility status.",
             xalign=0, wrap=True,
         ), False, False, 16)
         self._submit_job("compatibility", self._collect_compatibility, self._apply_compatibility)

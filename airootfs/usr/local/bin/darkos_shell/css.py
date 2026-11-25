@@ -55,6 +55,16 @@ selection {
 .stub-text { color: ${TEXT_MUTED}; }
 .flag-text { color: ${WARNING}; font-weight: 600; }
 
+/* Store: source badge and permission chips. The words carry the meaning; the colour only echoes it. */
+.source-badge, .perm-chip {
+    border: 1px solid ${BORDER_CONTROL};
+    border-radius: ${RADIUS_CONTROL}px;
+    padding: 0 ${SPACE_SM}px;
+    color: ${TEXT_MUTED};
+    font-size: ${FS_CAPTION}px;
+}
+.source-badge.unscanned, .perm-chip.broad { border-color: ${WARNING}; color: ${WARNING}; }
+
 /* ── Surfaces ── */
 .app-window { background-color: ${BASE}; }
 

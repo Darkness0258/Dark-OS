@@ -133,6 +133,7 @@ class LauncherIconTests(unittest.TestCase):
 NEW_UI_FILES = (
     "darkos-welcome.py", "darkos-taskmgr.py", "darkos_shell/display_page.py",
     "darkos_shell/power_page.py", "darkos_shell/mirror_card.py",
+    "darkos_shell/pack_picker.py", "darkos_shell/store_browse.py",
 )
 BUTTON_CLASSES = {"action-button", "toggle-button", "icon-button", "dock-icon-button"}
 
