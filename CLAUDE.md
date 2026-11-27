@@ -103,6 +103,14 @@ When in doubt, run the full build and boot the ISO in QEMU.
   (`librsvg2-common`) and the theme set to Adwaita explicitly. `has_icon` only says a name
   is in the index, and this sandbox's default theme is Yaru. Two guesses in APP-AUDIT were
   wrong because nobody looked them up.
+- **This sandbox's Adwaita (46) is older than the ISO's.** Adwaita 48 deleted the symbolic
+  emblems and 50's legacy set restored only `emblem-important` and `emblem-system`, so
+  `emblem-ok-symbolic` passed the icon test here, failed on the Arch runner and drew a
+  placeholder on the ISO. A theme lookup only sees the host's theme: `RemovedIconTests` in
+  `ci/test-ui-consistency.py` pins the nine names that are gone. To see what the runner sees,
+  put GNOME's `adwaita-icon-theme` tag 51.0 and `adwaita-icon-theme-legacy` tag 46.2 (GitHub
+  mirrors) in a fake `XDG_DATA_DIRS` share directory that symlinks everything in `/usr/share`
+  except `icons/Adwaita`, and run the tests with it.
 - **Never put today's date in a test's expectations.** A "ranked today" check against a fixed
   stamp passed on the day it was written and failed on the next.
 - **New apps and modules must be registered** in `build-iso.sh`, `profiledef.sh` and
@@ -311,6 +319,14 @@ python3 tools/gen-theme.py --check
 Screenshots on headless sway (no blur, no Hyprland) are a layout check, not a look check. `__pycache__` must not end up in the repo or a zip handed to the user.
 
 ## Where we left off (2026-11-24)
+
+**2026-11-26 update.** CI for the 2026-11-24 patch was red in `ci/test-ui-consistency.py`: `emblem-ok-symbolic`
+(named by `darkos-gaming.py` and `darkos-devhub.py`) is not in current Adwaita, so those two status rows drew the
+generic placeholder on the ISO as well. Fixed with `object-select-symbolic`; `RemovedIconTests` guards it where the
+sandbox can see it (suite 691 -> 692). The step stops at the first failure, so the tests after that one, including
+everything added on Nov 7 and Nov 24, had still never run to the end on Arch. Replayed here with Adwaita 51 as the
+icon theme all 32 commands pass, which is not a CI result. Runs 196-197 probably died on this same test (their logs
+were unreadable, so unverified). Everything below still applies.
 
 Branch `calm-dark` was at `7bb3a98`, which also fixed a merge that had committed conflict markers into eight files
 (CI failed on `build-iso.sh`), removed 17 AI-era files that `ci/test-polish.py` `RemovalTests` says must stay gone

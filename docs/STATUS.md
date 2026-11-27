@@ -1,12 +1,28 @@
 # DarkOS status
 
-Updated 2026-11-24 (a CI crash fix and the opt-in Store, on top of the 2026-11-07 backlog pass:
-icons, Welcome, Task Manager, Display, Power & sleep, mirror ranking). Tags are the ones defined in
-[MASTER-PLAN.md](MASTER-PLAN.md): **[C]** checked in the repo or a sandbox, never on a
+Updated 2026-11-26 (a CI icon fix, on top of the 2026-11-24 CI crash fix and opt-in Store and the
+2026-11-07 backlog pass: icons, Welcome, Task Manager, Display, Power & sleep, mirror ranking). Tags are
+the ones defined in [MASTER-PLAN.md](MASTER-PLAN.md): **[C]** checked in the repo or a sandbox, never on a
 booted DarkOS; **[R]** reported, not checked; **[U]** unverified; **[J]** judgment.
 
 ## What is true now
 
+- **CI icon fix, 2026-11-26 [C] (691 -> 692 tests).**
+  - **The 2026-11-24 patch was red in `ci/test-ui-consistency.py` [R].** From the log: `emblem-ok-symbolic`, named
+    by `darkos-gaming.py` and `darkos-devhub.py`, was the only symbolic icon the UI uses that the runner's theme
+    did not have.
+  - **Cause [C].** Adwaita 48 deleted the symbolic emblems (upstream NEWS 48.alpha, issue #287). The legacy set 50
+    restored (issue #316) has `emblem-important` and `emblem-system`, not `emblem-ok`. The ISO and the runner take
+    current Adwaita from Arch, so the DevHub tool status and the Gaming probe status drew the generic placeholder on
+    the ISO too. The sandbox's Ubuntu 24.04 has Adwaita 46, which still has the icon, so the test passed here.
+  - **Reproduced and fixed [C].** With upstream Adwaita 51.0 plus AdwaitaLegacy 46.2 as the only `Adwaita`, the test
+    failed with the CI's exact message; both apps now use `object-select-symbolic`, which is in Adwaita 46 and 51 and
+    loads at 16 and 24 px in both. `RemovedIconTests` pins the nine emblem names that are gone and fails on the old
+    code in the stock sandbox.
+  - **The rest of the step [U on Arch].** The step stops at the first failure, so the tests after this one had not run
+    to the end on Arch. Replayed here with Adwaita 51 as the icon theme, all 32 commands pass; that is Ubuntu's GTK
+    and Python 3.12, so it is not a CI result. This failure is older than the 2026-11-24 patch (the two lines date from
+    September, the test from 2026-10-27); that runs 196-197 failed on it is likely but unverified.
 - **CI crash fix and the opt-in Store, 2026-11-24 [C] (607 -> 691 tests, all green on Ubuntu 24.04).**
   - **CI was red at `7bb3a98` [C].** Run 199, step "Run Linux backend and native app regressions", exit
     139 (a segfault). The step's log needs a GitHub login, so which test crashed could not be read [U].
