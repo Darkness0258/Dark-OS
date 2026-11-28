@@ -147,7 +147,7 @@ class DevHubWindow(Gtk.ApplicationWindow):
         for argv in checks:
             ok, output = run_tool(argv)
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            status_icon = "emblem-ok-symbolic" if ok else "dialog-warning-symbolic"
+            status_icon = "object-select-symbolic" if ok else "dialog-warning-symbolic"
             row.pack_start(Gtk.Image.new_from_icon_name(status_icon, Gtk.IconSize.MENU), False, False, 0)
             text = f"{argv[0]}: " + (output.strip().splitlines()[0] if ok and output.strip() else output if not ok else "OK")
             row.pack_start(Gtk.Label(label=text, xalign=0), True, True, 0)

@@ -443,3 +443,23 @@ Tests 607 -> 691, all green on Ubuntu 24.04 (the CI step's 32 commands replayed 
   code enables both.
 - **Not done:** packaging, Update Center, base diet, Remove on the Installed/Updates tabs, README, orphans.
 - **Not verified:** nothing ran against real pacman, flatpak, sudo, the terminal or Hyprland. See `TESTING-MANUAL.md` 0f.
+
+## 2026-11-26 - CI icon fix
+
+Asked for: fix the red CI for the 2026-11-24 patch first (the failing log was pasted); packaging, the Update Center and
+the base diet come after the ISO build has run on this. Tests 691 -> 692.
+
+- **CI was red in `ci/test-ui-consistency.py`.** `emblem-ok-symbolic`, used by the DevHub and Gaming status rows, is not
+  in the runner's Adwaita: Adwaita 48 deleted the symbolic emblems and 50's legacy set did not bring this one back.
+  The ISO takes the same Adwaita, so both rows drew the generic placeholder there too.
+- **Why the sandbox could not see it.** Ubuntu 24.04 ships Adwaita 46, which still has the icon. Reproduced by making
+  upstream Adwaita 51.0 plus AdwaitaLegacy 46.2 the only `Adwaita` (a fake `XDG_DATA_DIRS`): the test then failed with
+  the CI's exact message and passed after the fix.
+- **Fix.** `object-select-symbolic` in both apps (it is in Adwaita 46 and 51, and `lookup_icon` plus a real load worked
+  at 16 and 24 px in both). `RemovedIconTests` pins the nine emblem names Adwaita removed; it needs no icon theme and
+  fails on the old code in the stock sandbox.
+- **The other commands in the step.** CI stops at the first failure, so the 17 after this one had not run to the end on
+  Arch. All 32 commands pass here with Adwaita 51 as the icon theme (Ubuntu's GTK 3.24 and Python 3.12).
+- **Not verified:** a real Arch run (Python 3.14, Arch's GTK), `ci/test-store-catalogue-live.py` (needs `pacman`, skips
+  here), the ISO build, and anything on Hyprland.
+- **Not done:** packaging, Update Center, base diet, the Remove prompt on the Store's Installed and Updates tabs.

@@ -694,7 +694,7 @@ class GamingWindow(Gtk.ApplicationWindow):
 
             status_icon = self._status_icons.get(key)
             if status_icon is not None:
-                icon_name = "emblem-ok-symbolic" if status.probe_ok else "dialog-warning-symbolic"
+                icon_name = "object-select-symbolic" if status.probe_ok else "dialog-warning-symbolic"
                 status_icon.set_from_icon_name(icon_name, Gtk.IconSize.LARGE_TOOLBAR)
 
             launch_button = self._launch_buttons.get(key)

@@ -35,21 +35,53 @@ except (ImportError, ValueError):
 
 SYMBOLIC = re.compile(r'"([a-z][a-z0-9]*(?:-[a-z0-9]+)*-symbolic)"')
 
+# Symbolic emblems that Adwaita 48 deleted (adwaita-icon-theme NEWS 48.alpha,
+# "symbolic: remove emblems", issue #287) and that 50 did not bring back: its
+# legacy set (50.rc, issue #316) restored emblem-important and emblem-system only.
+GONE_FROM_ADWAITA = frozenset({
+    "emblem-default-symbolic", "emblem-documents-symbolic", "emblem-favorite-symbolic",
+    "emblem-music-symbolic", "emblem-ok-symbolic", "emblem-photos-symbolic",
+    "emblem-shared-symbolic", "emblem-synchronizing-symbolic", "emblem-videos-symbolic",
+})
+
+
+def symbolic_icons_by_file():
+    """{icon name: {source file names}} for every "...-symbolic" name the UI writes."""
+    found = {}
+    sources = glob.glob(str(BIN / "*.py")) + glob.glob(str(BIN / "darkos_shell/*.py"))
+    for path in sources:
+        for name in SYMBOLIC.findall(Path(path).read_text(encoding="utf-8")):
+            found.setdefault(name, set()).add(os.path.basename(path))
+    return found
+
+
+def describe(names_by_file):
+    return ", ".join(f"{n} ({', '.join(sorted(f))})" for n, f in sorted(names_by_file.items()))
+
 
 @unittest.skipUnless(GTK_AVAILABLE, "GTK not available")
 class IconTests(unittest.TestCase):
     def test_every_symbolic_icon_the_ui_names_exists_in_the_theme(self):
         theme = Gtk.IconTheme.get_default()
-        sources = glob.glob(str(BIN / "*.py")) + glob.glob(str(BIN / "darkos_shell/*.py"))
-        missing = {}
-        for path in sources:
-            for name in SYMBOLIC.findall(Path(path).read_text(encoding="utf-8")):
-                if not theme.has_icon(name):
-                    missing.setdefault(name, set()).add(os.path.basename(path))
+        missing = {n: f for n, f in symbolic_icons_by_file().items() if not theme.has_icon(n)}
         self.assertEqual(
             missing, {},
-            "icons the theme doesn't have render as a generic placeholder: "
-            + ", ".join(f"{n} ({', '.join(sorted(f))})" for n, f in sorted(missing.items())),
+            "icons the theme doesn't have render as a generic placeholder: " + describe(missing),
+        )
+
+
+class RemovedIconTests(unittest.TestCase):
+    """The ISO and the CI runner take current Adwaita from the Arch repos, which
+    no longer has emblem-ok-symbolic and its siblings, so the Gaming and DevHub
+    status rows drew the generic placeholder there. This sandbox's Ubuntu 24.04
+    ships Adwaita 46, which still has them: the theme lookup above passes here
+    and fails on the runner. This check needs no icon theme, so it fails here too."""
+
+    def test_the_ui_names_no_icon_current_adwaita_dropped(self):
+        dropped = {n: f for n, f in symbolic_icons_by_file().items() if n in GONE_FROM_ADWAITA}
+        self.assertEqual(
+            dropped, {},
+            "Adwaita 48+ no longer ships these (object-select-symbolic is the tick): " + describe(dropped),
         )
 
 
